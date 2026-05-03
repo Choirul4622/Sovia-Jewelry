@@ -55,6 +55,10 @@ class SoviaAPI {
         return await this.call('processForm', formData);
     }
 
+    static async updateRepairStatus(repairNumber, newStatus) {
+        return await this.call('updateRepairStatus', { repairNumber, newStatus });
+    }
+
     static async getAllRepairs() {
         return await this.call('getAllRepairs');
     }
