@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sovia Jewelry - Premium Repair System</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+    <!-- Initial Loading -->
+    <div id="initialLoading" class="initial-loading">
+        <div class="spinner" style="width: 50px; height: 50px;"></div>
+        <p style="margin-top: 20px; color: var(--primary);">Memuat Kemewahan...</p>
+    </div>
+
+    <!-- Header -->
+    <header class="header">
+        <div class="header-content">
+            <img src="https://soviajewelry.com/wp-content/uploads/2022/08/NEW-LOGO-SOVIA-COLOUR-4.png" alt="Sovia Jewelry" class="logo">
+            <div class="header-text">
+                <h1>Repair & Production</h1>
+                <p>Premium Management System</p>
+            </div>
+        </div>
+    </header>
+
+    <main class="container">
+        <!-- Tabs / Navigation -->
+        <div style="display: flex; gap: 10px; margin-bottom: 30px; overflow-x: auto; padding-bottom: 5px;">
+            <button class="btn btn-primary" id="navSubmit">Submit Baru</button>
+            <button class="btn btn-secondary" id="navSearch">Cek Status</button>
+            <button class="btn btn-secondary" id="navDashboard">Dashboard Admin</button>
+        </div>
+
+        <div id="alertContainer" class="alert"></div>
+
+        <!-- Submission Form Section -->
+        <section id="submissionSection" class="fade-in">
+            <form id="repairForm">
+                <!-- Step 1: Transaksi -->
+                <div class="card">
+                    <div class="card-header" data-target="transactionInfo">
+                        <i class="fas fa-receipt"></i> Informasi Transaksi
+                    </div>
+                    <div class="card-content" id="transactionInfo">
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="repairDate" class="required">Tanggal Repair</label>
+                                <input type="date" id="repairDate" name="repairDate" required>
+                            </div>
+                            <div class="form-group">
+                                <label for="deadlineDate" class="required">Tanggal Deadline</label>
+                                <input type="date" id="deadlineDate" name="deadlineDate" required>
+                            </div>
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="repairNumber">Nomor Repair</label>
+                                <input type="text" id="repairNumber" name="repairNumber" readonly placeholder="Otomatis">
+                            </div>
+                            <div class="form-group">
+                                <label for="storeName" class="required">Store / Sales</label>
+                                <select id="storeName" name="storeName" required>
+                                    <option value="">Pilih Store</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Step 2: Customer -->
+                <div class="card">
+                    <div class="card-header" data-target="customerInfo">
+                        <i class="fas fa-user"></i> Data Customer
+                    </div>
+                    <div class="card-content" id="customerInfo">
+                        <div class="form-group">
+                            <label for="customerName" class="required">Nama Lengkap</label>
+                            <input type="text" id="customerName" name="customerName" required>
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="customerPhone" class="required">Nomor HP / WhatsApp</label>
+                                <input type="tel" id="customerPhone" name="customerPhone" required>
+                            </div>
+                            <div class="form-group">
+                                <label for="customerCity" class="required">Kota / Kabupaten</label>
+                                <select id="customerCity" name="customerCity" required>
+                                    <option value="">Pilih Kota</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label for="customerAddress" class="required">Alamat Lengkap</label>
+                            <textarea id="customerAddress" name="customerAddress" rows="2" required></textarea>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Step 3: Product Details -->
+                <div class="card">
+                    <div class="card-header" data-target="productDetails">
+                        <i class="fas fa-ring"></i> Rincian Produk
+                    </div>
+                    <div class="card-content" id="productDetails">
+                        <!-- Cowok Section -->
+                        <h3 style="color: var(--primary); margin-bottom: 15px; font-size: 1rem;">PRODUK PRIA</h3>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label>Bahan & Kadar</label>
+                                <select id="bahanCowok" name="bahanCowok">
+                                    <option value="">Pilih Bahan</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label>Jenis Repair</label>
+                                <select id="jenisRepairCowok" name="jenisRepairCowok" class="jenis-repair">
+                                    <option value="">Pilih Jenis</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label>Gambar Model</label>
+                                <div style="display: flex; gap: 10px;">
+                                    <input type="url" id="gambarModelCowok" name="gambarModelCowok" placeholder="URL Gambar">
+                                    <input type="file" id="fileCowok" accept="image/*" style="display:none">
+                                    <button type="button" class="btn btn-secondary" onclick="document.getElementById('fileCowok').click()"><i class="fas fa-camera"></i></button>
+                                </div>
+                            </div>
+                            <div class="form-group">
+                                <label>Catatan</label>
+                                <input type="text" id="catatanModelCowok" name="catatanModelCowok">
+                            </div>
+                        </div>
+
+                        <hr style="border-color: var(--glass-border); margin: 30px 0;">
+
+                        <!-- Cewek Section -->
+                        <h3 style="color: var(--primary); margin-bottom: 15px; font-size: 1rem;">PRODUK WANITA</h3>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label>Bahan & Kadar</label>
+                                <select id="bahanCewek" name="bahanCewek">
+                                    <option value="">Pilih Bahan</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label>Jenis Repair</label>
+                                <select id="jenisRepairCewek" name="jenisRepairCewek" class="jenis-repair">
+                                    <option value="">Pilih Jenis</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label>Gambar Model</label>
+                                <div style="display: flex; gap: 10px;">
+                                    <input type="url" id="gambarModelCewek" name="gambarModelCewek" placeholder="URL Gambar">
+                                    <input type="file" id="fileCewek" accept="image/*" style="display:none">
+                                    <button type="button" class="btn btn-secondary" onclick="document.getElementById('fileCewek').click()"><i class="fas fa-camera"></i></button>
+                                </div>
+                            </div>
+                            <div class="form-group">
+                                <label>Catatan</label>
+                                <input type="text" id="catatanModelCewek" name="catatanModelCewek">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Action Bar -->
+                <div style="display: flex; gap: 20px; justify-content: flex-end; margin-top: 40px;">
+                    <button type="button" class="btn btn-secondary" id="resetBtn">Reset</button>
+                    <button type="button" class="btn btn-secondary" id="previewBtn">Preview</button>
+                    <button type="submit" class="btn btn-primary" id="submitBtn">Simpan Data</button>
+                </div>
+            </form>
+        </section>
+
+        <!-- Search Section (Placeholder for now) -->
+        <section id="searchSection" class="fade-in" style="display: none;">
+            <div class="card">
+                <div class="card-header"><i class="fas fa-search"></i> Lacak Repair</div>
+                <div class="card-content">
+                    <div class="form-group">
+                        <label>Masukkan Nomor Repair</label>
+                        <div style="display: flex; gap: 10px;">
+                            <input type="text" id="searchQuery" placeholder="REP-XXX-XXXXXX-XXXXXX">
+                            <button class="btn btn-primary" id="doSearch">Cari</button>
+                        </div>
+                    </div>
+                    <div id="searchResults" style="margin-top: 30px;"></div>
+                </div>
+            </div>
+        </section>
+        <!-- Dashboard Section -->
+        <section id="dashboardSection" class="fade-in" style="display: none;">
+            <div class="card">
+                <div class="card-header" style="justify-content: space-between;">
+                    <span><i class="fas fa-chart-line"></i> Dashboard Repair</span>
+                    <button class="btn btn-secondary" style="padding: 5px 12px; font-size: 0.8rem;" id="refreshDashboard">
+                        <i class="fas fa-sync"></i> Refresh
+                    </button>
+                </div>
+                <div class="card-content" style="overflow-x: auto;">
+                    <table style="width: 100%; border-collapse: collapse; min-width: 600px;">
+                        <thead>
+                            <tr style="text-align: left; border-bottom: 1px solid var(--glass-border); color: var(--text-muted); font-size: 0.85rem;">
+                                <th style="padding: 12px 8px;">No. Repair</th>
+                                <th style="padding: 12px 8px;">Customer</th>
+                                <th style="padding: 12px 8px;">Store</th>
+                                <th style="padding: 12px 8px;">Deadline</th>
+                                <th style="padding: 12px 8px;">Status</th>
+                                <th style="padding: 12px 8px;">Aksi</th>
+                            </tr>
+                        </thead>
+                        <tbody id="dashboardTableBody">
+                            <!-- Data will be injected here -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <!-- Modal Preview -->
+    <div id="previewModal" class="modal" style="display:none; position: fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.8); z-index:2000; overflow-y:auto; backdrop-filter: blur(10px);">
+        <div class="modal-content card" style="max-width: 800px; margin: 50px auto;">
+            <div class="card-header" style="justify-content: space-between;">
+                <span><i class="fas fa-eye"></i> Preview Invoice</span>
+                <button onclick="document.getElementById('previewModal').style.display='none'" style="background:none; border:none; color:white; cursor:pointer;"><i class="fas fa-times"></i></button>
+            </div>
+            <div class="card-content" id="previewBody">
+                <!-- Preview data will be injected here -->
+            </div>
+            <div class="card-content" style="display: flex; gap: 10px; justify-content: center; border-top: 1px solid var(--glass-border);">
+                <button class="btn btn-secondary" id="printPDF"><i class="fas fa-print"></i> Cetak PDF</button>
+                <button class="btn btn-primary" id="saveAndPrint"><i class="fas fa-save"></i> Simpan & Cetak</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="js/api.js"></script>
+    <script src="js/main.js"></script>
+</body>
+</html>
