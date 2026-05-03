@@ -3,6 +3,7 @@
  * Communicates with Google Apps Script Web App
  */
 
+
 const CONFIG = {
     // URL WEB APP GAS AKTIF
     SCRIPT_URL: 'https://script.google.com/macros/s/AKfycbwaJsUPiuxnwVt2Rn_ALJrkUK8aaWwu7E5Z2F7cKkc8s5kuDCyiuif-PKs3dkUY1GJEvw/exec' 
