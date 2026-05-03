@@ -235,8 +235,11 @@ async function loadDashboard() {
                         </span>
                     </td>
                     <td style="padding: 12px 8px;">
-                        <button class="btn btn-secondary" style="padding: 4px 8px; font-size: 0.8rem;" onclick="openRepairDetail('${d.repairNumber}')">
+                        <button class="btn btn-secondary" style="padding: 4px 8px; font-size: 0.8rem;" onclick="openRepairDetail('${d.repairNumber}')" title="Detail">
                             <i class="fas fa-eye"></i>
+                        </button>
+                        <button class="btn btn-primary" style="padding: 4px 8px; font-size: 0.8rem;" onclick="changeStatus('${d.repairNumber}', '${d.Status || 'Baru'}')" title="Update Status">
+                            <i class="fas fa-edit"></i>
                         </button>
                     </td>
                 `;
@@ -251,6 +254,28 @@ async function loadDashboard() {
         document.getElementById('initialLoading').style.display = 'none';
     }
 }
+
+window.changeStatus = async (repairNumber, currentStatus) => {
+    const nextStatus = currentStatus === 'Baru' ? 'Proses' : 
+                       currentStatus === 'Proses' ? 'Selesai' : 'Baru';
+    
+    if (confirm(`Ubah status ${repairNumber} dari "${currentStatus}" ke "${nextStatus}"?`)) {
+        try {
+            document.getElementById('initialLoading').style.display = 'flex';
+            const result = await SoviaAPI.updateRepairStatus(repairNumber, nextStatus);
+            if (result.success) {
+                showAlert(result.message, 'success');
+                loadDashboard();
+            } else {
+                showAlert(result.message, 'error');
+            }
+        } catch (error) {
+            showAlert('Gagal update status: ' + error.message, 'error');
+        } finally {
+            document.getElementById('initialLoading').style.display = 'none';
+        }
+    }
+};
 
 async function handlePreview() {
     const formData = gatherFormData();
