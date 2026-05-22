@@ -870,14 +870,19 @@ function resetForm() {
     State.activeEditId = null;
     document.getElementById('repair-entry-form').reset();
     
-    // Regenerate unique number
-    let branchCode = State.currentUser.store_code === 'ALL' ? 'HQ' : State.currentUser.store_code;
-    document.getElementById('rep-number').value = generateRepairID(branchCode);
-    
-    // Auto populate sales/store
-    const activeStore = State.masterData.stores.find(s => s.code === State.currentUser.store_code);
-    const storeDesc = activeStore ? activeStore.name : 'Corporate Headquarters';
-    document.getElementById('rep-sales-store').value = `${storeDesc} (${State.currentUser.username})`;
+    if (State.currentUser) {
+        // Regenerate unique number
+        let branchCode = State.currentUser.store_code === 'ALL' ? 'HQ' : State.currentUser.store_code;
+        document.getElementById('rep-number').value = generateRepairID(branchCode);
+        
+        // Auto populate sales/store
+        const activeStore = State.masterData.stores.find(s => s.code === State.currentUser.store_code);
+        const storeDesc = activeStore ? activeStore.name : 'Corporate Headquarters';
+        document.getElementById('rep-sales-store').value = `${storeDesc} (${State.currentUser.username})`;
+    } else {
+        document.getElementById('rep-number').value = '';
+        document.getElementById('rep-sales-store').value = '';
+    }
 
     // Reset ring checks & panels
     document.getElementById('ring-cowok-active').checked = true;
@@ -1780,7 +1785,7 @@ async function pushDataToGAS(action, payload) {
             method: 'POST',
             mode: 'cors',
             headers: {
-                'Content-Type': 'application/json'
+                'Content-Type': 'text/plain;charset=utf-8'
             },
             body: JSON.stringify({ action, payload })
         });
