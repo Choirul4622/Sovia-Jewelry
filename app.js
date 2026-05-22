@@ -26,8 +26,21 @@ const CONFIG = {
     DB_NAME: 'SoviaRepairDB',
     DB_VERSION: 1,
     // Google Apps Script Deploy URL
-    GAS_API_URL: 'https://script.google.com/macros/s/AKfycbwaJsUPiuxnwVt2Rn_ALJrkUK8aaWwu7E5Z2F7cKkc8s5kuDCyiuif-PKs3dkUY1GJEvw/exec', 
+    GAS_API_URL: 'https://script.google.com/macros/s/AKfycbwaJsUPiuxnwVt2Rn_ALJrkUK8aaWwu7E5Z2F7cKkc8s5kuDCyiuif-PKs3dkUY1GJEvw/exec',
 };
+
+// --- UNIVERSAL IMAGE LOADER (BYPASS GOOGLE DRIVE COOKIE BLOCK) ---
+function resolveImageUrl(url) {
+    if (!url || typeof url !== 'string') return '';
+    if (url.startsWith('data:image')) return url;
+    if (url === '[Gagal Upload Gambar]' || url === '[Gagal Upload]') return '';
+    const match = url.match(/(?:id=|file\/d\/)([^&/]+)/);
+    if (match && match[1]) {
+        return `https://lh3.googleusercontent.com/d/${match[1]}`;
+    }
+    return url;
+}
+
 
 // ==========================================================================
 // 1. DATABASE LAYER (IndexedDB Engine)
@@ -49,12 +62,12 @@ function initDatabase() {
 
         request.onupgradeneeded = (event) => {
             const db = event.target.result;
-            
+
             // Create Transaction Store
             if (!db.objectStoreNames.contains('repair_transactions')) {
                 db.createObjectStore('repair_transactions', { keyPath: 'repair_number' });
             }
-            
+
             // Create Sync Queue Store
             if (!db.objectStoreNames.contains('sync_queue')) {
                 db.createObjectStore('sync_queue', { autoIncrement: true });
@@ -112,23 +125,23 @@ function seedDatabase(transaction) {
     // 3. Predefined Catalog Services/Items
     const catalogStore = transaction.objectStore('master_catalog');
     const defaultCatalog = [
-        { id: 'CAT-001', name: 'Ukir Laser Dalam Cincin', category: 'Jasa', price: 50000 },
-        { id: 'CAT-002', name: 'Ukir Laser Luar Cincin', category: 'Jasa', price: 75000 },
-        { id: 'CAT-003', name: 'Kotak Cincin Beludru Premium', category: 'Barang', price: 95000 },
-        { id: 'CAT-004', name: 'Kotak Cincin Kayu Rustic', category: 'Barang', price: 150000 },
-        { id: 'CAT-005', name: 'Lap Polishing Kain Microfiber', category: 'Barang', price: 15000 },
-        { id: 'CAT-006', name: 'Grafir Timbul Huruf', category: 'Jasa', price: 120000 }
+        { id: 'CAT-001', name: 'Ukir Laser Dalam Cincin', category: 'Jasa', price: 50000, modal_price: 20000 },
+        { id: 'CAT-002', name: 'Ukir Laser Luar Cincin', category: 'Jasa', price: 75000, modal_price: 30000 },
+        { id: 'CAT-003', name: 'Kotak Cincin Beludru Premium', category: 'Barang', price: 95000, modal_price: 40000 },
+        { id: 'CAT-004', name: 'Kotak Cincin Kayu Rustic', category: 'Barang', price: 150000, modal_price: 70000 },
+        { id: 'CAT-005', name: 'Lap Polishing Kain Microfiber', category: 'Barang', price: 15000, modal_price: 5000 },
+        { id: 'CAT-006', name: 'Grafir Timbul Huruf', category: 'Jasa', price: 120000, modal_price: 50000 }
     ];
     defaultCatalog.forEach(c => catalogStore.put(c));
 
     // 4. Predefined Metal Materials
     const metalStore = transaction.objectStore('master_metals');
     const defaultMetals = [
-        { id: 'MET-001', name: 'Emas Kuning 18K (75%)', price_per_gram: 1100000, custom_fee: 250000 },
-        { id: 'MET-002', name: 'Emas Putih 18K (75%)', price_per_gram: 1150000, custom_fee: 300000 },
-        { id: 'MET-003', name: 'Palladium 50%', price_per_gram: 750000, custom_fee: 400000 },
-        { id: 'MET-004', name: 'Platinum 95%', price_per_gram: 1250000, custom_fee: 450000 },
-        { id: 'MET-005', name: 'Perak 925 (Sterling Silver)', price_per_gram: 60000, custom_fee: 100000 }
+        { id: 'MET-001', name: 'Emas Kuning 18K (75%)', price_per_gram: 1100000, custom_fee: 250000, modal_per_gram: 950000 },
+        { id: 'MET-002', name: 'Emas Putih 18K (75%)', price_per_gram: 1150000, custom_fee: 300000, modal_per_gram: 990000 },
+        { id: 'MET-003', name: 'Palladium 50%', price_per_gram: 750000, custom_fee: 400000, modal_per_gram: 620000 },
+        { id: 'MET-004', name: 'Platinum 95%', price_per_gram: 1250000, custom_fee: 450000, modal_per_gram: 1050000 },
+        { id: 'MET-005', name: 'Perak 925 (Sterling Silver)', price_per_gram: 60000, custom_fee: 100000, modal_per_gram: 25000 }
     ];
     defaultMetals.forEach(m => metalStore.put(m));
 
@@ -147,8 +160,8 @@ function seedDatabase(transaction) {
     // 6. Predefined Goldsmiths / Workshops
     const workshopStore = transaction.objectStore('master_workshops');
     const defaultWorkshops = [
-        { id: 'WKS-001', name: 'Workshop Mertosanan Potorono', phone: '6281122334455', address: 'Potorono, Banguntapan, Bantul' },
-        { id: 'WKS-002', name: 'Workshop Kotagede Sentra Emas', phone: '6285566778899', address: 'Kotagede, Yogyakarta' }
+        { id: 'WKS-001', name: 'Workshop Mertosanan Potorono', phone: '6281122334455', address: 'Potorono, Banguntapan, Bantul', modal_repair_cowok: 50000, modal_repair_cewek: 50000 },
+        { id: 'WKS-002', name: 'Workshop Kotagede Sentra Emas', phone: '6285566778899', address: 'Kotagede, Yogyakarta', modal_repair_cowok: 60000, modal_repair_cewek: 60000 }
     ];
     defaultWorkshops.forEach(w => workshopStore.put(w));
 
@@ -223,7 +236,32 @@ function seedDatabase(transaction) {
         dp2_receipt_url: '',
         status: 'Synced',
         created_by: 'sales_bekasi',
-        created_at: new Date('2026-05-22T13:38:32').toISOString()
+        created_at: new Date('2026-05-22T13:38:32').toISOString(),
+        dp_approval: 'Pending',
+        pelunasan_approval: 'Pending',
+        render_model_url: '',
+        render_approval: 'Pending',
+        realpict_url: '',
+        realpict_approval: 'Pending',
+        refund_receipt_url: '',
+        final_pickup_status: 'Pending',
+        assigned_designer: '',
+        render_cowok_url: '',
+        render_cewek_url: '',
+        render_rejection_reason: '',
+        cowok_weight_final: '',
+        cewek_weight_final: '',
+        branch_receipt_status: 'Pending',
+        branch_receipt_comment: '',
+        is_reproduct: 'FALSE',
+        qa_status: 'Pending',
+        qa_notes: '',
+        qa_checked_by: '',
+        qa_checked_at: '',
+        qc_status: 'Pending',
+        qc_notes: '',
+        qc_checked_by: '',
+        qc_checked_at: ''
     };
     txnStore.put(mockTx);
 }
@@ -297,7 +335,7 @@ function handleLogin(username, password) {
     if (user) {
         State.currentUser = user;
         localStorage.setItem('sovia_session', JSON.stringify(user));
-        
+
         showToast('Login berhasil! Selamat bekerja.', 'success');
         showMainApp();
         return true;
@@ -342,7 +380,7 @@ async function showMainApp() {
 
     // Populate user profile info in sidebar
     document.getElementById('user-display-name').textContent = State.currentUser.username;
-    
+
     // Set display store/sales description
     let storeText = 'Semua Toko';
     if (State.currentUser.store_code !== 'ALL') {
@@ -367,14 +405,14 @@ async function showMainApp() {
 
     // Reset view panel
     switchPanel('dashboard-panel');
-    
+
     // Refresh lists
     await refreshAllData();
 }
 
 function switchPanel(panelId) {
     State.currentPanel = panelId;
-    
+
     // Update navbar active item
     document.querySelectorAll('.menu-item').forEach(btn => {
         if (btn.dataset.target === panelId) {
@@ -413,7 +451,7 @@ function populateSalesFormSelects() {
     // 1. Ring Sizes (4.0 to 35.5 in steps of 0.5)
     const cowokSizeSelect = document.getElementById('cowok-size');
     const cewekSizeSelect = document.getElementById('cewek-size');
-    
+
     let sizeOptions = '<option value="" disabled selected>Pilih Ukuran</option>';
     for (let s = 4.0; s <= 35.5; s += 0.5) {
         const val = s.toFixed(1);
@@ -464,7 +502,7 @@ function populateSalesFormSelects() {
 function addAdditionalItemRow(itemObject = null) {
     const tbody = document.getElementById('tbody-additional-items');
     const row = document.createElement('tr');
-    
+
     let catalogOpts = '<option value="" disabled selected>Pilih Layanan/Barang</option>';
     State.masterData.catalog.forEach(c => {
         catalogOpts += `<option value="${c.name}">${c.name} (${c.category})</option>`;
@@ -541,6 +579,7 @@ function calculateFormPricing() {
 
     // 1. Ring Cowok Pricing
     const cowokActive = document.getElementById('ring-cowok-active').checked;
+    const isReproductCowok = document.getElementById('cowok-is-reproduct')?.checked || false;
     if (cowokActive) {
         const materialId = document.getElementById('cowok-material').value;
         const weight = parseFloat(document.getElementById('cowok-weight').value) || 0;
@@ -554,10 +593,19 @@ function calculateFormPricing() {
         let repairFee = 0;
 
         if (metal) {
-            metalPrice = metal.price_per_gram * weight;
-            customFee = metal.custom_fee;
-            document.getElementById('cowok-material-price-preview').textContent = 
-                `Harga: ${formatRupiah(metal.price_per_gram)}/gr | Jasa: ${formatRupiah(metal.custom_fee)}`;
+            if (isReproductCowok) {
+                // Produksi ulang: kenakan biaya logam + jasa
+                metalPrice = metal.price_per_gram * weight;
+                customFee = metal.custom_fee;
+                document.getElementById('cowok-material-price-preview').textContent =
+                    `[Produksi Ulang] Logam: ${formatRupiah(metal.price_per_gram)}/gr | Jasa: ${formatRupiah(metal.custom_fee)}`;
+            } else {
+                // Repair biasa: TIDAK dikenakan biaya logam
+                metalPrice = 0;
+                customFee = 0;
+                document.getElementById('cowok-material-price-preview').textContent =
+                    `[Repair Biasa] Harga logam tidak dikenakan | Jasa: ${formatRupiah(metal.custom_fee)}/gr (info saja)`;
+            }
         } else {
             document.getElementById('cowok-material-price-preview').textContent = `Harga: Rp 0/gr | Jasa: Rp 0`;
         }
@@ -570,10 +618,10 @@ function calculateFormPricing() {
         }
 
         cowokPrice = metalPrice + customFee + repairFee;
-        
+
         // Populate calculators
-        document.getElementById('calc-cowok-metal-cost').textContent = formatRupiah(metalPrice);
-        document.getElementById('calc-cowok-custom-fee').textContent = formatRupiah(customFee);
+        document.getElementById('calc-cowok-metal-cost').textContent = isReproductCowok ? formatRupiah(metalPrice) : 'Rp 0 (Repair Biasa)';
+        document.getElementById('calc-cowok-custom-fee').textContent = isReproductCowok ? formatRupiah(customFee) : 'Rp 0 (Repair Biasa)';
         document.getElementById('calc-cowok-repair-fee').textContent = formatRupiah(repairFee);
         document.getElementById('calc-cowok-subtotal').textContent = formatRupiah(cowokPrice);
     } else {
@@ -585,6 +633,7 @@ function calculateFormPricing() {
 
     // 2. Ring Cewek Pricing
     const cewekActive = document.getElementById('ring-cewek-active').checked;
+    const isReproductCewek = document.getElementById('cewek-is-reproduct')?.checked || false;
     if (cewekActive) {
         const materialId = document.getElementById('cewek-material').value;
         const weight = parseFloat(document.getElementById('cewek-weight').value) || 0;
@@ -598,10 +647,19 @@ function calculateFormPricing() {
         let repairFee = 0;
 
         if (metal) {
-            metalPrice = metal.price_per_gram * weight;
-            customFee = metal.custom_fee;
-            document.getElementById('cewek-material-price-preview').textContent = 
-                `Harga: ${formatRupiah(metal.price_per_gram)}/gr | Jasa: ${formatRupiah(metal.custom_fee)}`;
+            if (isReproductCewek) {
+                // Produksi ulang: kenakan biaya logam + jasa
+                metalPrice = metal.price_per_gram * weight;
+                customFee = metal.custom_fee;
+                document.getElementById('cewek-material-price-preview').textContent =
+                    `[Produksi Ulang] Logam: ${formatRupiah(metal.price_per_gram)}/gr | Jasa: ${formatRupiah(metal.custom_fee)}`;
+            } else {
+                // Repair biasa: TIDAK dikenakan biaya logam
+                metalPrice = 0;
+                customFee = 0;
+                document.getElementById('cewek-material-price-preview').textContent =
+                    `[Repair Biasa] Harga logam tidak dikenakan | Jasa: ${formatRupiah(metal.custom_fee)}/gr (info saja)`;
+            }
         } else {
             document.getElementById('cewek-material-price-preview').textContent = `Harga: Rp 0/gr | Jasa: Rp 0`;
         }
@@ -616,8 +674,8 @@ function calculateFormPricing() {
         cewekPrice = metalPrice + customFee + repairFee;
 
         // Populate calculators
-        document.getElementById('calc-cewek-metal-cost').textContent = formatRupiah(metalPrice);
-        document.getElementById('calc-cewek-custom-fee').textContent = formatRupiah(customFee);
+        document.getElementById('calc-cewek-metal-cost').textContent = isReproductCewek ? formatRupiah(metalPrice) : 'Rp 0 (Repair Biasa)';
+        document.getElementById('calc-cewek-custom-fee').textContent = isReproductCewek ? formatRupiah(customFee) : 'Rp 0 (Repair Biasa)';
         document.getElementById('calc-cewek-repair-fee').textContent = formatRupiah(repairFee);
         document.getElementById('calc-cewek-subtotal').textContent = formatRupiah(cewekPrice);
     } else {
@@ -678,7 +736,7 @@ function generateRepairID(storeCode) {
 async function getTransactionFromForm() {
     const date = document.getElementById('rep-date').value || new Date().toISOString().slice(0, 10);
     const deadline = document.getElementById('rep-deadline').value;
-    
+
     // Retrieve base64 image values
     const cowokImg = await getImageBase64(document.getElementById('cowok-image').files[0], 'cowok-image-preview');
     const cewekImg = await getImageBase64(document.getElementById('cewek-image').files[0], 'cewek-image-preview');
@@ -711,7 +769,7 @@ async function getTransactionFromForm() {
         customer_phone: document.getElementById('cust-phone').value,
         customer_address: document.getElementById('cust-address').value,
         customer_city: document.getElementById('cust-city').value,
-        
+
         cowok_active: cowokActive ? 'TRUE' : 'FALSE',
         cowok_material: cowokActive ? document.getElementById('cowok-material').value : '',
         cowok_weight: cowokActive ? parseFloat(document.getElementById('cowok-weight').value) || 0 : 0,
@@ -720,7 +778,7 @@ async function getTransactionFromForm() {
         cowok_engraving: cowokActive ? document.getElementById('cowok-engraving').value : '',
         cowok_image_url: cowokImg || (State.activeEditId ? await getEditImage('cowok_image_url') : ''),
         cowok_notes: cowokActive ? document.getElementById('cowok-notes').value : '',
-        
+
         cewek_active: cewekActive ? 'TRUE' : 'FALSE',
         cewek_material: cewekActive ? document.getElementById('cewek-material').value : '',
         cewek_weight: cewekActive ? parseFloat(document.getElementById('cewek-weight').value) || 0 : 0,
@@ -729,9 +787,9 @@ async function getTransactionFromForm() {
         cewek_engraving: cewekActive ? document.getElementById('cewek-engraving').value : '',
         cewek_image_url: cewekImg || (State.activeEditId ? await getEditImage('cewek_image_url') : ''),
         cewek_notes: cewekActive ? document.getElementById('cewek-notes').value : '',
-        
+
         additional_items_json: JSON.stringify(additionalItems),
-        
+
         // Price subtotals
         cowok_price: parseFloat(document.getElementById('calc-cowok-subtotal').textContent.replace(/[^0-9]/g, '')) || 0,
         cewek_price: parseFloat(document.getElementById('calc-cewek-subtotal').textContent.replace(/[^0-9]/g, '')) || 0,
@@ -739,14 +797,14 @@ async function getTransactionFromForm() {
         shipping_fee: parseFloat(document.getElementById('calc-shipping-total').textContent.replace(/[^0-9]/g, '')) || 0,
         total_price: parseFloat(document.getElementById('calc-grand-total').textContent.replace(/[^0-9]/g, '')) || 0,
         min_dp: parseFloat(document.getElementById('calc-min-dp').textContent.replace(/[^0-9]/g, '')) || 0,
-        
+
         warranty_image_url: warrantyImg || (State.activeEditId ? await getEditImage('warranty_image_url') : ''),
-        
+
         // DP 1 details
         dp1_method: document.getElementById('dp1-method').value || '',
         dp1_amount: parseFloat(document.getElementById('dp1-amount').value) || 0,
         dp1_receipt_url: dp1ReceiptImg || (State.activeEditId ? await getEditImage('dp1_receipt_url') : ''),
-        
+
         // DP 2 details
         dp2_method: document.getElementById('dp2-method').value || '',
         dp2_amount: parseFloat(document.getElementById('dp2-amount').value) || 0,
@@ -760,6 +818,19 @@ async function getTransactionFromForm() {
         realpict_approval: State.activeEditId ? (await getEditImage('realpict_approval') || 'Pending') : 'Pending',
         refund_receipt_url: State.activeEditId ? await getEditImage('refund_receipt_url') : '',
         final_pickup_status: State.activeEditId ? (await getEditImage('final_pickup_status') || 'Pending') : 'Pending',
+
+        // Produksi ulang flag (true jika salah satu cincin dicentang produksi ulang)
+        is_reproduct: (document.getElementById('cowok-is-reproduct')?.checked || document.getElementById('cewek-is-reproduct')?.checked) ? 'TRUE' : 'FALSE',
+
+        // QA/QC fields
+        qa_status: State.activeEditId ? (await getEditImage('qa_status') || 'Pending') : 'Pending',
+        qa_notes: State.activeEditId ? (await getEditImage('qa_notes') || '') : '',
+        qa_checked_by: State.activeEditId ? (await getEditImage('qa_checked_by') || '') : '',
+        qa_checked_at: State.activeEditId ? (await getEditImage('qa_checked_at') || '') : '',
+        qc_status: State.activeEditId ? (await getEditImage('qc_status') || 'Pending') : 'Pending',
+        qc_notes: State.activeEditId ? (await getEditImage('qc_notes') || '') : '',
+        qc_checked_by: State.activeEditId ? (await getEditImage('qc_checked_by') || '') : '',
+        qc_checked_at: State.activeEditId ? (await getEditImage('qc_checked_at') || '') : '',
 
         status: 'Pending Sync',
         created_by: State.currentUser.username,
@@ -861,7 +932,7 @@ async function populateFormForEdit(tx) {
     setUploadPreview('dp2-image-preview', tx.dp2_receipt_url, 'resi DP 2');
 
     calculateFormPricing();
-    
+
     // Smooth scroll back to form top
     document.getElementById('content-panel').scrollTo({ top: 0, behavior: 'smooth' });
 }
@@ -878,12 +949,12 @@ function setUploadPreview(previewId, imgUrl, textLabel) {
 function resetForm() {
     State.activeEditId = null;
     document.getElementById('repair-entry-form').reset();
-    
+
     if (State.currentUser) {
         // Regenerate unique number
         let branchCode = State.currentUser.store_code === 'ALL' ? 'HQ' : State.currentUser.store_code;
         document.getElementById('rep-number').value = generateRepairID(branchCode);
-        
+
         // Auto populate sales/store
         const activeStore = State.masterData.stores.find(s => s.code === State.currentUser.store_code);
         const storeDesc = activeStore ? activeStore.name : 'Corporate Headquarters';
@@ -898,7 +969,7 @@ function resetForm() {
     document.getElementById('ring-cewek-active').checked = true;
     toggleRingCardActive('cowok', true);
     toggleRingCardActive('cewek', true);
-    
+
     resetRingCardFields('cowok');
     resetRingCardFields('cewek');
 
@@ -908,7 +979,7 @@ function resetForm() {
     // Reset dates
     const today = new Date().toISOString().slice(0, 10);
     document.getElementById('rep-date').value = today;
-    
+
     // Target deadline default to 7 days from now
     const d = new Date();
     d.setDate(d.getDate() + 7);
@@ -1005,9 +1076,9 @@ async function renderRepairHistory() {
     const list = await getLocalData('repair_transactions');
     const searchQuery = document.getElementById('history-search').value.toLowerCase();
     const statusFilter = document.getElementById('history-status-filter').value;
-    
+
     // Sort transactions reverse-chronologically (newest first)
-    list.sort((a,b) => new Date(b.created_at) - new Date(a.created_at));
+    list.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
 
     const tbody = document.getElementById('tbody-repair-history');
     tbody.innerHTML = '';
@@ -1016,16 +1087,16 @@ async function renderRepairHistory() {
 
     list.forEach(tx => {
         // Apply text filter
-        const matchesSearch = tx.repair_number.toLowerCase().includes(searchQuery) || 
-                              tx.customer_name.toLowerCase().includes(searchQuery) ||
-                              tx.customer_phone.includes(searchQuery);
-        
+        const matchesSearch = tx.repair_number.toLowerCase().includes(searchQuery) ||
+            tx.customer_name.toLowerCase().includes(searchQuery) ||
+            tx.customer_phone.includes(searchQuery);
+
         // Apply status filter
         const matchesStatus = statusFilter === 'ALL' || tx.status === statusFilter;
 
         if (matchesSearch && matchesStatus) {
             matchCount++;
-            
+
             // Format status badge
             let badgeClass = 'badge warning';
             let statusLabel = tx.status;
@@ -1104,7 +1175,7 @@ function triggerProtectedAction(repairNum, actionType) {
         document.getElementById('auth-admin-username').value = '';
         document.getElementById('auth-admin-password').value = '';
         document.getElementById('auth-error-msg').classList.add('hidden');
-        
+
         // Define temporarily in modal element for click handlers to read
         modal.dataset.pendingNum = repairNum;
         modal.dataset.pendingAction = actionType;
@@ -1122,10 +1193,10 @@ async function executeProtectedAction(repairNum, actionType) {
     } else if (actionType === 'DELETE') {
         if (confirm(`Apakah Anda yakin ingin menghapus data repair ${repairNum}?`)) {
             await deleteLocalData('repair_transactions', repairNum);
-            
+
             // Queue sync deletion task to sheets
             await queueSyncTask('DELETE_REPAIR', { repair_number: repairNum });
-            
+
             showToast(`Repair ${repairNum} berhasil dihapus dari perangkat!`, 'success');
             await refreshAllData();
         }
@@ -1299,10 +1370,10 @@ async function renderAccountingBoard() {
                     match.status = 'Pending Sync';
                     await saveLocalData('repair_transactions', match);
                 }
-                
+
                 await queueSyncTask('UPDATE_REPAIR_STATUS', { repair_number: id, dp_approval: 'Approved' });
                 runBackgroundSync();
-                
+
                 showToast(`DP untuk perbaikan ${id} berhasil disetujui!`, 'success');
                 await renderAccountingBoard();
             } catch (err) {
@@ -1325,10 +1396,10 @@ async function renderAccountingBoard() {
                     match.status = 'Pending Sync';
                     await saveLocalData('repair_transactions', match);
                 }
-                
+
                 await queueSyncTask('UPDATE_REPAIR_STATUS', { repair_number: id, pelunasan_approval: 'Approved' });
                 runBackgroundSync();
-                
+
                 showToast(`Pelunasan untuk perbaikan ${id} berhasil disetujui!`, 'success');
                 await renderAccountingBoard();
             } catch (err) {
@@ -1344,7 +1415,7 @@ async function renderAccountingBoard() {
             const id = input.dataset.id;
             const file = e.target.files[0];
             if (!file) return;
-            
+
             showToast('Membaca file & mengunggah bukti refund...', 'info');
             try {
                 const base64Data = await getFileBase64(file);
@@ -1355,10 +1426,10 @@ async function renderAccountingBoard() {
                     match.status = 'Pending Sync';
                     await saveLocalData('repair_transactions', match);
                 }
-                
+
                 await queueSyncTask('UPDATE_REPAIR_STATUS', { repair_number: id, refund_receipt_url: base64Data });
                 runBackgroundSync();
-                
+
                 showToast(`Bukti refund perbaikan ${id} berhasil diunggah!`, 'success');
                 await renderAccountingBoard();
             } catch (err) {
@@ -1371,7 +1442,7 @@ async function renderAccountingBoard() {
 
 async function renderProductionBoard() {
     const list = await getLocalData('repair_transactions');
-    list.sort((a,b) => new Date(b.created_at) - new Date(a.created_at));
+    list.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
 
     const tbody = document.getElementById('tbody-production-list');
     tbody.innerHTML = '';
@@ -1419,6 +1490,14 @@ async function renderProductionBoard() {
             statusBadge = `<span class="badge success">Selesai</span>`;
         }
 
+        // QA/QC Status badges
+        const qaBadge = tx.qa_status === 'Passed' ? `<span class="badge-qa passed">QA ✓</span>` :
+                        tx.qa_status === 'Failed' ? `<span class="badge-qa failed">QA ✗</span>` :
+                        tx.production_status === 'Completed' ? `<span class="badge-qa pending">QA?</span>` : '';
+        const qcBadge = tx.qc_status === 'Passed' ? `<span class="badge-qc passed">QC ✓</span>` :
+                        tx.qc_status === 'Failed' ? `<span class="badge-qc failed">QC ✗</span>` :
+                        tx.qa_status === 'Passed' ? `<span class="badge-qc pending">QC?</span>` : '';
+
         const tr = document.createElement('tr');
         tr.innerHTML = `
             <td><strong>${tx.repair_number}</strong></td>
@@ -1426,12 +1505,12 @@ async function renderProductionBoard() {
             <td><div style="font-size:11px;">${cewekDesc}</div></td>
             <td><strong>${currentWorkshop}</strong></td>
             <td>${formatSimpleDate(tx.deadline)}</td>
-            <td>${statusBadge}</td>
+            <td>${statusBadge} ${qaBadge} ${qcBadge}</td>
             <td>
                 <div class="action-buttons-flex" style="flex-direction:column; gap:4px; align-items:flex-start;">
                     <div style="display:flex; gap:4px;">
                         <button class="action-btn-circle btn-prod-assign" data-id="${tx.repair_number}" title="Delegasikan Pengrajin"><i class="fa-solid fa-hammer"></i></button>
-                        <button class="action-btn-circle btn-prod-complete" data-id="${tx.repair_number}" title="Tandai Selesai"><i class="fa-solid fa-circle-check"></i></button>
+                        <button class="action-btn-circle btn-prod-complete" data-id="${tx.repair_number}" title="Tandai Selesai Produksi" ${tx.production_status === 'Completed' ? 'disabled style="opacity:0.4"' : ''}><i class="fa-solid fa-circle-check"></i></button>
                     </div>
                     
                     <div style="width: 100%;">
@@ -1469,10 +1548,11 @@ async function renderProductionBoard() {
                 const match = txs.find(t => t.repair_number === repairNum);
                 if (match) {
                     match.production_status = 'Completed';
+                    match.qa_status = 'Pending';
                     match.status = 'Pending Sync';
                     await saveLocalData('repair_transactions', match);
-                    await queueSyncTask('UPDATE_REPAIR_STATUS', { repair_number: repairNum, production_status: 'Completed' });
-                    showToast(`Repair ${repairNum} selesai pengerjaan! Diteruskan ke Logistik.`, 'success');
+                    await queueSyncTask('UPDATE_REPAIR_STATUS', { repair_number: repairNum, production_status: 'Completed', qa_status: 'Pending' });
+                    showToast(`Repair ${repairNum} selesai produksi! Diteruskan ke QA untuk pemeriksaan kualitas.`, 'success');
                     await refreshAllData();
                 }
             }
@@ -1485,7 +1565,7 @@ async function renderProductionBoard() {
             const id = input.dataset.id;
             const file = e.target.files[0];
             if (!file) return;
-            
+
             showToast('Membaca file & mengunggah render model...', 'info');
             try {
                 const base64Data = await getFileBase64(file);
@@ -1497,10 +1577,10 @@ async function renderProductionBoard() {
                     match.status = 'Pending Sync';
                     await saveLocalData('repair_transactions', match);
                 }
-                
+
                 await queueSyncTask('UPDATE_REPAIR_STATUS', { repair_number: id, render_model_url: base64Data, render_approval: 'Pending' });
                 runBackgroundSync();
-                
+
                 showToast(`Gambar Render Model perbaikan ${id} berhasil diunggah!`, 'success');
                 await refreshAllData();
             } catch (err) {
@@ -1516,7 +1596,7 @@ async function renderProductionBoard() {
             const id = input.dataset.id;
             const file = e.target.files[0];
             if (!file) return;
-            
+
             showToast('Membaca file & mengunggah realpict...', 'info');
             try {
                 const base64Data = await getFileBase64(file);
@@ -1528,10 +1608,10 @@ async function renderProductionBoard() {
                     match.status = 'Pending Sync';
                     await saveLocalData('repair_transactions', match);
                 }
-                
+
                 await queueSyncTask('UPDATE_REPAIR_STATUS', { repair_number: id, realpict_url: base64Data, realpict_approval: 'Pending' });
                 runBackgroundSync();
-                
+
                 showToast(`Foto Realpict cincin perbaikan ${id} berhasil diunggah!`, 'success');
                 await refreshAllData();
             } catch (err) {
@@ -1540,6 +1620,386 @@ async function renderProductionBoard() {
             }
         });
     });
+} // end renderProductionBoard
+
+// ==========================================================================
+// DESIGNER BOARD — Tabel Penugasan & Upload Render per Desainer
+// ==========================================================================
+async function renderDesignerBoard() {
+    const list = await getLocalData('repair_transactions');
+    list.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+
+    const tbody = document.getElementById('tbody-production-designers');
+    if (!tbody) return;
+    tbody.innerHTML = '';
+    let count = 0;
+
+    // Build designer list from users (role = Production or Designer)
+    let designerOptions = '<option value="">-- Pilih Desainer --</option>';
+    State.masterData.users.filter(u => ['Admin','Production'].includes(u.role)).forEach(u => {
+        designerOptions += `<option value="${u.username}">${u.username}</option>`;
+    });
+
+    list.forEach(tx => {
+        if (tx.dp_approval !== 'Approved') return;
+        count++;
+
+        const renderApprovalBadge = tx.render_approval === 'Approved' ?
+            `<span class="badge success">Disetujui</span>` :
+            tx.render_approval === 'Rejected' ?
+            `<span class="badge danger">Ditolak</span>` :
+            `<span class="badge warning">Pending</span>`;
+
+        const renderCowokPreview = tx.render_cowok_url && tx.render_cowok_url !== '[Gagal Upload]' ?
+            `<img src="${resolveImageUrl(tx.render_cowok_url)}" class="img-thumbnail-link" data-url="${tx.render_cowok_url}" data-caption="Render Cowok - ${tx.repair_number}" style="width:36px;height:36px;border-radius:4px;object-fit:cover;border:1px solid var(--border-color);cursor:pointer;">` :
+            `<span style="color:var(--text-muted);font-size:11px;">Belum</span>`;
+
+        const renderCewekPreview = tx.render_cewek_url && tx.render_cewek_url !== '[Gagal Upload]' ?
+            `<img src="${resolveImageUrl(tx.render_cewek_url)}" class="img-thumbnail-link" data-url="${tx.render_cewek_url}" data-caption="Render Cewek - ${tx.repair_number}" style="width:36px;height:36px;border-radius:4px;object-fit:cover;border:1px solid var(--border-color);cursor:pointer;">` :
+            `<span style="color:var(--text-muted);font-size:11px;">Belum</span>`;
+
+        const rejectionNote = tx.render_rejection_reason ?
+            `<div class="revision-note"><i class="fa-solid fa-comment-dots"></i> <strong>Komentar Sales:</strong> ${tx.render_rejection_reason}</div>` : '';
+
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+            <td><strong>${tx.repair_number}</strong><br><small style="color:var(--text-muted)">${tx.customer_name}</small></td>
+            <td>
+                <select class="designer-select" data-id="${tx.repair_number}" style="font-size:12px; padding:4px 6px; border-radius:var(--border-radius-sm); border:1px solid var(--border-color); background:var(--surface); color:var(--text-primary);">
+                    ${designerOptions}
+                </select>
+                <div style="font-size:11px;color:var(--text-muted);margin-top:3px;">Saat ini: <strong>${tx.assigned_designer || 'Belum'}</strong></div>
+            </td>
+            <td>
+                <div style="display:flex;gap:8px;align-items:center;">
+                    <div style="text-align:center;">
+                        <div style="font-size:10px;color:var(--text-muted);margin-bottom:2px;">Cowok</div>
+                        ${renderCowokPreview}
+                        <label class="premium-btn" style="margin-top:3px;padding:2px 6px;font-size:10px;cursor:pointer;display:inline-flex;align-items:center;gap:3px;">
+                            <i class="fa-solid fa-upload"></i>
+                            <input type="file" class="input-render-cowok" data-id="${tx.repair_number}" accept="image/*" style="display:none;">
+                        </label>
+                    </div>
+                    <div style="text-align:center;">
+                        <div style="font-size:10px;color:var(--text-muted);margin-bottom:2px;">Cewek</div>
+                        ${renderCewekPreview}
+                        <label class="premium-btn" style="margin-top:3px;padding:2px 6px;font-size:10px;cursor:pointer;display:inline-flex;align-items:center;gap:3px;">
+                            <i class="fa-solid fa-upload"></i>
+                            <input type="file" class="input-render-cewek" data-id="${tx.repair_number}" accept="image/*" style="display:none;">
+                        </label>
+                    </div>
+                </div>
+                ${rejectionNote}
+            </td>
+            <td>${renderApprovalBadge}</td>
+            <td>${tx.render_rejection_reason ? `<div class="revision-note" style="font-size:11px;">${tx.render_rejection_reason}</div>` : '<span style="color:var(--text-muted);font-size:11px;">-</span>'}</td>
+            <td>
+                <button class="action-btn-circle btn-save-designer" data-id="${tx.repair_number}" title="Simpan Penugasan Desainer"><i class="fa-solid fa-floppy-disk"></i></button>
+            </td>
+        `;
+        tbody.appendChild(tr);
+    });
+
+    if (count === 0) {
+        tbody.innerHTML = `<tr class="table-empty-row"><td colspan="6">Belum ada data untuk penugasan desainer.</td></tr>`;
+    }
+
+    // Listener: Simpan penugasan desainer
+    tbody.querySelectorAll('.btn-save-designer').forEach(btn => {
+        btn.addEventListener('click', async () => {
+            const id = btn.dataset.id;
+            const row = btn.closest('tr');
+            const designerSelect = row.querySelector('.designer-select');
+            const designerName = designerSelect?.value || '';
+            if (!designerName) { showToast('Pilih desainer terlebih dahulu!', 'warning'); return; }
+            const txs = await getLocalData('repair_transactions');
+            const match = txs.find(t => t.repair_number === id);
+            if (match) {
+                match.assigned_designer = designerName;
+                match.status = 'Pending Sync';
+                await saveLocalData('repair_transactions', match);
+                await queueSyncTask('UPDATE_REPAIR_STATUS', { repair_number: id, assigned_designer: designerName });
+                runBackgroundSync();
+                showToast(`Desainer ${designerName} ditugaskan ke ${id}`, 'success');
+                await renderDesignerBoard();
+            }
+        });
+    });
+
+    // Listener: Upload render cowok
+    tbody.querySelectorAll('.input-render-cowok').forEach(input => {
+        input.addEventListener('change', async (e) => {
+            const id = input.dataset.id;
+            const file = e.target.files[0];
+            if (!file) return;
+            showToast('Mengunggah render cowok...', 'info');
+            try {
+                const base64Data = await getFileBase64(file);
+                const txs = await getLocalData('repair_transactions');
+                const match = txs.find(t => t.repair_number === id);
+                if (match) {
+                    match.render_cowok_url = base64Data;
+                    match.render_approval = 'Pending';
+                    match.status = 'Pending Sync';
+                    await saveLocalData('repair_transactions', match);
+                }
+                await queueSyncTask('UPDATE_REPAIR_STATUS', { repair_number: id, render_cowok_url: base64Data, render_approval: 'Pending' });
+                runBackgroundSync();
+                showToast(`Render Cowok ${id} berhasil diunggah!`, 'success');
+                await renderDesignerBoard();
+            } catch (err) { showToast('Gagal upload render cowok.', 'error'); }
+        });
+    });
+
+    // Listener: Upload render cewek
+    tbody.querySelectorAll('.input-render-cewek').forEach(input => {
+        input.addEventListener('change', async (e) => {
+            const id = input.dataset.id;
+            const file = e.target.files[0];
+            if (!file) return;
+            showToast('Mengunggah render cewek...', 'info');
+            try {
+                const base64Data = await getFileBase64(file);
+                const txs = await getLocalData('repair_transactions');
+                const match = txs.find(t => t.repair_number === id);
+                if (match) {
+                    match.render_cewek_url = base64Data;
+                    match.render_approval = 'Pending';
+                    match.status = 'Pending Sync';
+                    await saveLocalData('repair_transactions', match);
+                }
+                await queueSyncTask('UPDATE_REPAIR_STATUS', { repair_number: id, render_cewek_url: base64Data, render_approval: 'Pending' });
+                runBackgroundSync();
+                showToast(`Render Cewek ${id} berhasil diunggah!`, 'success');
+                await renderDesignerBoard();
+            } catch (err) { showToast('Gagal upload render cewek.', 'error'); }
+        });
+    });
+}
+
+// ==========================================================================
+// QA BOARD — Quality Assurance Panel
+// ==========================================================================
+async function renderQABoard() {
+    const list = await getLocalData('repair_transactions');
+    const tbody = document.getElementById('tbody-qa-list');
+    if (!tbody) return;
+    tbody.innerHTML = '';
+    let count = 0;
+
+    list.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+    list.forEach(tx => {
+        // Tampilkan yang production selesai dan QA belum Passed
+        if (tx.production_status !== 'Completed') return;
+        if (tx.qa_status === 'Passed') return;
+        count++;
+
+        const qaBadge = tx.qa_status === 'Failed' ?
+            `<span class="badge danger">Gagal QA</span>` :
+            `<span class="badge warning">Belum Diperiksa</span>`;
+
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+            <td><strong>${tx.repair_number}</strong><br><small style="color:var(--text-muted)">${tx.customer_name}</small></td>
+            <td>${tx.assigned_workshop || '-'}</td>
+            <td>${formatSimpleDate(tx.deadline)}</td>
+            <td>${qaBadge}</td>
+            <td><textarea class="qa-notes-input" data-id="${tx.repair_number}" placeholder="Catatan QA (kondisi cincin, ukuran, permata, dll)..." style="width:100%;min-height:50px;padding:6px;border-radius:var(--border-radius-sm);border:1px solid var(--border-color);background:var(--surface);color:var(--text-primary);font-size:12px;resize:vertical;">${tx.qa_notes || ''}</textarea></td>
+            <td>
+                <div style="display:flex;flex-direction:column;gap:4px;">
+                    <button class="premium-btn" data-id="${tx.repair_number}" data-result="Passed" style="padding:5px 10px;font-size:11px;background:linear-gradient(135deg,#27ae60,#2ecc71);"><i class="fa-solid fa-check"></i> Lulus QA</button>
+                    <button class="premium-btn btn-danger" data-id="${tx.repair_number}" data-result="Failed" style="padding:5px 10px;font-size:11px;"><i class="fa-solid fa-times"></i> Gagal QA</button>
+                </div>
+            </td>
+        `;
+        tbody.appendChild(tr);
+    });
+
+    if (count === 0) {
+        tbody.innerHTML = `<tr class="table-empty-row"><td colspan="6">Tidak ada item yang menunggu pemeriksaan QA.</td></tr>`;
+    }
+
+    // Listener tombol QA
+    tbody.querySelectorAll('[data-result]').forEach(btn => {
+        btn.addEventListener('click', async () => {
+            const id = btn.dataset.id;
+            const result = btn.dataset.result;
+            const row = btn.closest('tr');
+            const notes = row.querySelector('.qa-notes-input')?.value || '';
+            const checkedBy = State.currentUser?.username || 'system';
+            const checkedAt = new Date().toISOString();
+
+            const txs = await getLocalData('repair_transactions');
+            const match = txs.find(t => t.repair_number === id);
+            if (match) {
+                match.qa_status = result;
+                match.qa_notes = notes;
+                match.qa_checked_by = checkedBy;
+                match.qa_checked_at = checkedAt;
+                if (result === 'Passed') {
+                    match.qc_status = 'Pending';
+                } else {
+                    // Gagal QA: kembalikan ke produksi
+                    match.production_status = 'Active';
+                }
+                match.status = 'Pending Sync';
+                await saveLocalData('repair_transactions', match);
+                await queueSyncTask('UPDATE_REPAIR_STATUS', {
+                    repair_number: id,
+                    qa_status: result,
+                    qa_notes: notes,
+                    qa_checked_by: checkedBy,
+                    qa_checked_at: checkedAt,
+                    qc_status: result === 'Passed' ? 'Pending' : match.qc_status,
+                    production_status: result === 'Failed' ? 'Active' : match.production_status
+                });
+                runBackgroundSync();
+                showToast(`QA ${result === 'Passed' ? 'Lulus' : 'Gagal'} untuk ${id}. ${ result === 'Passed' ? 'Diteruskan ke QC.' : 'Dikembalikan ke Produksi.'}`, result === 'Passed' ? 'success' : 'warning');
+                await refreshAllData();
+            }
+        });
+    });
+}
+
+// ==========================================================================
+// QC BOARD — Quality Control Panel
+// ==========================================================================
+async function renderQCBoard() {
+    const list = await getLocalData('repair_transactions');
+    const tbody = document.getElementById('tbody-qc-list');
+    if (!tbody) return;
+    tbody.innerHTML = '';
+    let count = 0;
+
+    list.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+    list.forEach(tx => {
+        // Tampilkan yang QA sudah Passed dan QC belum Passed
+        if (tx.qa_status !== 'Passed') return;
+        if (tx.qc_status === 'Passed') return;
+        count++;
+
+        const qcBadge = tx.qc_status === 'Failed' ?
+            `<span class="badge danger">Gagal QC</span>` :
+            `<span class="badge warning">Belum Final Check</span>`;
+
+        const realpictPreview = tx.realpict_url && tx.realpict_url !== '[Gagal Upload]' ?
+            `<img src="${resolveImageUrl(tx.realpict_url)}" class="img-thumbnail-link" data-url="${tx.realpict_url}" data-caption="Realpict - ${tx.repair_number}" style="width:40px;height:40px;border-radius:4px;object-fit:cover;border:1px solid var(--border-color);cursor:pointer;">` : '-';
+
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+            <td><strong>${tx.repair_number}</strong><br><small style="color:var(--text-muted)">${tx.customer_name}</small></td>
+            <td>${tx.qa_checked_by || '-'}</td>
+            <td>${realpictPreview}</td>
+            <td>${formatSimpleDate(tx.deadline)}</td>
+            <td>${qcBadge}</td>
+            <td><textarea class="qc-notes-input" data-id="${tx.repair_number}" placeholder="Catatan QC (finishing, packaging, label, dll)..." style="width:100%;min-height:50px;padding:6px;border-radius:var(--border-radius-sm);border:1px solid var(--border-color);background:var(--surface);color:var(--text-primary);font-size:12px;resize:vertical;">${tx.qc_notes || ''}</textarea></td>
+            <td>
+                <div style="display:flex;flex-direction:column;gap:4px;">
+                    <button class="premium-btn" data-id="${tx.repair_number}" data-result="Passed" style="padding:5px 10px;font-size:11px;background:linear-gradient(135deg,#1a6b96,#2980b9);"><i class="fa-solid fa-check-double"></i> Lulus QC</button>
+                    <button class="premium-btn btn-danger" data-id="${tx.repair_number}" data-result="Failed" style="padding:5px 10px;font-size:11px;"><i class="fa-solid fa-times"></i> Gagal QC</button>
+                </div>
+            </td>
+        `;
+        tbody.appendChild(tr);
+    });
+
+    if (count === 0) {
+        tbody.innerHTML = `<tr class="table-empty-row"><td colspan="7">Tidak ada item yang menunggu pemeriksaan QC.</td></tr>`;
+    }
+
+    // Listener tombol QC
+    tbody.querySelectorAll('[data-result]').forEach(btn => {
+        btn.addEventListener('click', async () => {
+            const id = btn.dataset.id;
+            const result = btn.dataset.result;
+            const row = btn.closest('tr');
+            const notes = row.querySelector('.qc-notes-input')?.value || '';
+            const checkedBy = State.currentUser?.username || 'system';
+            const checkedAt = new Date().toISOString();
+
+            const txs = await getLocalData('repair_transactions');
+            const match = txs.find(t => t.repair_number === id);
+            if (match) {
+                match.qc_status = result;
+                match.qc_notes = notes;
+                match.qc_checked_by = checkedBy;
+                match.qc_checked_at = checkedAt;
+                if (result === 'Failed') {
+                    // Gagal QC: kembalikan ke QA
+                    match.qa_status = 'Pending';
+                }
+                match.status = 'Pending Sync';
+                await saveLocalData('repair_transactions', match);
+                await queueSyncTask('UPDATE_REPAIR_STATUS', {
+                    repair_number: id,
+                    qc_status: result,
+                    qc_notes: notes,
+                    qc_checked_by: checkedBy,
+                    qc_checked_at: checkedAt,
+                    qa_status: result === 'Failed' ? 'Pending' : match.qa_status
+                });
+                runBackgroundSync();
+                showToast(`QC ${result === 'Passed' ? 'Final Check Lulus! Siap kirim ke Logistik.' : 'Gagal — dikembalikan ke QA.'}`, result === 'Passed' ? 'success' : 'warning');
+                await refreshAllData();
+            }
+        });
+    });
+}
+
+// ==========================================================================
+// PRINT INDIVIDUAL LOGISTIC — Cetak Surat Jalan per Order
+// ==========================================================================
+async function printIndividualLogistic(repairNum) {
+    const txs = await getLocalData('repair_transactions');
+    const tx = txs.find(t => t.repair_number === repairNum);
+    if (!tx) { showToast('Data transaksi tidak ditemukan!', 'error'); return; }
+
+    const html = `
+        <div style="font-family:Arial,sans-serif;padding:20px;">
+            <h2 style="text-align:center;border-bottom:2px solid #c5a85c;padding-bottom:8px;margin-bottom:16px;">SURAT JALAN PENGIRIMAN</h2>
+            <table style="width:100%;border-collapse:collapse;margin-bottom:16px;">
+                <tr><td style="width:40%;font-weight:bold;padding:4px 0;">No. Repair</td><td>: ${tx.repair_number}</td></tr>
+                <tr><td style="font-weight:bold;padding:4px 0;">Tanggal Kirim</td><td>: ${new Date().toLocaleDateString('id-ID',{day:'2-digit',month:'long',year:'numeric'})}</td></tr>
+                <tr><td style="font-weight:bold;padding:4px 0;">Nama Penerima</td><td>: ${tx.customer_name}</td></tr>
+                <tr><td style="font-weight:bold;padding:4px 0;">Alamat Tujuan</td><td>: ${tx.customer_address}</td></tr>
+                <tr><td style="font-weight:bold;padding:4px 0;">Kota / Kabupaten</td><td>: ${tx.customer_city}</td></tr>
+                <tr><td style="font-weight:bold;padding:4px 0;">No. HP Penerima</td><td>: ${tx.customer_phone}</td></tr>
+                <tr><td style="font-weight:bold;padding:4px 0;">Nomor Resi</td><td>: ${tx.logistic_receipt_no || '---'}</td></tr>
+            </table>
+            <h3 style="margin-bottom:8px;">Isi Paket</h3>
+            <table style="width:100%;border-collapse:collapse;border:1px solid #ddd;">
+                <thead><tr style="background:#f5f5f5;"><th style="border:1px solid #ddd;padding:6px;">No</th><th style="border:1px solid #ddd;padding:6px;">Deskripsi</th><th style="border:1px solid #ddd;padding:6px;">Berat Awal</th><th style="border:1px solid #ddd;padding:6px;">Berat Akhir</th></tr></thead>
+                <tbody>
+                    ${tx.cowok_active === 'TRUE' ? `<tr><td style="border:1px solid #ddd;padding:6px;text-align:center;">1</td><td style="border:1px solid #ddd;padding:6px;">Cincin Pria (${tx.cowok_size})</td><td style="border:1px solid #ddd;padding:6px;text-align:center;">${tx.cowok_weight}g</td><td style="border:1px solid #ddd;padding:6px;text-align:center;">${tx.cowok_weight_final || '-'}g</td></tr>` : ''}
+                    ${tx.cewek_active === 'TRUE' ? `<tr><td style="border:1px solid #ddd;padding:6px;text-align:center;">${tx.cowok_active === 'TRUE' ? '2' : '1'}</td><td style="border:1px solid #ddd;padding:6px;">Cincin Wanita (${tx.cewek_size})</td><td style="border:1px solid #ddd;padding:6px;text-align:center;">${tx.cewek_weight}g</td><td style="border:1px solid #ddd;padding:6px;text-align:center;">${tx.cewek_weight_final || '-'}g</td></tr>` : ''}
+                </tbody>
+            </table>
+            <div style="margin-top:24px;border:1px solid #000;padding:12px;display:inline-block;min-width:220px;">
+                <div style="font-weight:bold;font-size:14px;margin-bottom:4px;">LABEL PENGIRIMAN</div>
+                <div style="font-size:13px;"><strong>Kepada:</strong></div>
+                <div style="font-size:13px;">${tx.customer_name}</div>
+                <div style="font-size:12px;">${tx.customer_address}</div>
+                <div style="font-size:12px;">${tx.customer_city}</div>
+                <div style="font-size:12px;">Telp: ${tx.customer_phone}</div>
+                <div style="margin-top:8px;font-size:12px;">Resi: <strong>${tx.logistic_receipt_no || '---'}</strong></div>
+            </div>
+            <div style="margin-top:30px;display:flex;justify-content:space-between;">
+                <div style="text-align:center;">
+                    <div style="height:50px;"></div>
+                    <div style="border-top:1px solid #000;padding-top:4px;font-size:12px;">Pengirim</div>
+                </div>
+                <div style="text-align:center;">
+                    <div style="height:50px;"></div>
+                    <div style="border-top:1px solid #000;padding-top:4px;font-size:12px;">Penerima</div>
+                </div>
+            </div>
+        </div>
+    `;
+
+    const modalBody = document.getElementById('print-receipt-body');
+    if (modalBody) modalBody.innerHTML = html;
+    const printModal = document.getElementById('print-modal');
+    if (printModal) printModal.classList.remove('hidden');
 }
 
 function showProductionAssignModal(repairNum) {
@@ -1560,7 +2020,7 @@ function showProductionAssignModal(repairNum) {
 
     document.getElementById('crud-modal-title').textContent = `Delegasi Pengrajin (${repairNum})`;
     document.getElementById('crud-form-fields').innerHTML = fields;
-    
+
     const crudModal = document.getElementById('crud-modal');
     crudModal.classList.remove('hidden');
     crudModal.dataset.crudType = 'PRODUCTION_ASSIGN';
@@ -1568,7 +2028,7 @@ function showProductionAssignModal(repairNum) {
 
 async function renderLogisticBoard() {
     const list = await getLocalData('repair_transactions');
-    list.sort((a,b) => new Date(b.created_at) - new Date(a.created_at));
+    list.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
 
     const tbody = document.getElementById('tbody-logistic-list');
     tbody.innerHTML = '';
@@ -1578,12 +2038,13 @@ async function renderLogisticBoard() {
         count++;
         const statusLabel = tx.logistic_status || 'Gudang HQ';
         const trackingNum = tx.logistic_receipt_no || 'Belum Dikirim';
-        
+
         let badgeClass = 'badge warning';
         if (tx.logistic_status === 'Shipped') badgeClass = 'badge success';
 
         const tr = document.createElement('tr');
         tr.innerHTML = `
+            <td class="logistic-checkbox-col" style="text-align:center;"><input type="checkbox" class="logistic-checkbox" data-id="${tx.repair_number}"></td>
             <td><strong>${tx.repair_number}</strong></td>
             <td>${tx.customer_name}</td>
             <td>
@@ -1599,8 +2060,15 @@ async function renderLogisticBoard() {
             <td>
                 <div class="action-buttons-flex">
                     <button class="action-btn-circle btn-log-ship" data-id="${tx.repair_number}" title="Input Nomor Resi Kurir"><i class="fa-solid fa-truck-fast"></i></button>
+                    <button class="action-btn-circle" style="background:linear-gradient(135deg,#c5a85c,#e0c97a);color:#1a1a1a;" onclick="printIndividualLogistic('${tx.repair_number}')" title="Cetak Surat Jalan Individual"><i class="fa-solid fa-file-invoice"></i></button>
                 </div>
             </td>
+            <td>${tx.cowok_active === 'TRUE' ? `${tx.cowok_weight}g` : ''}</td>
+            <td>${tx.cowok_weight_final ? `${tx.cowok_weight_final}g` : ''}</td>
+            <td>${(tx.cowok_weight && tx.cowok_weight_final) ? (tx.cowok_weight - tx.cowok_weight_final - 0.2).toFixed(2) + 'g' : ''}</td>
+            <td>${tx.cewek_active === 'TRUE' ? `${tx.cewek_weight}g` : ''}</td>
+            <td>${tx.cewek_weight_final ? `${tx.cewek_weight_final}g` : ''}</td>
+            <td>${(tx.cewek_weight && tx.cewek_weight_final) ? (tx.cewek_weight - tx.cewek_weight_final - 0.2).toFixed(2) + 'g' : ''}</td>
         `;
         tbody.appendChild(tr);
     });
@@ -1613,10 +2081,79 @@ async function renderLogisticBoard() {
     document.querySelectorAll('.btn-log-ship').forEach(btn => {
         btn.addEventListener('click', () => showLogisticShipModal(btn.dataset.id));
     });
-}
+    // Collective print and checkbox listeners
+    const collectivePrintBtn = document.getElementById('btn-logistic-print-collective');
+    if (collectivePrintBtn) collectivePrintBtn.addEventListener('click', printCollectiveLogistic);
+    const selectAllChk = document.getElementById('chk-logistic-select-all');
+    if (selectAllChk) selectAllChk.addEventListener('change', toggleSelectAllLogistic);
+    document.querySelectorAll('.logistic-checkbox').forEach(cb => {
+        cb.addEventListener('change', updateCollectivePrintState);
+    });
 
-function showLogisticShipModal(repairNum) {
-    const fields = `
+    // --------------------------------------------------------------------------
+    // Helper functions for Logistic checkbox selection and collective printing
+    // --------------------------------------------------------------------------
+    function toggleSelectAllLogistic(e) {
+        const checked = e.target.checked;
+        document.querySelectorAll('.logistic-checkbox').forEach(cb => cb.checked = checked);
+        updateCollectivePrintState();
+    }
+
+    function updateCollectivePrintState() {
+        const anyChecked = Array.from(document.querySelectorAll('.logistic-checkbox')).some(cb => cb.checked);
+        const btn = document.getElementById('btn-logistic-print-collective');
+        if (btn) btn.disabled = !anyChecked;
+    }
+
+    function printCollectiveLogistic() {
+        const selected = Array.from(document.querySelectorAll('.logistic-checkbox'))
+            .filter(cb => cb.checked)
+            .map(cb => cb.dataset.id);
+        if (selected.length === 0) return;
+        const txs = State.masterData.repair_transactions || [];
+        const groups = {};
+        selected.forEach(id => {
+            const tx = txs.find(t => t.repair_number === id);
+            if (!tx) return;
+            const branch = tx.store_sales_name || 'Cabang Lain';
+            if (!groups[branch]) groups[branch] = [];
+            groups[branch].push(tx);
+        });
+        let html = '';
+        for (const branch in groups) {
+            const orders = groups[branch];
+            html += `<h2>Surat Jalan Kolektif - ${branch}</h2>`;
+            html += '<table class="print-table" style="width:100%; border-collapse:collapse; margin-bottom:20px;">'
+                + '<thead><tr><th>No</th><th>Repair #</th><th>Customer</th><th>Alamat</th><th>Berat Awal</th><th>Berat Akhir</th><th>Residu</th></tr></thead><tbody>';
+            orders.forEach((tx, idx) => {
+                const beratAwal = tx.cowok_active === "TRUE" ? tx.cowok_weight : (tx.cewek_active === "TRUE" ? tx.cewek_weight : '-');
+                const beratAkhir = tx.cowok_weight_final || tx.cewek_weight_final || '-';
+                const residu = (tx.cowok_weight && tx.cowok_weight_final) ? (tx.cowok_weight - tx.cowok_weight_final - 0.2).toFixed(2) : (tx.cewek_weight && tx.cewek_weight_final) ? (tx.cewek_weight - tx.cewek_weight_final - 0.2).toFixed(2) : '-';
+                html += `<tr><td>${idx + 1}</td><td>${tx.repair_number}</td><td>${tx.customer_name}</td><td>${tx.customer_address}, ${tx.customer_city}</td><td>${beratAwal}g</td><td>${beratAkhir}g</td><td>${residu}g</td></tr>`;
+            });
+            html += '</tbody></table>';
+            html += '<div class="label-section">';
+            orders.forEach(tx => {
+                html += `<div class="label" style="border:1px solid #000; padding:8px; margin:5px; width:250px;">
+                <strong>${branch}</strong><br/>
+                ${tx.customer_name}<br/>
+                ${tx.customer_address}<br/>
+                ${tx.customer_city}<br/>
+                Resi: ${tx.logistic_receipt_no || '---'}
+            </div>`;
+            });
+            html += '</div>';
+        }
+        const modalBody = document.getElementById('print-receipt-body');
+        if (modalBody) modalBody.innerHTML = html;
+        const printModal = document.getElementById('print-modal');
+        if (printModal) printModal.classList.remove('hidden');
+    }
+
+
+
+    function showLogisticShipModal(repairNum) {
+        const fields = `
         <input type="hidden" id="crud-l-repnum" value="${repairNum}">
         <div class="form-group">
             <label for="crud-l-receipt">Masukkan Nomor Resi Ekspedisi (JNE/J&T/Sicepat)</label>
@@ -1624,41 +2161,41 @@ function showLogisticShipModal(repairNum) {
         </div>
     `;
 
-    document.getElementById('crud-modal-title').textContent = `Input Resi Kirim (${repairNum})`;
-    document.getElementById('crud-form-fields').innerHTML = fields;
-    
-    const crudModal = document.getElementById('crud-modal');
-    crudModal.classList.remove('hidden');
-    crudModal.dataset.crudType = 'LOGISTIC_SHIP';
-}
+        document.getElementById('crud-modal-title').textContent = `Input Resi Kirim (${repairNum})`;
+        document.getElementById('crud-form-fields').innerHTML = fields;
 
-// ==========================================================================
-// 6. WHATSAPP & PRINT LAYOUT BUILDER
-// ==========================================================================
+        const crudModal = document.getElementById('crud-modal');
+        crudModal.classList.remove('hidden');
+        crudModal.dataset.crudType = 'LOGISTIC_SHIP';
+    }
 
-// Prepares and shows thermal / letterhead print layouts
-async function showReceiptPrintModal(repairNum, type = 'RECEIPT') {
-    const txs = await getLocalData('repair_transactions');
-    const tx = txs.find(t => t.repair_number === repairNum);
-    if (!tx) return;
+    // ==========================================================================
+    // 6. WHATSAPP & PRINT LAYOUT BUILDER
+    // ==========================================================================
 
-    const modalBody = document.getElementById('print-receipt-body');
-    
-    // Core details rendering
-    const cowokMetal = State.masterData.metals.find(m => m.id === tx.cowok_material);
-    const cowokRep = State.masterData.repairs.find(r => r.id === tx.cowok_repair_type);
-    const cewekMetal = State.masterData.metals.find(m => m.id === tx.cewek_material);
-    const cewekRep = State.masterData.repairs.find(r => r.id === tx.cewek_repair_type);
+    // Prepares and shows thermal / letterhead print layouts
+    async function showReceiptPrintModal(repairNum, type = 'RECEIPT') {
+        const txs = await getLocalData('repair_transactions');
+        const tx = txs.find(t => t.repair_number === repairNum);
+        if (!tx) return;
 
-    const isCowok = tx.cowok_active === 'TRUE';
-    const isCewek = tx.cewek_active === 'TRUE';
+        const modalBody = document.getElementById('print-receipt-body');
 
-    // Build extra items rows html
-    const addItems = JSON.parse(tx.additional_items_json || '[]');
-    let itemsRowsHtml = '';
-    if (addItems.length > 0) {
-        addItems.forEach(item => {
-            itemsRowsHtml += `
+        // Core details rendering
+        const cowokMetal = State.masterData.metals.find(m => m.id === tx.cowok_material);
+        const cowokRep = State.masterData.repairs.find(r => r.id === tx.cowok_repair_type);
+        const cewekMetal = State.masterData.metals.find(m => m.id === tx.cewek_material);
+        const cewekRep = State.masterData.repairs.find(r => r.id === tx.cewek_repair_type);
+
+        const isCowok = tx.cowok_active === 'TRUE';
+        const isCewek = tx.cewek_active === 'TRUE';
+
+        // Build extra items rows html
+        const addItems = JSON.parse(tx.additional_items_json || '[]');
+        let itemsRowsHtml = '';
+        if (addItems.length > 0) {
+            addItems.forEach(item => {
+                itemsRowsHtml += `
                 <tr>
                     <td>${item.name}</td>
                     <td>${item.qty}</td>
@@ -1666,14 +2203,14 @@ async function showReceiptPrintModal(repairNum, type = 'RECEIPT') {
                     <td>${formatRupiah(item.subtotal)}</td>
                 </tr>
             `;
-        });
-    } else {
-        itemsRowsHtml = `<tr><td colspan="4" style="text-align:center; color:#777;">Tidak ada barang/jasa tambahan</td></tr>`;
-    }
+            });
+        } else {
+            itemsRowsHtml = `<tr><td colspan="4" style="text-align:center; color:#777;">Tidak ada barang/jasa tambahan</td></tr>`;
+        }
 
-    const receiptTitle = type === 'FORM' ? 'SURAT PENGERJAAN REPAIR JEWELRY' : 'BUKTI TANDA TERIMA REPAIR';
+        const receiptTitle = type === 'FORM' ? 'SURAT PENGERJAAN REPAIR JEWELRY' : 'BUKTI TANDA TERIMA REPAIR';
 
-    modalBody.innerHTML = `
+        modalBody.innerHTML = `
         <div class="print-document">
             <div class="preview-invoice-head">
                 <div class="preview-company-info">
@@ -1868,379 +2405,379 @@ async function showReceiptPrintModal(repairNum, type = 'RECEIPT') {
         </div>
     `;
 
-    document.getElementById('print-modal').classList.remove('hidden');
-}
-
-// Builds formatted WhatsApp templates and calls WA direct linking protocol
-async function triggerWhatsAppNotification(repairNum) {
-    const txs = await getLocalData('repair_transactions');
-    const tx = txs.find(t => t.repair_number === repairNum);
-    if (!tx) return;
-
-    // Clean phone number (replace starting '0' with country code '62')
-    let rawPhone = tx.customer_phone.trim().replace(/[^0-9]/g, '');
-    if (rawPhone.startsWith('0')) {
-        rawPhone = '62' + rawPhone.substring(1);
+        document.getElementById('print-modal').classList.remove('hidden');
     }
 
-    const dpTotal = tx.dp1_amount + tx.dp2_amount;
-    const remaining = tx.total_price - dpTotal;
+    // Builds formatted WhatsApp templates and calls WA direct linking protocol
+    async function triggerWhatsAppNotification(repairNum) {
+        const txs = await getLocalData('repair_transactions');
+        const tx = txs.find(t => t.repair_number === repairNum);
+        if (!tx) return;
 
-    // Build message body
-    let msg = `*NOTA TRANSAKSI REPAIR CINCIN - SOVIA JEWELRY*\n`;
-    msg += `------------------------------------------------------------\n`;
-    msg += `Halo Kak *${tx.customer_name}*,\n`;
-    msg += `Terima kasih telah mempercayakan perbaikan cincin Anda di SOVIA JEWELRY. Berikut adalah rincian data transaksi repair Anda:\n\n`;
-    msg += `*Nomor Repair:* ${tx.repair_number}\n`;
-    msg += `*Tanggal Masuk:* ${formatSimpleDate(tx.date)}\n`;
-    msg += `*Target Selesai:* ${formatSimpleDate(tx.deadline)}\n`;
-    msg += `*Sales Terkait:* ${tx.store_sales_name.split(' (')[0]}\n\n`;
-    
-    if (tx.cowok_active === 'TRUE') {
-        const metal = State.masterData.metals.find(m => m.id === tx.cowok_material);
-        const rep = State.masterData.repairs.find(r => r.id === tx.cowok_repair_type);
-        msg += `*Cincin Cowok:* ${metal?.name || ''} (Sz: ${tx.cowok_size})\n`;
-        msg += `- Layanan: ${rep?.name || ''}\n`;
-        if (tx.cowok_engraving) msg += `- Ukir Nama: "${tx.cowok_engraving}"\n`;
-    }
-    if (tx.cewek_active === 'TRUE') {
-        const metal = State.masterData.metals.find(m => m.id === tx.cewek_material);
-        const rep = State.masterData.repairs.find(r => r.id === tx.cewek_repair_type);
-        msg += `*Cincin Cewek:* ${metal?.name || ''} (Sz: ${tx.cewek_size})\n`;
-        msg += `- Layanan: ${rep?.name || ''}\n`;
-        if (tx.cewek_engraving) msg += `- Ukir Nama: "${tx.cewek_engraving}"\n`;
-    }
-
-    const addItems = JSON.parse(tx.additional_items_json || '[]');
-    if (addItems.length > 0) {
-        msg += `\n*Layanan/Barang Tambahan:*\n`;
-        addItems.forEach(item => {
-            msg += `- ${item.name} (${item.qty}x) : ${formatRupiah(item.subtotal)}\n`;
-        });
-    }
-
-    msg += `\n*RINCIAN BIAYA:*\n`;
-    msg += `------------------------------------------------------------\n`;
-    msg += `Total Tagihan: *${formatRupiah(tx.total_price)}*\n`;
-    msg += `Total DP Masuk: *${formatRupiah(dpTotal)}*\n`;
-    msg += `Sisa Tagihan: *${formatRupiah(remaining)}* ${remaining <= 0 ? '(LUNAS)' : ''}\n\n`;
-    msg += `Alamat Pengiriman:\n_${tx.customer_address}_\n_${tx.customer_city}_\n\n`;
-    msg += `Kakak bisa memantau status repair cincin Kakak secara berkala lewat sales kami. Terima kasih! ✨\n`;
-    msg += `------------------------------------------------------------\n`;
-    msg += `*SOVIA JEWELRY* - Sleman, Bantul, HQ Yogyakarta`;
-
-    const encodedText = encodeURIComponent(msg);
-    
-    // Direct whatsapp URL link (opens WA application instantly on mobile/desktop without prompt browser middleman)
-    const waUrl = `https://wa.me/${rawPhone}?text=${encodedText}`;
-    
-    // Open in window
-    window.open(waUrl, '_blank');
-    showToast('Membuka aplikasi WhatsApp...', 'success');
-}
-
-// ==========================================================================
-// 7. OFFLINE-FIRST SYNC & LOCK ENGINE
-// ==========================================================================
-
-async function queueSyncTask(action, payload) {
-    const task = {
-        action,
-        payload,
-        timestamp: new Date().toISOString()
-    };
-    await saveLocalData('sync_queue', task);
-    await updateSyncQueueDisplay();
-}
-
-async function updateSyncQueueDisplay() {
-    const queue = await getLocalData('sync_queue');
-    const badge = document.getElementById('sync-badge-count');
-    const statPending = document.getElementById('stat-pending-sync');
-    const syncStatusText = document.getElementById('sync-queue-status');
-    const syncList = document.getElementById('sync-queue-list');
-
-    // Stats counter
-    if (badge) {
-        if (queue.length > 0) {
-            badge.classList.remove('hidden');
-            badge.textContent = queue.length;
-        } else {
-            badge.classList.add('hidden');
+        // Clean phone number (replace starting '0' with country code '62')
+        let rawPhone = tx.customer_phone.trim().replace(/[^0-9]/g, '');
+        if (rawPhone.startsWith('0')) {
+            rawPhone = '62' + rawPhone.substring(1);
         }
+
+        const dpTotal = tx.dp1_amount + tx.dp2_amount;
+        const remaining = tx.total_price - dpTotal;
+
+        // Build message body
+        let msg = `*NOTA TRANSAKSI REPAIR CINCIN - SOVIA JEWELRY*\n`;
+        msg += `------------------------------------------------------------\n`;
+        msg += `Halo Kak *${tx.customer_name}*,\n`;
+        msg += `Terima kasih telah mempercayakan perbaikan cincin Anda di SOVIA JEWELRY. Berikut adalah rincian data transaksi repair Anda:\n\n`;
+        msg += `*Nomor Repair:* ${tx.repair_number}\n`;
+        msg += `*Tanggal Masuk:* ${formatSimpleDate(tx.date)}\n`;
+        msg += `*Target Selesai:* ${formatSimpleDate(tx.deadline)}\n`;
+        msg += `*Sales Terkait:* ${tx.store_sales_name.split(' (')[0]}\n\n`;
+
+        if (tx.cowok_active === 'TRUE') {
+            const metal = State.masterData.metals.find(m => m.id === tx.cowok_material);
+            const rep = State.masterData.repairs.find(r => r.id === tx.cowok_repair_type);
+            msg += `*Cincin Cowok:* ${metal?.name || ''} (Sz: ${tx.cowok_size})\n`;
+            msg += `- Layanan: ${rep?.name || ''}\n`;
+            if (tx.cowok_engraving) msg += `- Ukir Nama: "${tx.cowok_engraving}"\n`;
+        }
+        if (tx.cewek_active === 'TRUE') {
+            const metal = State.masterData.metals.find(m => m.id === tx.cewek_material);
+            const rep = State.masterData.repairs.find(r => r.id === tx.cewek_repair_type);
+            msg += `*Cincin Cewek:* ${metal?.name || ''} (Sz: ${tx.cewek_size})\n`;
+            msg += `- Layanan: ${rep?.name || ''}\n`;
+            if (tx.cewek_engraving) msg += `- Ukir Nama: "${tx.cewek_engraving}"\n`;
+        }
+
+        const addItems = JSON.parse(tx.additional_items_json || '[]');
+        if (addItems.length > 0) {
+            msg += `\n*Layanan/Barang Tambahan:*\n`;
+            addItems.forEach(item => {
+                msg += `- ${item.name} (${item.qty}x) : ${formatRupiah(item.subtotal)}\n`;
+            });
+        }
+
+        msg += `\n*RINCIAN BIAYA:*\n`;
+        msg += `------------------------------------------------------------\n`;
+        msg += `Total Tagihan: *${formatRupiah(tx.total_price)}*\n`;
+        msg += `Total DP Masuk: *${formatRupiah(dpTotal)}*\n`;
+        msg += `Sisa Tagihan: *${formatRupiah(remaining)}* ${remaining <= 0 ? '(LUNAS)' : ''}\n\n`;
+        msg += `Alamat Pengiriman:\n_${tx.customer_address}_\n_${tx.customer_city}_\n\n`;
+        msg += `Kakak bisa memantau status repair cincin Kakak secara berkala lewat sales kami. Terima kasih! ✨\n`;
+        msg += `------------------------------------------------------------\n`;
+        msg += `*SOVIA JEWELRY* - Sleman, Bantul, HQ Yogyakarta`;
+
+        const encodedText = encodeURIComponent(msg);
+
+        // Direct whatsapp URL link (opens WA application instantly on mobile/desktop without prompt browser middleman)
+        const waUrl = `https://wa.me/${rawPhone}?text=${encodedText}`;
+
+        // Open in window
+        window.open(waUrl, '_blank');
+        showToast('Membuka aplikasi WhatsApp...', 'success');
     }
 
-    if (statPending) statPending.textContent = queue.length;
-    if (syncStatusText) syncStatusText.textContent = `${queue.length} item menunggu sinkronisasi`;
+    // ==========================================================================
+    // 7. OFFLINE-FIRST SYNC & LOCK ENGINE
+    // ==========================================================================
 
-    // Render Queue Items Lists in Dashboard Panel
-    if (syncList) {
-        syncList.innerHTML = '';
-        if (queue.length === 0) {
-            syncList.innerHTML = '<li class="empty-list-placeholder">Tidak ada antrean tertunda.</li>';
-        } else {
-            queue.forEach(item => {
-                const li = document.createElement('li');
-                let displayTitle = item.payload.repair_number || item.payload.id || 'Master Update';
-                li.innerHTML = `
+    async function queueSyncTask(action, payload) {
+        const task = {
+            action,
+            payload,
+            timestamp: new Date().toISOString()
+        };
+        await saveLocalData('sync_queue', task);
+        await updateSyncQueueDisplay();
+    }
+
+    async function updateSyncQueueDisplay() {
+        const queue = await getLocalData('sync_queue');
+        const badge = document.getElementById('sync-badge-count');
+        const statPending = document.getElementById('stat-pending-sync');
+        const syncStatusText = document.getElementById('sync-queue-status');
+        const syncList = document.getElementById('sync-queue-list');
+
+        // Stats counter
+        if (badge) {
+            if (queue.length > 0) {
+                badge.classList.remove('hidden');
+                badge.textContent = queue.length;
+            } else {
+                badge.classList.add('hidden');
+            }
+        }
+
+        if (statPending) statPending.textContent = queue.length;
+        if (syncStatusText) syncStatusText.textContent = `${queue.length} item menunggu sinkronisasi`;
+
+        // Render Queue Items Lists in Dashboard Panel
+        if (syncList) {
+            syncList.innerHTML = '';
+            if (queue.length === 0) {
+                syncList.innerHTML = '<li class="empty-list-placeholder">Tidak ada antrean tertunda.</li>';
+            } else {
+                queue.forEach(item => {
+                    const li = document.createElement('li');
+                    let displayTitle = item.payload.repair_number || item.payload.id || 'Master Update';
+                    li.innerHTML = `
                     <span><strong>${displayTitle}</strong> - ${item.action}</span>
                     <span class="queue-badge-action">Lokal</span>
                 `;
-                syncList.appendChild(li);
-            });
-        }
-    }
-}
-
-// The core background engine attempting synchronization with safety locking
-async function runBackgroundSync() {
-    // 1. Guard check connection status
-    if (!navigator.onLine) {
-        setSyncLockDisplay('offline');
-        return;
-    }
-
-    // 2. Lock guard prevent concurrent thread processes
-    if (State.syncLock) {
-        return;
-    }
-
-    // 3. Obtain Sync Queue
-    const queue = await getLocalData('sync_queue');
-    if (queue.length === 0) {
-        setSyncLockDisplay('idle');
-        return;
-    }
-
-    // Acquire lock
-    State.syncLock = true;
-    setSyncLockDisplay('locked');
-    showToast(`Memulai sinkronisasi ${queue.length} transaksi ke Sheets...`, 'info');
-
-    // Run item-by-item queue drains
-    const tx = State.db.transaction('sync_queue', 'readwrite');
-    const store = tx.objectStore('sync_queue');
-    
-    // We fetch cursor to process FIFO
-    let processedCount = 0;
-    
-    try {
-        for (const item of queue) {
-            // Push payload to GAS api
-            const success = await pushDataToGAS(item.action, item.payload);
-            if (success) {
-                // Delete from local queue store upon success
-                await deleteFromQueueByTimestamp(item.timestamp);
-                processedCount++;
-            } else {
-                // If it fails, stop execution and try again in next cycles
-                throw new Error("Gagal menyambung ke server Google");
+                    syncList.appendChild(li);
+                });
             }
         }
-        if (processedCount > 0) {
-            showToast(`Berhasil sinkronisasi ${processedCount} data ke Google Sheets!`, 'success');
-        }
-    } catch (err) {
-        console.warn("Background Sync Error: ", err);
-        showToast('Sinkronisasi ditunda (masalah jaringan atau API GAS).', 'warning');
-    } finally {
-        // Release Lock
-        State.syncLock = false;
-        setSyncLockDisplay('idle');
-        await refreshAllData();
     }
-}
 
-// Dynamic POST request sender to Apps Script
-async function pushDataToGAS(action, payload) {
-    if (!CONFIG.GAS_API_URL) {
-        // Mock Mode - if URL is empty, simulate successful sync after delay to demonstrate offline success!
-        return new Promise(resolve => {
-            setTimeout(async () => {
-                // If action is SAVE_REPAIR or UPDATE, mark transaction status as Synced in local store
-                if (action === 'SAVE_REPAIR' || action === 'UPDATE_REPAIR_STATUS') {
+    // The core background engine attempting synchronization with safety locking
+    async function runBackgroundSync() {
+        // 1. Guard check connection status
+        if (!navigator.onLine) {
+            setSyncLockDisplay('offline');
+            return;
+        }
+
+        // 2. Lock guard prevent concurrent thread processes
+        if (State.syncLock) {
+            return;
+        }
+
+        // 3. Obtain Sync Queue
+        const queue = await getLocalData('sync_queue');
+        if (queue.length === 0) {
+            setSyncLockDisplay('idle');
+            return;
+        }
+
+        // Acquire lock
+        State.syncLock = true;
+        setSyncLockDisplay('locked');
+        showToast(`Memulai sinkronisasi ${queue.length} transaksi ke Sheets...`, 'info');
+
+        // Run item-by-item queue drains
+        const tx = State.db.transaction('sync_queue', 'readwrite');
+        const store = tx.objectStore('sync_queue');
+
+        // We fetch cursor to process FIFO
+        let processedCount = 0;
+
+        try {
+            for (const item of queue) {
+                // Push payload to GAS api
+                const success = await pushDataToGAS(item.action, item.payload);
+                if (success) {
+                    // Delete from local queue store upon success
+                    await deleteFromQueueByTimestamp(item.timestamp);
+                    processedCount++;
+                } else {
+                    // If it fails, stop execution and try again in next cycles
+                    throw new Error("Gagal menyambung ke server Google");
+                }
+            }
+            if (processedCount > 0) {
+                showToast(`Berhasil sinkronisasi ${processedCount} data ke Google Sheets!`, 'success');
+            }
+        } catch (err) {
+            console.warn("Background Sync Error: ", err);
+            showToast('Sinkronisasi ditunda (masalah jaringan atau API GAS).', 'warning');
+        } finally {
+            // Release Lock
+            State.syncLock = false;
+            setSyncLockDisplay('idle');
+            await refreshAllData();
+        }
+    }
+
+    // Dynamic POST request sender to Apps Script
+    async function pushDataToGAS(action, payload) {
+        if (!CONFIG.GAS_API_URL) {
+            // Mock Mode - if URL is empty, simulate successful sync after delay to demonstrate offline success!
+            return new Promise(resolve => {
+                setTimeout(async () => {
+                    // If action is SAVE_REPAIR or UPDATE, mark transaction status as Synced in local store
+                    if (action === 'SAVE_REPAIR' || action === 'UPDATE_REPAIR_STATUS') {
+                        const txs = await getLocalData('repair_transactions');
+                        const match = txs.find(t => t.repair_number === payload.repair_number);
+                        if (match) {
+                            match.status = 'Synced';
+                            await saveLocalData('repair_transactions', match);
+                        }
+                    }
+                    resolve(true);
+                }, 1000);
+            });
+        }
+
+        try {
+            const response = await fetch(CONFIG.GAS_API_URL, {
+                method: 'POST',
+                mode: 'cors',
+                headers: {
+                    'Content-Type': 'text/plain;charset=utf-8'
+                },
+                body: JSON.stringify({ action, payload })
+            });
+            const result = await response.json();
+
+            if (result && result.status === 'success') {
+                // Update local transaction URLs / statuses if uploaded successfully
+                if ((action === 'SAVE_REPAIR' || action === 'UPDATE_REPAIR' || action === 'UPDATE_REPAIR_STATUS') && result.data) {
                     const txs = await getLocalData('repair_transactions');
                     const match = txs.find(t => t.repair_number === payload.repair_number);
                     if (match) {
                         match.status = 'Synced';
+                        if (result.data.cowok_image_url) match.cowok_image_url = result.data.cowok_image_url;
+                        if (result.data.cewek_image_url) match.cewek_image_url = result.data.cewek_image_url;
+                        if (result.data.warranty_image_url) match.warranty_image_url = result.data.warranty_image_url;
+                        if (result.data.dp1_receipt_url) match.dp1_receipt_url = result.data.dp1_receipt_url;
+                        if (result.data.dp2_receipt_url) match.dp2_receipt_url = result.data.dp2_receipt_url;
+
+                        if (result.data.dp_approval) match.dp_approval = result.data.dp_approval;
+                        if (result.data.pelunasan_approval) match.pelunasan_approval = result.data.pelunasan_approval;
+                        if (result.data.render_model_url) match.render_model_url = result.data.render_model_url;
+                        if (result.data.render_approval) match.render_approval = result.data.render_approval;
+                        if (result.data.realpict_url) match.realpict_url = result.data.realpict_url;
+                        if (result.data.realpict_approval) match.realpict_approval = result.data.realpict_approval;
+                        if (result.data.refund_receipt_url) match.refund_receipt_url = result.data.refund_receipt_url;
+                        if (result.data.final_pickup_status) match.final_pickup_status = result.data.final_pickup_status;
+                        if (result.data.pelunasan_receipt_url) match.dp2_receipt_url = result.data.pelunasan_receipt_url;
+
+                        if (payload.assigned_workshop !== undefined) match.assigned_workshop = payload.assigned_workshop;
+                        if (payload.production_status !== undefined) match.production_status = payload.production_status;
+                        if (payload.logistic_status !== undefined) match.logistic_status = payload.logistic_status;
+                        if (payload.logistic_receipt_no !== undefined) match.logistic_receipt_no = payload.logistic_receipt_no;
+                        if (payload.pelunasan_amount !== undefined) match.dp2_amount = payload.pelunasan_amount;
+                        if (payload.pelunasan_method !== undefined) match.dp2_method = payload.pelunasan_method;
+
                         await saveLocalData('repair_transactions', match);
                     }
                 }
-                resolve(true);
-            }, 1000);
-        });
-    }
-
-    try {
-        const response = await fetch(CONFIG.GAS_API_URL, {
-            method: 'POST',
-            mode: 'cors',
-            headers: {
-                'Content-Type': 'text/plain;charset=utf-8'
-            },
-            body: JSON.stringify({ action, payload })
-        });
-        const result = await response.json();
-        
-        if (result && result.status === 'success') {
-            // Update local transaction URLs / statuses if uploaded successfully
-            if ((action === 'SAVE_REPAIR' || action === 'UPDATE_REPAIR' || action === 'UPDATE_REPAIR_STATUS') && result.data) {
-                const txs = await getLocalData('repair_transactions');
-                const match = txs.find(t => t.repair_number === payload.repair_number);
-                if (match) {
-                    match.status = 'Synced';
-                    if (result.data.cowok_image_url) match.cowok_image_url = result.data.cowok_image_url;
-                    if (result.data.cewek_image_url) match.cewek_image_url = result.data.cewek_image_url;
-                    if (result.data.warranty_image_url) match.warranty_image_url = result.data.warranty_image_url;
-                    if (result.data.dp1_receipt_url) match.dp1_receipt_url = result.data.dp1_receipt_url;
-                    if (result.data.dp2_receipt_url) match.dp2_receipt_url = result.data.dp2_receipt_url;
-
-                    if (result.data.dp_approval) match.dp_approval = result.data.dp_approval;
-                    if (result.data.pelunasan_approval) match.pelunasan_approval = result.data.pelunasan_approval;
-                    if (result.data.render_model_url) match.render_model_url = result.data.render_model_url;
-                    if (result.data.render_approval) match.render_approval = result.data.render_approval;
-                    if (result.data.realpict_url) match.realpict_url = result.data.realpict_url;
-                    if (result.data.realpict_approval) match.realpict_approval = result.data.realpict_approval;
-                    if (result.data.refund_receipt_url) match.refund_receipt_url = result.data.refund_receipt_url;
-                    if (result.data.final_pickup_status) match.final_pickup_status = result.data.final_pickup_status;
-                    if (result.data.pelunasan_receipt_url) match.dp2_receipt_url = result.data.pelunasan_receipt_url;
-
-                    if (payload.assigned_workshop !== undefined) match.assigned_workshop = payload.assigned_workshop;
-                    if (payload.production_status !== undefined) match.production_status = payload.production_status;
-                    if (payload.logistic_status !== undefined) match.logistic_status = payload.logistic_status;
-                    if (payload.logistic_receipt_no !== undefined) match.logistic_receipt_no = payload.logistic_receipt_no;
-                    if (payload.pelunasan_amount !== undefined) match.dp2_amount = payload.pelunasan_amount;
-                    if (payload.pelunasan_method !== undefined) match.dp2_method = payload.pelunasan_method;
-                    
-                    await saveLocalData('repair_transactions', match);
-                }
+                return true;
             }
-            return true;
+            return false;
+        } catch (e) {
+            console.error("GAS Push Fail: ", e);
+            return false;
         }
-        return false;
-    } catch (e) {
-        console.error("GAS Push Fail: ", e);
-        return false;
     }
-}
 
-function deleteFromQueueByTimestamp(timestamp) {
-    return new Promise((resolve) => {
-        const tx = State.db.transaction('sync_queue', 'readwrite');
-        const store = tx.objectStore('sync_queue');
-        const req = store.openCursor();
-        req.onsuccess = (e) => {
-            const cursor = e.target.result;
-            if (cursor) {
-                if (cursor.value.timestamp === timestamp) {
-                    cursor.delete();
-                    resolve();
+    function deleteFromQueueByTimestamp(timestamp) {
+        return new Promise((resolve) => {
+            const tx = State.db.transaction('sync_queue', 'readwrite');
+            const store = tx.objectStore('sync_queue');
+            const req = store.openCursor();
+            req.onsuccess = (e) => {
+                const cursor = e.target.result;
+                if (cursor) {
+                    if (cursor.value.timestamp === timestamp) {
+                        cursor.delete();
+                        resolve();
+                    } else {
+                        cursor.continue();
+                    }
                 } else {
-                    cursor.continue();
+                    resolve();
                 }
-            } else {
-                resolve();
-            }
-        };
-    });
-}
-
-function setSyncLockDisplay(status) {
-    const el = document.getElementById('sync-lock-status');
-    if (!el) return;
-    if (status === 'locked') {
-        el.textContent = 'Terkunci (Sedang Sinkronisasi)';
-        el.className = 'locked';
-    } else if (status === 'offline') {
-        el.textContent = 'Ditunda (Offline)';
-        el.className = 'offline';
-    } else {
-        el.textContent = 'Bebas (Idle)';
-        el.className = 'unlocked';
-    }
-}
-
-// Watch Connection State Events
-window.addEventListener('online', () => {
-    updateConnectionIndicator(true);
-    runBackgroundSync();
-});
-
-window.addEventListener('offline', () => {
-    updateConnectionIndicator(false);
-});
-
-function updateConnectionIndicator(online) {
-    const ind = document.getElementById('network-indicator');
-    const dot = ind.querySelector('.status-dot');
-    const text = document.getElementById('network-text');
-    const dbStatus = document.getElementById('sync-db-status');
-    const driveStatus = document.getElementById('sync-drive-status');
-
-    if (online) {
-        dot.className = 'status-dot online';
-        text.textContent = 'Online';
-        if (dbStatus) {
-            dbStatus.textContent = 'Tersambung (Sheets DB)';
-            dbStatus.className = 'online';
-        }
-        if (driveStatus) {
-            driveStatus.textContent = 'Tersambung (Drive API)';
-            driveStatus.className = 'online';
-        }
-    } else {
-        dot.className = 'status-dot';
-        text.textContent = 'Offline-mode';
-        if (dbStatus) {
-            dbStatus.textContent = 'Terputus (Mode Lokal)';
-            dbStatus.className = 'offline';
-        }
-        if (driveStatus) {
-            driveStatus.textContent = 'Terputus (Mode Lokal)';
-            driveStatus.className = 'offline';
-        }
-    }
-}
-
-// ==========================================================================
-// 8. ADMINISTRATOR CONSOLE CONTROLLER
-// ==========================================================================
-
-async function renderAdminPanels() {
-    // Dynamic loading of admin lists
-    await loadAdminTable('users', 'master_users', ['username', 'role', 'store_code']);
-    await loadAdminTable('stores', 'master_stores', ['code', 'name', 'address', 'phone']);
-    await loadAdminTable('catalog', 'master_catalog', ['id', 'name', 'category', 'price']);
-    await loadAdminTable('metals', 'master_metals', ['id', 'name', 'price_per_gram', 'custom_fee']);
-    await loadAdminTable('repairs', 'master_repairs', ['id', 'name', 'repair_fee']);
-    await loadAdminTable('workshops', 'master_workshops', ['id', 'name', 'phone', 'address']);
-    await loadAdminTable('cities', 'master_cities', ['id', 'city', 'province', 'shipping_fee']);
-    await loadAdminTable('payments', 'master_payments', ['id', 'name']);
-}
-
-async function loadAdminTable(panelSuffix, storeName, keys) {
-    const data = await getLocalData(storeName);
-    const tbody = document.querySelector(`#table-admin-${panelSuffix} tbody`);
-    if (!tbody) return;
-
-    tbody.innerHTML = '';
-
-    data.forEach(item => {
-        const tr = document.createElement('tr');
-        let cellsHtml = '';
-        keys.forEach(k => {
-            let val = item[k];
-            // Format price variables if they are numbers
-            if (typeof val === 'number' && (k.includes('price') || k.includes('fee'))) {
-                val = formatRupiah(val);
-            }
-            cellsHtml += `<td>${val}</td>`;
+            };
         });
-        
-        // Target ID for key operations
-        const idVal = item[keys[0]]; // usually the primary key is first key
-        
-        cellsHtml += `
+    }
+
+    function setSyncLockDisplay(status) {
+        const el = document.getElementById('sync-lock-status');
+        if (!el) return;
+        if (status === 'locked') {
+            el.textContent = 'Terkunci (Sedang Sinkronisasi)';
+            el.className = 'locked';
+        } else if (status === 'offline') {
+            el.textContent = 'Ditunda (Offline)';
+            el.className = 'offline';
+        } else {
+            el.textContent = 'Bebas (Idle)';
+            el.className = 'unlocked';
+        }
+    }
+
+    // Watch Connection State Events
+    window.addEventListener('online', () => {
+        updateConnectionIndicator(true);
+        runBackgroundSync();
+    });
+
+    window.addEventListener('offline', () => {
+        updateConnectionIndicator(false);
+    });
+
+    function updateConnectionIndicator(online) {
+        const ind = document.getElementById('network-indicator');
+        const dot = ind.querySelector('.status-dot');
+        const text = document.getElementById('network-text');
+        const dbStatus = document.getElementById('sync-db-status');
+        const driveStatus = document.getElementById('sync-drive-status');
+
+        if (online) {
+            dot.className = 'status-dot online';
+            text.textContent = 'Online';
+            if (dbStatus) {
+                dbStatus.textContent = 'Tersambung (Sheets DB)';
+                dbStatus.className = 'online';
+            }
+            if (driveStatus) {
+                driveStatus.textContent = 'Tersambung (Drive API)';
+                driveStatus.className = 'online';
+            }
+        } else {
+            dot.className = 'status-dot';
+            text.textContent = 'Offline-mode';
+            if (dbStatus) {
+                dbStatus.textContent = 'Terputus (Mode Lokal)';
+                dbStatus.className = 'offline';
+            }
+            if (driveStatus) {
+                driveStatus.textContent = 'Terputus (Mode Lokal)';
+                driveStatus.className = 'offline';
+            }
+        }
+    }
+
+    // ==========================================================================
+    // 8. ADMINISTRATOR CONSOLE CONTROLLER
+    // ==========================================================================
+
+    async function renderAdminPanels() {
+        // Dynamic loading of admin lists
+        await loadAdminTable('users', 'master_users', ['username', 'role', 'store_code']);
+        await loadAdminTable('stores', 'master_stores', ['code', 'name', 'address', 'phone']);
+        await loadAdminTable('catalog', 'master_catalog', ['id', 'name', 'category', 'price']);
+        await loadAdminTable('metals', 'master_metals', ['id', 'name', 'price_per_gram', 'custom_fee']);
+        await loadAdminTable('repairs', 'master_repairs', ['id', 'name', 'repair_fee']);
+        await loadAdminTable('workshops', 'master_workshops', ['id', 'name', 'phone', 'address']);
+        await loadAdminTable('cities', 'master_cities', ['id', 'city', 'province', 'shipping_fee']);
+        await loadAdminTable('payments', 'master_payments', ['id', 'name']);
+    }
+
+    async function loadAdminTable(panelSuffix, storeName, keys) {
+        const data = await getLocalData(storeName);
+        const tbody = document.querySelector(`#table-admin-${panelSuffix} tbody`);
+        if (!tbody) return;
+
+        tbody.innerHTML = '';
+
+        data.forEach(item => {
+            const tr = document.createElement('tr');
+            let cellsHtml = '';
+            keys.forEach(k => {
+                let val = item[k];
+                // Format price variables if they are numbers
+                if (typeof val === 'number' && (k.includes('price') || k.includes('fee'))) {
+                    val = formatRupiah(val);
+                }
+                cellsHtml += `<td>${val}</td>`;
+            });
+
+            // Target ID for key operations
+            const idVal = item[keys[0]]; // usually the primary key is first key
+
+            cellsHtml += `
             <td>
                 <div class="action-buttons-flex">
                     <button class="action-btn-circle btn-admin-edit" data-store="${storeName}" data-id="${idVal}" title="Edit"><i class="fa-solid fa-pen-to-square"></i></button>
@@ -2248,49 +2785,49 @@ async function loadAdminTable(panelSuffix, storeName, keys) {
                 </div>
             </td>
         `;
-        tr.innerHTML = cellsHtml;
-        tbody.appendChild(tr);
-    });
+            tr.innerHTML = cellsHtml;
+            tbody.appendChild(tr);
+        });
 
-    if (data.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="${keys.length + 1}" style="text-align:center; color:var(--text-muted);">Tidak ada data master terdaftar.</td></tr>`;
+        if (data.length === 0) {
+            tbody.innerHTML = `<tr><td colspan="${keys.length + 1}" style="text-align:center; color:var(--text-muted);">Tidak ada data master terdaftar.</td></tr>`;
+        }
+
+        // Attach CRUD listeners
+        tbody.querySelectorAll('.btn-admin-edit').forEach(btn => {
+            btn.addEventListener('click', () => showCRUDModal(btn.dataset.store, btn.dataset.id, 'EDIT'));
+        });
+        tbody.querySelectorAll('.btn-admin-delete').forEach(btn => {
+            btn.addEventListener('click', () => executeAdminDelete(btn.dataset.store, btn.dataset.id));
+        });
     }
 
-    // Attach CRUD listeners
-    tbody.querySelectorAll('.btn-admin-edit').forEach(btn => {
-        btn.addEventListener('click', () => showCRUDModal(btn.dataset.store, btn.dataset.id, 'EDIT'));
-    });
-    tbody.querySelectorAll('.btn-admin-delete').forEach(btn => {
-        btn.addEventListener('click', () => executeAdminDelete(btn.dataset.store, btn.dataset.id));
-    });
-}
+    async function executeAdminDelete(storeName, key) {
+        if (confirm(`Apakah Anda yakin ingin menghapus data master ${key} dari database?`)) {
+            await deleteLocalData(storeName, key);
 
-async function executeAdminDelete(storeName, key) {
-    if (confirm(`Apakah Anda yakin ingin menghapus data master ${key} dari database?`)) {
-        await deleteLocalData(storeName, key);
-        
-        // Sync database deletions to Sheet DB
-        await queueSyncTask('DELETE_MASTER_RECORD', { store_name: storeName, key: key });
-        
-        showToast('Data master berhasil dihapus!', 'success');
-        await refreshAllData();
-    }
-}
+            // Sync database deletions to Sheet DB
+            await queueSyncTask('DELETE_MASTER_RECORD', { store_name: storeName, key: key });
 
-// Renders CRUD Inputs dynamically based on which table is open
-async function showCRUDModal(storeName, key = null, type = 'ADD') {
-    const crudForm = document.getElementById('crud-form-fields');
-    let fields = '';
-
-    let record = null;
-    if (key) {
-        const data = await getLocalData(storeName);
-        record = data.find(item => item[Object.keys(data[0])[0]] === key || item.id === key || item.username === key || item.code === key);
+            showToast('Data master berhasil dihapus!', 'success');
+            await refreshAllData();
+        }
     }
 
-    // 1. Users CRUD fields
-    if (storeName === 'master_users') {
-        fields = `
+    // Renders CRUD Inputs dynamically based on which table is open
+    async function showCRUDModal(storeName, key = null, type = 'ADD') {
+        const crudForm = document.getElementById('crud-form-fields');
+        let fields = '';
+
+        let record = null;
+        if (key) {
+            const data = await getLocalData(storeName);
+            record = data.find(item => item[Object.keys(data[0])[0]] === key || item.id === key || item.username === key || item.code === key);
+        }
+
+        // 1. Users CRUD fields
+        if (storeName === 'master_users') {
+            fields = `
             <div class="form-group">
                 <label for="c-user-name">Username (ID)</label>
                 <input type="text" id="c-user-name" placeholder="E.g., andi_sales" value="${record ? record.username : ''}" ${record ? 'readonly class="readonly-input"' : ''} required>
@@ -2314,10 +2851,10 @@ async function showCRUDModal(storeName, key = null, type = 'ADD') {
                 <input type="text" id="c-user-store" placeholder="E.g., BEK or ALL" value="${record ? record.store_code : ''}" required>
             </div>
         `;
-    }
-    // 2. Stores CRUD fields
-    else if (storeName === 'master_stores') {
-        fields = `
+        }
+        // 2. Stores CRUD fields
+        else if (storeName === 'master_stores') {
+            fields = `
             <div class="form-group">
                 <label for="c-store-code">Kode Cabang Store</label>
                 <input type="text" id="c-store-code" placeholder="E.g., BEK" value="${record ? record.code : ''}" ${record ? 'readonly class="readonly-input"' : ''} required>
@@ -2335,10 +2872,10 @@ async function showCRUDModal(storeName, key = null, type = 'ADD') {
                 <input type="tel" id="c-store-phone" placeholder="E.g., 6281xxxxxx" value="${record ? record.phone : ''}" required>
             </div>
         `;
-    }
-    // 3. Catalog CRUD fields
-    else if (storeName === 'master_catalog') {
-        fields = `
+        }
+        // 3. Catalog CRUD fields
+        else if (storeName === 'master_catalog') {
+            fields = `
             <div class="form-group">
                 <label for="c-cat-id">ID Katalog</label>
                 <input type="text" id="c-cat-id" placeholder="E.g., CAT-007" value="${record ? record.id : ''}" ${record ? 'readonly class="readonly-input"' : ''} required>
@@ -2359,10 +2896,10 @@ async function showCRUDModal(storeName, key = null, type = 'ADD') {
                 <input type="number" id="c-cat-price" value="${record ? record.price : ''}" required>
             </div>
         `;
-    }
-    // 4. Metals CRUD fields
-    else if (storeName === 'master_metals') {
-        fields = `
+        }
+        // 4. Metals CRUD fields
+        else if (storeName === 'master_metals') {
+            fields = `
             <div class="form-group">
                 <label for="c-met-id">ID Bahan</label>
                 <input type="text" id="c-met-id" placeholder="E.g., MET-006" value="${record ? record.id : ''}" ${record ? 'readonly class="readonly-input"' : ''} required>
@@ -2380,10 +2917,10 @@ async function showCRUDModal(storeName, key = null, type = 'ADD') {
                 <input type="number" id="c-met-fee" value="${record ? record.custom_fee : ''}" required>
             </div>
         `;
-    }
-    // 5. Repairs CRUD fields
-    else if (storeName === 'master_repairs') {
-        fields = `
+        }
+        // 5. Repairs CRUD fields
+        else if (storeName === 'master_repairs') {
+            fields = `
             <div class="form-group">
                 <label for="c-rep-id">ID Repair</label>
                 <input type="text" id="c-rep-id" placeholder="E.g., REP-007" value="${record ? record.id : ''}" ${record ? 'readonly class="readonly-input"' : ''} required>
@@ -2397,10 +2934,10 @@ async function showCRUDModal(storeName, key = null, type = 'ADD') {
                 <input type="number" id="c-rep-fee" value="${record ? record.repair_fee : ''}" required>
             </div>
         `;
-    }
-    // 6. Workshops CRUD fields
-    else if (storeName === 'master_workshops') {
-        fields = `
+        }
+        // 6. Workshops CRUD fields
+        else if (storeName === 'master_workshops') {
+            fields = `
             <div class="form-group">
                 <label for="c-wks-id">ID Workshop</label>
                 <input type="text" id="c-wks-id" placeholder="E.g., WKS-003" value="${record ? record.id : ''}" ${record ? 'readonly class="readonly-input"' : ''} required>
@@ -2418,10 +2955,10 @@ async function showCRUDModal(storeName, key = null, type = 'ADD') {
                 <textarea id="c-wks-addr" required>${record ? record.address : ''}</textarea>
             </div>
         `;
-    }
-    // 7. Cities CRUD fields
-    else if (storeName === 'master_cities') {
-        fields = `
+        }
+        // 7. Cities CRUD fields
+        else if (storeName === 'master_cities') {
+            fields = `
             <div class="form-group">
                 <label for="c-city-id">ID Kabupaten/Kota</label>
                 <input type="text" id="c-city-id" placeholder="E.g., CIT-010" value="${record ? record.id : ''}" ${record ? 'readonly class="readonly-input"' : ''} required>
@@ -2439,10 +2976,10 @@ async function showCRUDModal(storeName, key = null, type = 'ADD') {
                 <input type="number" id="c-city-fee" value="${record ? record.shipping_fee : ''}" required>
             </div>
         `;
-    }
-    // 8. Payments CRUD fields
-    else if (storeName === 'master_payments') {
-        fields = `
+        }
+        // 8. Payments CRUD fields
+        else if (storeName === 'master_payments') {
+            fields = `
             <div class="form-group">
                 <label for="c-pay-id">ID Pembayaran</label>
                 <input type="text" id="c-pay-id" placeholder="E.g., PAY-005" value="${record ? record.id : ''}" ${record ? 'readonly class="readonly-input"' : ''} required>
@@ -2452,215 +2989,218 @@ async function showCRUDModal(storeName, key = null, type = 'ADD') {
                 <input type="text" id="c-pay-name" placeholder="E.g., BRI Transfer SOVIA" value="${record ? record.name : ''}" required>
             </div>
         `;
+        }
+
+        document.getElementById('crud-modal-title').textContent = `${type === 'EDIT' ? 'Ubah' : 'Tambah'} Data Master`;
+        crudForm.innerHTML = fields;
+
+        // Attach details in modal element datasets
+        const modal = document.getElementById('crud-modal');
+        modal.classList.remove('hidden');
+        modal.dataset.crudStore = storeName;
+        modal.dataset.crudAction = type;
     }
 
-    document.getElementById('crud-modal-title').textContent = `${type === 'EDIT' ? 'Ubah' : 'Tambah'} Data Master`;
-    crudForm.innerHTML = fields;
-    
-    // Attach details in modal element datasets
-    const modal = document.getElementById('crud-modal');
-    modal.classList.remove('hidden');
-    modal.dataset.crudStore = storeName;
-    modal.dataset.crudAction = type;
-}
+    // Parses CRUD inputs and commits changes locally and lists them for sync
+    async function executeCRUDSubmit() {
+        const modal = document.getElementById('crud-modal');
+        const storeName = modal.dataset.crudStore;
+        const actionType = modal.dataset.crudAction;
 
-// Parses CRUD inputs and commits changes locally and lists them for sync
-async function executeCRUDSubmit() {
-    const modal = document.getElementById('crud-modal');
-    const storeName = modal.dataset.crudStore;
-    const actionType = modal.dataset.crudAction;
+        let payloadObj = {};
 
-    let payloadObj = {};
+        // Retrieve input values dynamically based on active store CRUD
+        if (storeName === 'master_users') {
+            payloadObj = {
+                username: document.getElementById('c-user-name').value.trim(),
+                password: document.getElementById('c-user-pass').value,
+                role: document.getElementById('c-user-role').value,
+                store_code: document.getElementById('c-user-store').value.trim().toUpperCase()
+            };
+        } else if (storeName === 'master_stores') {
+            payloadObj = {
+                code: document.getElementById('c-store-code').value.trim().toUpperCase(),
+                name: document.getElementById('c-store-name').value.trim(),
+                address: document.getElementById('c-store-addr').value.trim(),
+                phone: document.getElementById('c-store-phone').value.trim()
+            };
+        } else if (storeName === 'master_catalog') {
+            payloadObj = {
+                id: document.getElementById('c-cat-id').value.trim(),
+                name: document.getElementById('c-cat-name').value.trim(),
+                category: document.getElementById('c-cat-cat').value,
+                price: parseFloat(document.getElementById('c-cat-price').value) || 0
+            };
+        } else if (storeName === 'master_metals') {
+            payloadObj = {
+                id: document.getElementById('c-met-id').value.trim(),
+                name: document.getElementById('c-met-name').value.trim(),
+                price_per_gram: parseFloat(document.getElementById('c-met-price').value) || 0,
+                custom_fee: parseFloat(document.getElementById('c-met-fee').value) || 0
+            };
+        } else if (storeName === 'master_repairs') {
+            payloadObj = {
+                id: document.getElementById('c-rep-id').value.trim(),
+                name: document.getElementById('c-rep-name').value.trim(),
+                repair_fee: parseFloat(document.getElementById('c-rep-fee').value) || 0
+            };
+        } else if (storeName === 'master_workshops') {
+            payloadObj = {
+                id: document.getElementById('c-wks-id').value.trim(),
+                name: document.getElementById('c-wks-name').value.trim(),
+                phone: document.getElementById('c-wks-phone').value.trim(),
+                address: document.getElementById('c-wks-addr').value.trim()
+            };
+        } else if (storeName === 'master_cities') {
+            payloadObj = {
+                id: document.getElementById('c-city-id').value.trim(),
+                city: document.getElementById('c-city-name').value.trim(),
+                province: document.getElementById('c-city-prov').value.trim(),
+                shipping_fee: parseFloat(document.getElementById('c-city-fee').value) || 0
+            };
+        } else if (storeName === 'master_payments') {
+            payloadObj = {
+                id: document.getElementById('c-pay-id').value.trim(),
+                name: document.getElementById('c-pay-name').value.trim()
+            };
+        }
 
-    // Retrieve input values dynamically based on active store CRUD
-    if (storeName === 'master_users') {
-        payloadObj = {
-            username: document.getElementById('c-user-name').value.trim(),
-            password: document.getElementById('c-user-pass').value,
-            role: document.getElementById('c-user-role').value,
-            store_code: document.getElementById('c-user-store').value.trim().toUpperCase()
-        };
-    } else if (storeName === 'master_stores') {
-        payloadObj = {
-            code: document.getElementById('c-store-code').value.trim().toUpperCase(),
-            name: document.getElementById('c-store-name').value.trim(),
-            address: document.getElementById('c-store-addr').value.trim(),
-            phone: document.getElementById('c-store-phone').value.trim()
-        };
-    } else if (storeName === 'master_catalog') {
-        payloadObj = {
-            id: document.getElementById('c-cat-id').value.trim(),
-            name: document.getElementById('c-cat-name').value.trim(),
-            category: document.getElementById('c-cat-cat').value,
-            price: parseFloat(document.getElementById('c-cat-price').value) || 0
-        };
-    } else if (storeName === 'master_metals') {
-        payloadObj = {
-            id: document.getElementById('c-met-id').value.trim(),
-            name: document.getElementById('c-met-name').value.trim(),
-            price_per_gram: parseFloat(document.getElementById('c-met-price').value) || 0,
-            custom_fee: parseFloat(document.getElementById('c-met-fee').value) || 0
-        };
-    } else if (storeName === 'master_repairs') {
-        payloadObj = {
-            id: document.getElementById('c-rep-id').value.trim(),
-            name: document.getElementById('c-rep-name').value.trim(),
-            repair_fee: parseFloat(document.getElementById('c-rep-fee').value) || 0
-        };
-    } else if (storeName === 'master_workshops') {
-        payloadObj = {
-            id: document.getElementById('c-wks-id').value.trim(),
-            name: document.getElementById('c-wks-name').value.trim(),
-            phone: document.getElementById('c-wks-phone').value.trim(),
-            address: document.getElementById('c-wks-addr').value.trim()
-        };
-    } else if (storeName === 'master_cities') {
-        payloadObj = {
-            id: document.getElementById('c-city-id').value.trim(),
-            city: document.getElementById('c-city-name').value.trim(),
-            province: document.getElementById('c-city-prov').value.trim(),
-            shipping_fee: parseFloat(document.getElementById('c-city-fee').value) || 0
-        };
-    } else if (storeName === 'master_payments') {
-        payloadObj = {
-            id: document.getElementById('c-pay-id').value.trim(),
-            name: document.getElementById('c-pay-name').value.trim()
-        };
-    }
+        // Confirm that payload values are filled
+        const emptyKeys = Object.keys(payloadObj).filter(k => payloadObj[k] === '' || payloadObj[k] === null);
+        if (emptyKeys.length > 0) {
+            showToast('Lengkapi seluruh formulir isian master!', 'warning');
+            return;
+        }
 
-    // Confirm that payload values are filled
-    const emptyKeys = Object.keys(payloadObj).filter(k => payloadObj[k] === '' || payloadObj[k] === null);
-    if (emptyKeys.length > 0) {
-        showToast('Lengkapi seluruh formulir isian master!', 'warning');
-        return;
-    }
+        // Save locally
+        await saveLocalData(storeName, payloadObj);
 
-    // Save locally
-    await saveLocalData(storeName, payloadObj);
+        // Queue sync task
+        const actionKey = actionType === 'EDIT' ? 'UPDATE_MASTER_RECORD' : 'SAVE_MASTER_RECORD';
+        await queueSyncTask(actionKey, { store_name: storeName, payload: payloadObj });
 
-    // Queue sync task
-    const actionKey = actionType === 'EDIT' ? 'UPDATE_MASTER_RECORD' : 'SAVE_MASTER_RECORD';
-    await queueSyncTask(actionKey, { store_name: storeName, payload: payloadObj });
+        showToast('Data master disimpan!', 'success');
+        modal.classList.add('hidden');
 
-    showToast('Data master disimpan!', 'success');
-    modal.classList.add('hidden');
-    
-    await refreshAllData();
-}
-
-// Delegating workshop to pengerjaan repair
-async function executeProductionAssignSubmit() {
-    const repNum = document.getElementById('crud-p-repnum').value;
-    const assignedWks = document.getElementById('crud-p-wks').value;
-
-    const txs = await getLocalData('repair_transactions');
-    const match = txs.find(t => t.repair_number === repNum);
-    
-    if (match) {
-        match.assigned_workshop = assignedWks;
-        match.production_status = 'Active'; // Automatically moves status to active pengerjaan
-        match.status = 'Pending Sync';
-        await saveLocalData('repair_transactions', match);
-        
-        await queueSyncTask('UPDATE_REPAIR_STATUS', { 
-            repair_number: repNum, 
-            assigned_workshop: assignedWks, 
-            production_status: 'Active' 
-        });
-
-        showToast(`Cincin ${repNum} didelegasikan ke ${assignedWks}!`, 'success');
-        document.getElementById('crud-modal').classList.add('hidden');
         await refreshAllData();
     }
-}
 
-// Logistik inputting kurir tracking numbers
-async function executeLogisticShipSubmit() {
-    const repNum = document.getElementById('crud-l-repnum').value;
-    const trackingNo = document.getElementById('crud-l-receipt').value.trim();
+    // Delegating workshop to pengerjaan repair
+    async function executeProductionAssignSubmit() {
+        const repNum = document.getElementById('crud-p-repnum').value;
+        const assignedWks = document.getElementById('crud-p-wks').value;
 
-    const txs = await getLocalData('repair_transactions');
-    const match = txs.find(t => t.repair_number === repNum);
-    
-    if (match && trackingNo) {
-        match.logistic_receipt_no = trackingNo;
-        match.logistic_status = 'Shipped';
-        match.status = 'Synced'; // Simulating completed delivery
-        await saveLocalData('repair_transactions', match);
-        
-        await queueSyncTask('UPDATE_REPAIR_STATUS', { 
-            repair_number: repNum, 
-            logistic_receipt_no: trackingNo, 
-            logistic_status: 'Shipped',
-            status: 'Completed'
-        });
+        const txs = await getLocalData('repair_transactions');
+        const match = txs.find(t => t.repair_number === repNum);
 
-        showToast(`Resi kurir ${trackingNo} disimpan pada transaksi ${repNum}!`, 'success');
-        document.getElementById('crud-modal').classList.add('hidden');
-        await refreshAllData();
-    }
-}
+        if (match) {
+            match.assigned_workshop = assignedWks;
+            match.production_status = 'Active'; // Automatically moves status to active pengerjaan
+            match.status = 'Pending Sync';
+            await saveLocalData('repair_transactions', match);
 
-// ==========================================================================
-// 9. GENERAL REFRESH & UTILITIES
-// ==========================================================================
+            await queueSyncTask('UPDATE_REPAIR_STATUS', {
+                repair_number: repNum,
+                assigned_workshop: assignedWks,
+                production_status: 'Active'
+            });
 
-async function refreshAllData() {
-    // 1. Reload RAM cache from IndexedDB
-    await loadAllMasterDataToCache();
-    
-    // 2. Refresh UI tables
-    if (State.currentUser) {
-        await renderRepairHistory();
-        await renderAccountingBoard();
-        await renderProductionBoard();
-        await renderLogisticBoard();
-        await renderAdminPanels();
-        
-        // Update stats
-        const allTx = await getLocalData('repair_transactions');
-        document.getElementById('stat-total-repairs').textContent = allTx.length;
-        
-        const activeProd = allTx.filter(t => t.production_status === 'Active').length;
-        document.getElementById('stat-production-repairs').textContent = activeProd;
-
-        const comp = allTx.filter(t => t.production_status === 'Completed' || t.logistic_status === 'Shipped').length;
-        document.getElementById('stat-completed-repairs').textContent = comp;
+            showToast(`Cincin ${repNum} didelegasikan ke ${assignedWks}!`, 'success');
+            document.getElementById('crud-modal').classList.add('hidden');
+            await refreshAllData();
+        }
     }
 
-    // 3. Update Sync Queue logs visualizer
-    await updateSyncQueueDisplay();
-}
+    // Logistik inputting kurir tracking numbers
+    async function executeLogisticShipSubmit() {
+        const repNum = document.getElementById('crud-l-repnum').value;
+        const trackingNo = document.getElementById('crud-l-receipt').value.trim();
 
-// --- UTILITY FORMATTING HELPERS ---
-function formatRupiah(amount) {
-    return 'Rp ' + Number(amount).toLocaleString('id-ID');
-}
+        const txs = await getLocalData('repair_transactions');
+        const match = txs.find(t => t.repair_number === repNum);
 
-function formatSimpleDate(dateString) {
-    if (!dateString) return '-';
-    const parts = dateString.split('-');
-    if (parts.length !== 3) return dateString;
-    return `${parts[2]}/${parts[1]}/${parts[0]}`;
-}
+        if (match && trackingNo) {
+            match.logistic_receipt_no = trackingNo;
+            match.logistic_status = 'Shipped';
+            match.status = 'Synced'; // Simulating completed delivery
+            await saveLocalData('repair_transactions', match);
 
-function formatSimpleTime(timeString) {
-    if (!timeString) return '';
-    return timeString.substring(0, 5);
-}
+            await queueSyncTask('UPDATE_REPAIR_STATUS', {
+                repair_number: repNum,
+                logistic_receipt_no: trackingNo,
+                logistic_status: 'Shipped',
+                status: 'Completed'
+            });
 
-// Notification Toast Visualizer
-function showToast(message, type = 'info') {
-    const container = document.getElementById('toast-container');
-    const toast = document.createElement('div');
-    toast.className = `toast ${type}`;
-    
-    let icon = '<i class="fa-solid fa-circle-info"></i>';
-    if (type === 'success') icon = '<i class="fa-solid fa-circle-check"></i>';
-    else if (type === 'error') icon = '<i class="fa-solid fa-circle-exclamation"></i>';
-    else if (type === 'warning') icon = '<i class="fa-solid fa-triangle-exclamation"></i>';
+            showToast(`Resi kurir ${trackingNo} disimpan pada transaksi ${repNum}!`, 'success');
+            document.getElementById('crud-modal').classList.add('hidden');
+            await refreshAllData();
+        }
+    }
 
-    toast.innerHTML = `
+    // ==========================================================================
+    // 9. GENERAL REFRESH & UTILITIES
+    // ==========================================================================
+
+    async function refreshAllData() {
+        // 1. Reload RAM cache from IndexedDB
+        await loadAllMasterDataToCache();
+
+        // 2. Refresh UI tables
+        if (State.currentUser) {
+            await renderRepairHistory();
+            await renderAccountingBoard();
+            await renderProductionBoard();
+            await renderDesignerBoard();
+            await renderQABoard();
+            await renderQCBoard();
+            await renderLogisticBoard();
+            await renderAdminPanels();
+
+            // Update stats
+            const allTx = await getLocalData('repair_transactions');
+            document.getElementById('stat-total-repairs').textContent = allTx.length;
+
+            const activeProd = allTx.filter(t => t.production_status === 'Active').length;
+            document.getElementById('stat-production-repairs').textContent = activeProd;
+
+            const comp = allTx.filter(t => t.production_status === 'Completed' || t.logistic_status === 'Shipped').length;
+            document.getElementById('stat-completed-repairs').textContent = comp;
+        }
+
+        // 3. Update Sync Queue logs visualizer
+        await updateSyncQueueDisplay();
+    }
+
+    // --- UTILITY FORMATTING HELPERS ---
+    function formatRupiah(amount) {
+        return 'Rp ' + Number(amount).toLocaleString('id-ID');
+    }
+
+    function formatSimpleDate(dateString) {
+        if (!dateString) return '-';
+        const parts = dateString.split('-');
+        if (parts.length !== 3) return dateString;
+        return `${parts[2]}/${parts[1]}/${parts[0]}`;
+    }
+
+    function formatSimpleTime(timeString) {
+        if (!timeString) return '';
+        return timeString.substring(0, 5);
+    }
+
+    // Notification Toast Visualizer
+    function showToast(message, type = 'info') {
+        const container = document.getElementById('toast-container');
+        const toast = document.createElement('div');
+        toast.className = `toast ${type}`;
+
+        let icon = '<i class="fa-solid fa-circle-info"></i>';
+        if (type === 'success') icon = '<i class="fa-solid fa-circle-check"></i>';
+        else if (type === 'error') icon = '<i class="fa-solid fa-circle-exclamation"></i>';
+        else if (type === 'warning') icon = '<i class="fa-solid fa-triangle-exclamation"></i>';
+
+        toast.innerHTML = `
         <div class="toast-icon">${icon}</div>
         <div class="toast-content">
             <h4>${type.toUpperCase()}</h4>
@@ -2668,938 +3208,938 @@ function showToast(message, type = 'info') {
         </div>
     `;
 
-    container.appendChild(toast);
+        container.appendChild(toast);
 
-    setTimeout(() => {
-        toast.classList.add('fade-out');
-        setTimeout(() => toast.remove(), 400);
-    }, 4000);
-}
+        setTimeout(() => {
+            toast.classList.add('fade-out');
+            setTimeout(() => toast.remove(), 400);
+        }, 4000);
+    }
 
-// ==========================================================================
-// 10. DOM EVENT HANDLERS BINDING
-// ==========================================================================
+    // ==========================================================================
+    // 10. DOM EVENT HANDLERS BINDING
+    // ==========================================================================
 
-document.addEventListener('DOMContentLoaded', async () => {
-    // 1. Initialize local databases
-    await initDatabase();
-    await loadAllMasterDataToCache();
+    document.addEventListener('DOMContentLoaded', async () => {
+        // 1. Initialize local databases
+        await initDatabase();
+        await loadAllMasterDataToCache();
 
-    // 2. Check login state
-    checkSession();
+        // 2. Check login state
+        checkSession();
 
-    // Set connection status label
-    updateConnectionIndicator(navigator.onLine);
+        // Set connection status label
+        updateConnectionIndicator(navigator.onLine);
 
-    // --- BINDING: PORTAL HUB & LOGIN ---
-    document.getElementById('btn-enter-repair').addEventListener('click', () => {
-        showLoginScreen();
-    });
+        // --- BINDING: PORTAL HUB & LOGIN ---
+        document.getElementById('btn-enter-repair').addEventListener('click', () => {
+            showLoginScreen();
+        });
 
-    document.getElementById('btn-login-back').addEventListener('click', () => {
-        showPortalHub();
-    });
+        document.getElementById('btn-login-back').addEventListener('click', () => {
+            showPortalHub();
+        });
 
-    document.getElementById('btn-toggle-password').addEventListener('click', () => {
-        const passInput = document.getElementById('login-password');
-        const eyeIcon = document.getElementById('btn-toggle-password').querySelector('i');
-        if (passInput.type === 'password') {
-            passInput.type = 'text';
-            eyeIcon.className = 'fa-regular fa-eye-slash';
-        } else {
-            passInput.type = 'password';
-            eyeIcon.className = 'fa-regular fa-eye';
-        }
-    });
+        document.getElementById('btn-toggle-password').addEventListener('click', () => {
+            const passInput = document.getElementById('login-password');
+            const eyeIcon = document.getElementById('btn-toggle-password').querySelector('i');
+            if (passInput.type === 'password') {
+                passInput.type = 'text';
+                eyeIcon.className = 'fa-regular fa-eye-slash';
+            } else {
+                passInput.type = 'password';
+                eyeIcon.className = 'fa-regular fa-eye';
+            }
+        });
 
-    document.getElementById('login-form').addEventListener('submit', (e) => {
-        e.preventDefault();
-        const username = document.getElementById('login-username').value;
-        const password = document.getElementById('login-password').value;
-        handleLogin(username, password);
-    });
-
-    document.getElementById('btn-logout').addEventListener('click', () => {
-        if (confirm('Apakah Anda yakin ingin keluar dari sistem?')) {
-            handleLogout();
-        }
-    });
-
-    // --- BINDING: ROUTER NAVBAR ---
-    document.querySelectorAll('.menu-item').forEach(btn => {
-        btn.addEventListener('click', (e) => {
+        document.getElementById('login-form').addEventListener('submit', (e) => {
             e.preventDefault();
-            switchPanel(btn.dataset.target);
+            const username = document.getElementById('login-username').value;
+            const password = document.getElementById('login-password').value;
+            handleLogin(username, password);
         });
-    });
 
-    document.getElementById('btn-sidebar-toggle').addEventListener('click', () => {
-        document.getElementById('app-sidebar').classList.toggle('active');
-    });
-
-    // --- BINDING: DYNAMIC THEME SYSTEM TOGGLE ---
-    document.getElementById('btn-theme-toggle').addEventListener('click', () => {
-        const b = document.body;
-        const icon = document.getElementById('btn-theme-toggle').querySelector('i');
-        if (b.classList.contains('light-theme')) {
-            b.className = 'dark-theme';
-            icon.className = 'fa-solid fa-sun';
-        } else {
-            b.className = 'light-theme';
-            icon.className = 'fa-solid fa-moon';
-        }
-    });
-
-    // --- BINDING: QUICK ACTIONS ---
-    document.getElementById('btn-quick-new-repair').addEventListener('click', () => {
-        switchPanel('sales-panel');
-        resetForm();
-    });
-    
-    document.getElementById('btn-quick-sync').addEventListener('click', () => {
-        runBackgroundSync();
-    });
-    
-    document.getElementById('btn-quick-admin').addEventListener('click', () => {
-        if (State.currentUser.role === 'Admin') {
-            switchPanel('admin-panel');
-        } else {
-            showToast('Anda harus menjadi Admin untuk mengelola data master!', 'warning');
-        }
-    });
-
-    document.getElementById('btn-sync-trigger').addEventListener('click', () => {
-        runBackgroundSync();
-    });
-
-    // --- BINDING: SALES FORM ACTIONS ---
-    document.getElementById('ring-cowok-active').addEventListener('change', (e) => {
-        toggleRingCardActive('cowok', e.target.checked);
-        calculateFormPricing();
-    });
-    
-    document.getElementById('ring-cewek-active').addEventListener('change', (e) => {
-        toggleRingCardActive('cewek', e.target.checked);
-        calculateFormPricing();
-    });
-
-    // Live calculations inputs listeners
-    const calcSelectors = [
-        'cowok-material', 'cowok-weight', 'cowok-repair-type',
-        'cewek-material', 'cewek-weight', 'cewek-repair-type',
-        'cust-city', 'dp1-amount', 'dp2-amount'
-    ];
-    calcSelectors.forEach(id => {
-        document.getElementById(id).addEventListener('input', () => calculateFormPricing());
-        document.getElementById(id).addEventListener('change', () => calculateFormPricing());
-    });
-
-    document.getElementById('btn-add-item-row').addEventListener('click', () => {
-        addAdditionalItemRow();
-    });
-
-    // Image Upload Inputs change thumbnail visualizers
-    const imgUploads = ['cowok-image', 'cewek-image', 'warranty-image', 'dp1-image', 'dp2-image'];
-    imgUploads.forEach(id => {
-        const inp = document.getElementById(id);
-        inp.addEventListener('change', async (e) => {
-            const file = e.target.files[0];
-            const pId = `${id}-preview`;
-            const previewEl = document.getElementById(pId);
-            if (file) {
-                const base64Str = await getImageBase64(file, pId);
-                previewEl.innerHTML = `<img src="${base64Str}" alt="Preview"><span style="margin-top:6px; font-size:10px;">Ganti Foto</span>`;
-                calculateFormPricing();
+        document.getElementById('btn-logout').addEventListener('click', () => {
+            if (confirm('Apakah Anda yakin ingin keluar dari sistem?')) {
+                handleLogout();
             }
         });
-    });
 
-    // Actions
-    document.getElementById('btn-form-delete').addEventListener('click', () => {
-        if (confirm('Hapus seluruh inputan formulir ini?')) {
-            resetForm();
-            showToast('Seluruh kolom isian dibersihkan!', 'info');
-        }
-    });
-
-    document.getElementById('btn-form-preview').addEventListener('click', async () => {
-        if (!validateRepairForm()) return;
-        const tx = await getTransactionFromForm();
-        
-        // Show Preview modal
-        const modal = document.getElementById('preview-modal');
-        const modalBody = document.getElementById('preview-modal-body');
-        
-        // Generate html preview layout (reuses print slip engine structurally)
-        await showReceiptPrintModal(tx.repair_number, 'RECEIPT');
-        
-        // Move the HTML content inside the preview modal specifically
-        modalBody.innerHTML = document.getElementById('print-receipt-body').innerHTML;
-        document.getElementById('print-modal').classList.add('hidden'); // Ensure printable isn't showing
-        modal.classList.remove('hidden');
-    });
-
-    document.getElementById('btn-modal-preview-close').addEventListener('click', () => {
-        document.getElementById('preview-modal').classList.add('hidden');
-    });
-    
-    document.getElementById('btn-close-preview-modal').addEventListener('click', () => {
-        document.getElementById('preview-modal').classList.add('hidden');
-    });
-
-    document.getElementById('btn-modal-preview-confirm').addEventListener('click', async () => {
-        document.getElementById('preview-modal').classList.add('hidden');
-        document.getElementById('repair-entry-form').dispatchEvent(new Event('submit'));
-    });
-
-    // Save/Submit Form Handler
-    document.getElementById('repair-entry-form').addEventListener('submit', async (e) => {
-        e.preventDefault();
-        
-        if (!validateRepairForm()) return;
-
-        showToast('Memproses penyimpanan formulir repair...', 'info');
-
-        const tx = await getTransactionFromForm();
-        
-        // Add to local database
-        await saveLocalData('repair_transactions', tx);
-        
-        // Put in sync queue
-        const syncAction = State.activeEditId ? 'UPDATE_REPAIR' : 'SAVE_REPAIR';
-        await queueSyncTask(syncAction, tx);
-
-        showToast(`Repair Cincin ${tx.repair_number} berhasil disimpan di sistem lokal!`, 'success');
-        
-        // Reset and refresh
-        resetForm();
-        await refreshAllData();
-        
-        // Auto trigger background sync check
-        runBackgroundSync();
-    });
-
-    // Recent History Table Filter events
-    document.getElementById('history-search').addEventListener('input', () => renderRepairHistory());
-    document.getElementById('history-status-filter').addEventListener('change', () => renderRepairHistory());
-
-    // --- BINDING: MODALS CONTROLS ---
-    
-    // Auth password challenge modal overrides
-    document.getElementById('btn-auth-cancel').addEventListener('click', () => {
-        document.getElementById('admin-auth-modal').classList.add('hidden');
-    });
-    document.getElementById('btn-close-auth-modal').addEventListener('click', () => {
-        document.getElementById('admin-auth-modal').classList.add('hidden');
-    });
-    
-    document.getElementById('btn-auth-submit').addEventListener('click', () => {
-        const user = document.getElementById('auth-admin-username').value;
-        const pass = document.getElementById('auth-admin-password').value;
-        
-        if (challengeAdminAccess(user, pass)) {
-            const modal = document.getElementById('admin-auth-modal');
-            modal.classList.add('hidden');
-            
-            const pNum = modal.dataset.pendingNum;
-            const pAction = modal.dataset.pendingAction;
-            
-            executeProtectedAction(pNum, pAction);
-        } else {
-            document.getElementById('auth-error-msg').classList.remove('hidden');
-        }
-    });
-
-    // CRUD modal
-    document.getElementById('btn-crud-cancel').addEventListener('click', () => {
-        document.getElementById('crud-modal').classList.add('hidden');
-    });
-    document.getElementById('btn-close-crud-modal').addEventListener('click', () => {
-        document.getElementById('crud-modal').classList.add('hidden');
-    });
-    document.getElementById('btn-crud-submit').addEventListener('click', (e) => {
-        e.preventDefault();
-        const modal = document.getElementById('crud-modal');
-        const crudType = modal.dataset.crudType;
-        
-        if (crudType === 'PRODUCTION_ASSIGN') {
-            executeProductionAssignSubmit();
-        } else if (crudType === 'LOGISTIC_SHIP') {
-            executeLogisticShipSubmit();
-        } else {
-            executeCRUDSubmit();
-        }
-    });
-
-    // Admin Pane tab triggers
-    document.querySelectorAll('.admin-tab-btn').forEach(btn => {
-        btn.addEventListener('click', () => {
-            document.querySelectorAll('.admin-tab-btn').forEach(b => b.classList.remove('active'));
-            document.querySelectorAll('.admin-tab-pane').forEach(p => p.classList.remove('active'));
-            
-            btn.classList.add('active');
-            document.getElementById(btn.dataset.tab).classList.add('active');
-        });
-    });
-
-    // Admin CRUD Addition triggers
-    document.querySelectorAll('.btn-admin-add').forEach(btn => {
-        btn.addEventListener('click', () => {
-            let store = 'master_users';
-            const type = btn.dataset.type;
-            if (type === 'store') store = 'master_stores';
-            else if (type === 'catalog') store = 'master_catalog';
-            else if (type === 'metal') store = 'master_metals';
-            else if (type === 'repair') store = 'master_repairs';
-            else if (type === 'workshop') store = 'master_workshops';
-            else if (type === 'city') store = 'master_cities';
-            else if (type === 'payment') store = 'master_payments';
-
-            showCRUDModal(store, null, 'ADD');
-        });
-    });
-
-    // Print execution buttons
-    document.getElementById('btn-print-cancel').addEventListener('click', () => {
-        document.getElementById('print-modal').classList.add('hidden');
-    });
-    document.getElementById('btn-close-print-modal').addEventListener('click', () => {
-        document.getElementById('print-modal').classList.add('hidden');
-    });
-    document.getElementById('btn-print-execute').addEventListener('click', () => {
-        window.print();
-    });
-
-    // --- BINDING: SALES DETAIL PROGRESS MODAL ---
-    const closeSalesDetail = () => {
-        document.getElementById('sales-detail-modal').classList.add('hidden');
-    };
-    document.getElementById('btn-close-sales-detail-modal').addEventListener('click', closeSalesDetail);
-    document.getElementById('btn-close-sales-detail-modal-footer').addEventListener('click', closeSalesDetail);
-
-    // Lightbox close button
-    const closeLightbox = () => {
-        document.getElementById('image-lightbox-modal').classList.remove('active');
-    };
-    document.getElementById('btn-close-lightbox').addEventListener('click', closeLightbox);
-    document.getElementById('image-lightbox-modal').addEventListener('click', (e) => {
-        if (e.target.id === 'image-lightbox-modal') {
-            closeLightbox();
-        }
-    });
-
-    // Approval / Rejection Render Model 3D
-    document.getElementById('btn-sd-approve-render').addEventListener('click', async () => {
-        const modal = document.getElementById('sales-detail-modal');
-        const repairNumber = modal.dataset.repairNumber;
-        if (!repairNumber) return;
-
-        showToast('Menyetujui model render 3D...', 'info');
-        try {
-            const txs = await getLocalData('repair_transactions');
-            const match = txs.find(t => t.repair_number === repairNumber);
-            if (match) {
-                match.render_approval = 'Approved';
-                match.status = 'Pending Sync';
-                await saveLocalData('repair_transactions', match);
-            }
-            
-            await queueSyncTask('UPDATE_REPAIR_STATUS', { repair_number: repairNumber, render_approval: 'Approved' });
-            runBackgroundSync();
-            
-            showToast(`Render Model 3D perbaikan ${repairNumber} disetujui!`, 'success');
-            await showSalesDetailModal(repairNumber);
-            await refreshAllData();
-        } catch (err) {
-            console.error(err);
-            showToast('Gagal menyetujui render model.', 'error');
-        }
-    });
-
-    document.getElementById('btn-sd-reject-render').addEventListener('click', async () => {
-        const modal = document.getElementById('sales-detail-modal');
-        const repairNumber = modal.dataset.repairNumber;
-        if (!repairNumber) return;
-
-        showToast('Menolak model render 3D...', 'info');
-        try {
-            const txs = await getLocalData('repair_transactions');
-            const match = txs.find(t => t.repair_number === repairNumber);
-            if (match) {
-                match.render_approval = 'Rejected';
-                match.status = 'Pending Sync';
-                await saveLocalData('repair_transactions', match);
-            }
-            
-            await queueSyncTask('UPDATE_REPAIR_STATUS', { repair_number: repairNumber, render_approval: 'Rejected' });
-            runBackgroundSync();
-            
-            showToast(`Render Model 3D perbaikan ${repairNumber} ditolak!`, 'warning');
-            await showSalesDetailModal(repairNumber);
-            await refreshAllData();
-        } catch (err) {
-            console.error(err);
-            showToast('Gagal menolak render model.', 'error');
-        }
-    });
-
-    // Approval / Rejection Realpict Cincin
-    document.getElementById('btn-sd-approve-realpict').addEventListener('click', async () => {
-        const modal = document.getElementById('sales-detail-modal');
-        const repairNumber = modal.dataset.repairNumber;
-        if (!repairNumber) return;
-
-        showToast('Menyetujui realpict cincin...', 'info');
-        try {
-            const txs = await getLocalData('repair_transactions');
-            const match = txs.find(t => t.repair_number === repairNumber);
-            if (match) {
-                match.realpict_approval = 'Approved';
-                match.status = 'Pending Sync';
-                await saveLocalData('repair_transactions', match);
-            }
-            
-            await queueSyncTask('UPDATE_REPAIR_STATUS', { repair_number: repairNumber, realpict_approval: 'Approved' });
-            runBackgroundSync();
-            
-            showToast(`Foto Realpict perbaikan ${repairNumber} disetujui!`, 'success');
-            await showSalesDetailModal(repairNumber);
-            await refreshAllData();
-        } catch (err) {
-            console.error(err);
-            showToast('Gagal menyetujui realpict cincin.', 'error');
-        }
-    });
-
-    document.getElementById('btn-sd-reject-realpict').addEventListener('click', async () => {
-        const modal = document.getElementById('sales-detail-modal');
-        const repairNumber = modal.dataset.repairNumber;
-        if (!repairNumber) return;
-
-        showToast('Menolak realpict cincin...', 'info');
-        try {
-            const txs = await getLocalData('repair_transactions');
-            const match = txs.find(t => t.repair_number === repairNumber);
-            if (match) {
-                match.realpict_approval = 'Rejected';
-                match.status = 'Pending Sync';
-                await saveLocalData('repair_transactions', match);
-            }
-            
-            await queueSyncTask('UPDATE_REPAIR_STATUS', { repair_number: repairNumber, realpict_approval: 'Rejected' });
-            runBackgroundSync();
-            
-            showToast(`Foto Realpict perbaikan ${repairNumber} ditolak!`, 'warning');
-            await showSalesDetailModal(repairNumber);
-            await refreshAllData();
-        } catch (err) {
-            console.error(err);
-            showToast('Gagal menolak realpict cincin.', 'error');
-        }
-    });
-
-    // File input changes for Pelunasan
-    document.getElementById('sd-pelunasan-file').addEventListener('change', async (e) => {
-        const file = e.target.files[0];
-        if (file) {
-            try {
-                const base64Str = await getFileBase64(file);
-                document.getElementById('sd-pelunasan-base64').value = base64Str;
-            } catch (err) {
-                console.error(err);
-                showToast('Gagal membaca berkas gambar pelunasan.', 'error');
-            }
-        } else {
-            document.getElementById('sd-pelunasan-base64').value = '';
-        }
-    });
-
-    // Submit pelunasan payment
-    document.getElementById('btn-sd-submit-pelunasan').addEventListener('click', async () => {
-        const modal = document.getElementById('sales-detail-modal');
-        const repairNumber = modal.dataset.repairNumber;
-        if (!repairNumber) return;
-
-        const method = document.getElementById('sd-pelunasan-method').value;
-        const amount = parseFloat(document.getElementById('sd-pelunasan-amount').value) || 0;
-        const base64Data = document.getElementById('sd-pelunasan-base64').value;
-
-        if (!method) {
-            showToast('Harap pilih metode pembayaran pelunasan!', 'warning');
-            return;
-        }
-        if (amount <= 0) {
-            showToast('Harap masukkan nominal pelunasan yang valid!', 'warning');
-            return;
-        }
-        if (!base64Data) {
-            showToast('Harap unggah bukti transfer pelunasan!', 'warning');
-            return;
-        }
-
-        showToast('Mengunggah pembayaran pelunasan...', 'info');
-        try {
-            const txs = await getLocalData('repair_transactions');
-            const match = txs.find(t => t.repair_number === repairNumber);
-            if (match) {
-                match.dp2_method = method;
-                match.dp2_amount = amount;
-                match.dp2_receipt_url = base64Data;
-                match.pelunasan_approval = 'Pending';
-                match.status = 'Pending Sync';
-                await saveLocalData('repair_transactions', match);
-            }
-            
-            await queueSyncTask('UPDATE_REPAIR_STATUS', { 
-                repair_number: repairNumber, 
-                pelunasan_method: method, 
-                pelunasan_amount: amount, 
-                pelunasan_receipt_url: base64Data, 
-                pelunasan_approval: 'Pending' 
+        // --- BINDING: ROUTER NAVBAR ---
+        document.querySelectorAll('.menu-item').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                e.preventDefault();
+                switchPanel(btn.dataset.target);
             });
+        });
+
+        document.getElementById('btn-sidebar-toggle').addEventListener('click', () => {
+            document.getElementById('app-sidebar').classList.toggle('active');
+        });
+
+        // --- BINDING: DYNAMIC THEME SYSTEM TOGGLE ---
+        document.getElementById('btn-theme-toggle').addEventListener('click', () => {
+            const b = document.body;
+            const icon = document.getElementById('btn-theme-toggle').querySelector('i');
+            if (b.classList.contains('light-theme')) {
+                b.className = 'dark-theme';
+                icon.className = 'fa-solid fa-sun';
+            } else {
+                b.className = 'light-theme';
+                icon.className = 'fa-solid fa-moon';
+            }
+        });
+
+        // --- BINDING: QUICK ACTIONS ---
+        document.getElementById('btn-quick-new-repair').addEventListener('click', () => {
+            switchPanel('sales-panel');
+            resetForm();
+        });
+
+        document.getElementById('btn-quick-sync').addEventListener('click', () => {
             runBackgroundSync();
-            
-            showToast(`Bukti pelunasan perbaikan ${repairNumber} berhasil diunggah! Menunggu persetujuan Keuangan.`, 'success');
-            await showSalesDetailModal(repairNumber);
+        });
+
+        document.getElementById('btn-quick-admin').addEventListener('click', () => {
+            if (State.currentUser.role === 'Admin') {
+                switchPanel('admin-panel');
+            } else {
+                showToast('Anda harus menjadi Admin untuk mengelola data master!', 'warning');
+            }
+        });
+
+        document.getElementById('btn-sync-trigger').addEventListener('click', () => {
+            runBackgroundSync();
+        });
+
+        // --- BINDING: SALES FORM ACTIONS ---
+        document.getElementById('ring-cowok-active').addEventListener('change', (e) => {
+            toggleRingCardActive('cowok', e.target.checked);
+            calculateFormPricing();
+        });
+
+        document.getElementById('ring-cewek-active').addEventListener('change', (e) => {
+            toggleRingCardActive('cewek', e.target.checked);
+            calculateFormPricing();
+        });
+
+        // Live calculations inputs listeners
+        const calcSelectors = [
+            'cowok-material', 'cowok-weight', 'cowok-repair-type',
+            'cewek-material', 'cewek-weight', 'cewek-repair-type',
+            'cust-city', 'dp1-amount', 'dp2-amount'
+        ];
+        calcSelectors.forEach(id => {
+            document.getElementById(id).addEventListener('input', () => calculateFormPricing());
+            document.getElementById(id).addEventListener('change', () => calculateFormPricing());
+        });
+
+        document.getElementById('btn-add-item-row').addEventListener('click', () => {
+            addAdditionalItemRow();
+        });
+
+        // Image Upload Inputs change thumbnail visualizers
+        const imgUploads = ['cowok-image', 'cewek-image', 'warranty-image', 'dp1-image', 'dp2-image'];
+        imgUploads.forEach(id => {
+            const inp = document.getElementById(id);
+            inp.addEventListener('change', async (e) => {
+                const file = e.target.files[0];
+                const pId = `${id}-preview`;
+                const previewEl = document.getElementById(pId);
+                if (file) {
+                    const base64Str = await getImageBase64(file, pId);
+                    previewEl.innerHTML = `<img src="${base64Str}" alt="Preview"><span style="margin-top:6px; font-size:10px;">Ganti Foto</span>`;
+                    calculateFormPricing();
+                }
+            });
+        });
+
+        // Actions
+        document.getElementById('btn-form-delete').addEventListener('click', () => {
+            if (confirm('Hapus seluruh inputan formulir ini?')) {
+                resetForm();
+                showToast('Seluruh kolom isian dibersihkan!', 'info');
+            }
+        });
+
+        document.getElementById('btn-form-preview').addEventListener('click', async () => {
+            if (!validateRepairForm()) return;
+            const tx = await getTransactionFromForm();
+
+            // Show Preview modal
+            const modal = document.getElementById('preview-modal');
+            const modalBody = document.getElementById('preview-modal-body');
+
+            // Generate html preview layout (reuses print slip engine structurally)
+            await showReceiptPrintModal(tx.repair_number, 'RECEIPT');
+
+            // Move the HTML content inside the preview modal specifically
+            modalBody.innerHTML = document.getElementById('print-receipt-body').innerHTML;
+            document.getElementById('print-modal').classList.add('hidden'); // Ensure printable isn't showing
+            modal.classList.remove('hidden');
+        });
+
+        document.getElementById('btn-modal-preview-close').addEventListener('click', () => {
+            document.getElementById('preview-modal').classList.add('hidden');
+        });
+
+        document.getElementById('btn-close-preview-modal').addEventListener('click', () => {
+            document.getElementById('preview-modal').classList.add('hidden');
+        });
+
+        document.getElementById('btn-modal-preview-confirm').addEventListener('click', async () => {
+            document.getElementById('preview-modal').classList.add('hidden');
+            document.getElementById('repair-entry-form').dispatchEvent(new Event('submit'));
+        });
+
+        // Save/Submit Form Handler
+        document.getElementById('repair-entry-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            if (!validateRepairForm()) return;
+
+            showToast('Memproses penyimpanan formulir repair...', 'info');
+
+            const tx = await getTransactionFromForm();
+
+            // Add to local database
+            await saveLocalData('repair_transactions', tx);
+
+            // Put in sync queue
+            const syncAction = State.activeEditId ? 'UPDATE_REPAIR' : 'SAVE_REPAIR';
+            await queueSyncTask(syncAction, tx);
+
+            showToast(`Repair Cincin ${tx.repair_number} berhasil disimpan di sistem lokal!`, 'success');
+
+            // Reset and refresh
+            resetForm();
             await refreshAllData();
-        } catch (err) {
-            console.error(err);
-            showToast('Gagal memproses pelunasan.', 'error');
-        }
-    });
 
-    // Confirm Pickup Product
-    document.getElementById('btn-sd-pickup-product').addEventListener('click', async () => {
-        const modal = document.getElementById('sales-detail-modal');
-        const repairNumber = modal.dataset.repairNumber;
-        if (!repairNumber) return;
+            // Auto trigger background sync check
+            runBackgroundSync();
+        });
 
-        if (confirm(`Konfirmasi bahwa perhiasan repair dengan nomor ${repairNumber} telah diserahterimakan secara sah kepada customer?`)) {
-            showToast('Memproses serah terima...', 'info');
+        // Recent History Table Filter events
+        document.getElementById('history-search').addEventListener('input', () => renderRepairHistory());
+        document.getElementById('history-status-filter').addEventListener('change', () => renderRepairHistory());
+
+        // --- BINDING: MODALS CONTROLS ---
+
+        // Auth password challenge modal overrides
+        document.getElementById('btn-auth-cancel').addEventListener('click', () => {
+            document.getElementById('admin-auth-modal').classList.add('hidden');
+        });
+        document.getElementById('btn-close-auth-modal').addEventListener('click', () => {
+            document.getElementById('admin-auth-modal').classList.add('hidden');
+        });
+
+        document.getElementById('btn-auth-submit').addEventListener('click', () => {
+            const user = document.getElementById('auth-admin-username').value;
+            const pass = document.getElementById('auth-admin-password').value;
+
+            if (challengeAdminAccess(user, pass)) {
+                const modal = document.getElementById('admin-auth-modal');
+                modal.classList.add('hidden');
+
+                const pNum = modal.dataset.pendingNum;
+                const pAction = modal.dataset.pendingAction;
+
+                executeProtectedAction(pNum, pAction);
+            } else {
+                document.getElementById('auth-error-msg').classList.remove('hidden');
+            }
+        });
+
+        // CRUD modal
+        document.getElementById('btn-crud-cancel').addEventListener('click', () => {
+            document.getElementById('crud-modal').classList.add('hidden');
+        });
+        document.getElementById('btn-close-crud-modal').addEventListener('click', () => {
+            document.getElementById('crud-modal').classList.add('hidden');
+        });
+        document.getElementById('btn-crud-submit').addEventListener('click', (e) => {
+            e.preventDefault();
+            const modal = document.getElementById('crud-modal');
+            const crudType = modal.dataset.crudType;
+
+            if (crudType === 'PRODUCTION_ASSIGN') {
+                executeProductionAssignSubmit();
+            } else if (crudType === 'LOGISTIC_SHIP') {
+                executeLogisticShipSubmit();
+            } else {
+                executeCRUDSubmit();
+            }
+        });
+
+        // Admin Pane tab triggers
+        document.querySelectorAll('.admin-tab-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                document.querySelectorAll('.admin-tab-btn').forEach(b => b.classList.remove('active'));
+                document.querySelectorAll('.admin-tab-pane').forEach(p => p.classList.remove('active'));
+
+                btn.classList.add('active');
+                document.getElementById(btn.dataset.tab).classList.add('active');
+            });
+        });
+
+        // Admin CRUD Addition triggers
+        document.querySelectorAll('.btn-admin-add').forEach(btn => {
+            btn.addEventListener('click', () => {
+                let store = 'master_users';
+                const type = btn.dataset.type;
+                if (type === 'store') store = 'master_stores';
+                else if (type === 'catalog') store = 'master_catalog';
+                else if (type === 'metal') store = 'master_metals';
+                else if (type === 'repair') store = 'master_repairs';
+                else if (type === 'workshop') store = 'master_workshops';
+                else if (type === 'city') store = 'master_cities';
+                else if (type === 'payment') store = 'master_payments';
+
+                showCRUDModal(store, null, 'ADD');
+            });
+        });
+
+        // Print execution buttons
+        document.getElementById('btn-print-cancel').addEventListener('click', () => {
+            document.getElementById('print-modal').classList.add('hidden');
+        });
+        document.getElementById('btn-close-print-modal').addEventListener('click', () => {
+            document.getElementById('print-modal').classList.add('hidden');
+        });
+        document.getElementById('btn-print-execute').addEventListener('click', () => {
+            window.print();
+        });
+
+        // --- BINDING: SALES DETAIL PROGRESS MODAL ---
+        const closeSalesDetail = () => {
+            document.getElementById('sales-detail-modal').classList.add('hidden');
+        };
+        document.getElementById('btn-close-sales-detail-modal').addEventListener('click', closeSalesDetail);
+        document.getElementById('btn-close-sales-detail-modal-footer').addEventListener('click', closeSalesDetail);
+
+        // Lightbox close button
+        const closeLightbox = () => {
+            document.getElementById('image-lightbox-modal').classList.remove('active');
+        };
+        document.getElementById('btn-close-lightbox').addEventListener('click', closeLightbox);
+        document.getElementById('image-lightbox-modal').addEventListener('click', (e) => {
+            if (e.target.id === 'image-lightbox-modal') {
+                closeLightbox();
+            }
+        });
+
+        // Approval / Rejection Render Model 3D
+        document.getElementById('btn-sd-approve-render').addEventListener('click', async () => {
+            const modal = document.getElementById('sales-detail-modal');
+            const repairNumber = modal.dataset.repairNumber;
+            if (!repairNumber) return;
+
+            showToast('Menyetujui model render 3D...', 'info');
             try {
                 const txs = await getLocalData('repair_transactions');
                 const match = txs.find(t => t.repair_number === repairNumber);
                 if (match) {
-                    match.final_pickup_status = 'Picked Up';
+                    match.render_approval = 'Approved';
                     match.status = 'Pending Sync';
                     await saveLocalData('repair_transactions', match);
                 }
-                
-                await queueSyncTask('UPDATE_REPAIR_STATUS', { 
-                    repair_number: repairNumber, 
-                    final_pickup_status: 'Picked Up',
-                    status: 'Completed' 
-                });
+
+                await queueSyncTask('UPDATE_REPAIR_STATUS', { repair_number: repairNumber, render_approval: 'Approved' });
                 runBackgroundSync();
-                
-                showToast(`Serah terima perbaikan ${repairNumber} berhasil dikonfirmasi!`, 'success');
+
+                showToast(`Render Model 3D perbaikan ${repairNumber} disetujui!`, 'success');
                 await showSalesDetailModal(repairNumber);
                 await refreshAllData();
             } catch (err) {
                 console.error(err);
-                showToast('Gagal memproses serah terima.', 'error');
+                showToast('Gagal menyetujui render model.', 'error');
             }
-        }
-    });
-
-    // Print Final Invoice
-    document.getElementById('btn-sd-print-final-invoice').addEventListener('click', () => {
-        const modal = document.getElementById('sales-detail-modal');
-        const repairNumber = modal.dataset.repairNumber;
-        if (!repairNumber) return;
-        showReceiptPrintModal(repairNumber, 'RECEIPT');
-    });
-
-    // Initialize lightbox events globally
-    initLightboxEvents();
-
-    // 3. Initiate background sync loops periodically (every 15 seconds)
-    setInterval(() => {
-        runBackgroundSync();
-    }, 15000);
-
-    // Initial form setup
-    resetForm();
-});
-
-// --- AUXILIARY HELPERS FOR ADVANCED FINANCIALS & LIGHTBOX ---
-
-function calculateTransactionHPP(tx) {
-    let cowokHpp = 0;
-    if (tx.cowok_active === 'TRUE') {
-        const metal = State.masterData.metals.find(m => m.id === tx.cowok_material);
-        if (metal) {
-            cowokHpp = (parseFloat(tx.cowok_weight) || 0) * (parseFloat(metal.price_per_gram) || 0) + ((parseFloat(metal.custom_fee) || 0) * 0.5);
-        }
-    }
-
-    let cewekHpp = 0;
-    if (tx.cewek_active === 'TRUE') {
-        const metal = State.masterData.metals.find(m => m.id === tx.cewek_material);
-        if (metal) {
-            cewekHpp = (parseFloat(tx.cewek_weight) || 0) * (parseFloat(metal.price_per_gram) || 0) + ((parseFloat(metal.custom_fee) || 0) * 0.5);
-        }
-    }
-
-    let cowokRepHpp = 0;
-    if (tx.cowok_active === 'TRUE') {
-        const rep = State.masterData.repairs.find(r => r.id === tx.cowok_repair_type);
-        if (rep) {
-            cowokRepHpp = (parseFloat(rep.repair_fee) || 0) * 0.4;
-        }
-    }
-
-    let cewekRepHpp = 0;
-    if (tx.cewek_active === 'TRUE') {
-        const rep = State.masterData.repairs.find(r => r.id === tx.cewek_repair_type);
-        if (rep) {
-            cewekRepHpp = (parseFloat(rep.repair_fee) || 0) * 0.4;
-        }
-    }
-
-    let additionalHpp = 0;
-    try {
-        const addItems = JSON.parse(tx.additional_items_json || '[]');
-        addItems.forEach(item => {
-            const catItem = State.masterData.catalog.find(c => c.name === item.name);
-            const category = catItem ? catItem.category : 'Barang';
-            const multiplier = category === 'Jasa' ? 0.45 : 0.60;
-            additionalHpp += (parseFloat(item.price) || 0) * (parseInt(item.qty) || 0) * multiplier;
         });
-    } catch (e) {
-        console.error("Error parsing additional items for HPP: ", e);
-    }
 
-    return cowokHpp + cewekHpp + cowokRepHpp + cewekRepHpp + additionalHpp;
-}
+        document.getElementById('btn-sd-reject-render').addEventListener('click', async () => {
+            const modal = document.getElementById('sales-detail-modal');
+            const repairNumber = modal.dataset.repairNumber;
+            if (!repairNumber) return;
 
-function getFileBase64(file) {
-    return new Promise((resolve, reject) => {
-        if (!file) {
-            return resolve('');
-        }
-        const reader = new FileReader();
-        reader.onload = () => resolve(reader.result);
-        reader.onerror = (error) => reject(error);
-        reader.readAsDataURL(file);
-    });
-}
+            showToast('Menolak model render 3D...', 'info');
+            try {
+                const txs = await getLocalData('repair_transactions');
+                const match = txs.find(t => t.repair_number === repairNumber);
+                if (match) {
+                    match.render_approval = 'Rejected';
+                    match.status = 'Pending Sync';
+                    await saveLocalData('repair_transactions', match);
+                }
 
-async function showSalesDetailModal(repairNumber) {
-    const txs = await getLocalData('repair_transactions');
-    const tx = txs.find(t => t.repair_number === repairNumber);
-    if (!tx) {
-        showToast("Transaksi tidak ditemukan!", "error");
-        return;
-    }
+                await queueSyncTask('UPDATE_REPAIR_STATUS', { repair_number: repairNumber, render_approval: 'Rejected' });
+                runBackgroundSync();
 
-    const modal = document.getElementById('sales-detail-modal');
-    modal.dataset.repairNumber = repairNumber;
+                showToast(`Render Model 3D perbaikan ${repairNumber} ditolak!`, 'warning');
+                await showSalesDetailModal(repairNumber);
+                await refreshAllData();
+            } catch (err) {
+                console.error(err);
+                showToast('Gagal menolak render model.', 'error');
+            }
+        });
 
-    // Bind basic info
-    document.getElementById('sd-repair-num').textContent = tx.repair_number;
-    document.getElementById('sd-cust-name').textContent = tx.customer_name;
-    document.getElementById('sd-cust-phone').textContent = tx.customer_phone;
-    document.getElementById('sd-store-sales').textContent = tx.store_sales_name;
-    document.getElementById('sd-date').textContent = formatSimpleDate(tx.date);
-    document.getElementById('sd-deadline').textContent = formatSimpleDate(tx.deadline);
+        // Approval / Rejection Realpict Cincin
+        document.getElementById('btn-sd-approve-realpict').addEventListener('click', async () => {
+            const modal = document.getElementById('sales-detail-modal');
+            const repairNumber = modal.dataset.repairNumber;
+            if (!repairNumber) return;
 
-    // Bind ring cowok details
-    const cowokBlock = document.getElementById('sd-cowok-block');
-    if (tx.cowok_active === 'TRUE') {
-        cowokBlock.classList.remove('hidden');
-        const metal = State.masterData.metals.find(m => m.id === tx.cowok_material);
-        const rep = State.masterData.repairs.find(r => r.id === tx.cowok_repair_type);
-        document.getElementById('sd-cowok-mat').textContent = metal ? metal.name : tx.cowok_material;
-        document.getElementById('sd-cowok-weight').textContent = tx.cowok_weight;
-        document.getElementById('sd-cowok-size').textContent = tx.cowok_size;
-        document.getElementById('sd-cowok-type').textContent = rep ? rep.name : tx.cowok_repair_type;
-        document.getElementById('sd-cowok-engrave').textContent = tx.cowok_engraving || 'Tidak ada';
-        document.getElementById('sd-cowok-notes').textContent = tx.cowok_notes || 'Tidak ada catatan';
-    } else {
-        cowokBlock.classList.add('hidden');
-    }
+            showToast('Menyetujui realpict cincin...', 'info');
+            try {
+                const txs = await getLocalData('repair_transactions');
+                const match = txs.find(t => t.repair_number === repairNumber);
+                if (match) {
+                    match.realpict_approval = 'Approved';
+                    match.status = 'Pending Sync';
+                    await saveLocalData('repair_transactions', match);
+                }
 
-    // Bind ring cewek details
-    const cewekBlock = document.getElementById('sd-cewek-block');
-    if (tx.cewek_active === 'TRUE') {
-        cewekBlock.classList.remove('hidden');
-        const metal = State.masterData.metals.find(m => m.id === tx.cewek_material);
-        const rep = State.masterData.repairs.find(r => r.id === tx.cewek_repair_type);
-        document.getElementById('sd-cewek-mat').textContent = metal ? metal.name : tx.cewek_material;
-        document.getElementById('sd-cewek-weight').textContent = tx.cewek_weight;
-        document.getElementById('sd-cewek-size').textContent = tx.cewek_size;
-        document.getElementById('sd-cewek-type').textContent = rep ? rep.name : tx.cewek_repair_type;
-        document.getElementById('sd-cewek-engrave').textContent = tx.cewek_engraving || 'Tidak ada';
-        document.getElementById('sd-cewek-notes').textContent = tx.cewek_notes || 'Tidak ada catatan';
-    } else {
-        cewekBlock.classList.add('hidden');
-    }
+                await queueSyncTask('UPDATE_REPAIR_STATUS', { repair_number: repairNumber, realpict_approval: 'Approved' });
+                runBackgroundSync();
 
-    // Bind financials
-    const dpTotal = (parseFloat(tx.dp1_amount) || 0) + (parseFloat(tx.dp2_amount) || 0);
-    const totalPrice = parseFloat(tx.total_price) || 0;
-    const outstanding = totalPrice - dpTotal;
+                showToast(`Foto Realpict perbaikan ${repairNumber} disetujui!`, 'success');
+                await showSalesDetailModal(repairNumber);
+                await refreshAllData();
+            } catch (err) {
+                console.error(err);
+                showToast('Gagal menyetujui realpict cincin.', 'error');
+            }
+        });
 
-    document.getElementById('sd-total-price').textContent = formatRupiah(totalPrice);
-    document.getElementById('sd-remaining-price').textContent = formatRupiah(Math.max(0, outstanding));
+        document.getElementById('btn-sd-reject-realpict').addEventListener('click', async () => {
+            const modal = document.getElementById('sales-detail-modal');
+            const repairNumber = modal.dataset.repairNumber;
+            if (!repairNumber) return;
 
-    // DP approval badge
-    const dpApprovalBadge = document.getElementById('sd-dp-approval-badge');
-    dpApprovalBadge.textContent = tx.dp_approval || 'Pending';
-    if (tx.dp_approval === 'Approved') {
-        dpApprovalBadge.className = 'badge success';
-    } else {
-        dpApprovalBadge.className = 'badge warning';
-    }
+            showToast('Menolak realpict cincin...', 'info');
+            try {
+                const txs = await getLocalData('repair_transactions');
+                const match = txs.find(t => t.repair_number === repairNumber);
+                if (match) {
+                    match.realpict_approval = 'Rejected';
+                    match.status = 'Pending Sync';
+                    await saveLocalData('repair_transactions', match);
+                }
 
-    // Pelunasan approval badge
-    const pelunasanApprovalBadge = document.getElementById('sd-pelunasan-approval-badge');
-    if (tx.pelunasan_approval === 'Approved') {
-        pelunasanApprovalBadge.textContent = 'Approved';
-        pelunasanApprovalBadge.className = 'badge success';
-    } else if (tx.pelunasan_approval === 'Pending' && (tx.dp2_amount > 0 || tx.dp2_receipt_url)) {
-        pelunasanApprovalBadge.textContent = 'Pending';
-        pelunasanApprovalBadge.className = 'badge warning';
-    } else {
-        pelunasanApprovalBadge.textContent = outstanding <= 0 ? 'Approved (Lunas DP)' : 'Belum Lunas';
-        pelunasanApprovalBadge.className = outstanding <= 0 ? 'badge success' : 'badge secondary';
-    }
+                await queueSyncTask('UPDATE_REPAIR_STATUS', { repair_number: repairNumber, realpict_approval: 'Rejected' });
+                runBackgroundSync();
 
-    // Alur Bengkel (Workshop)
-    document.getElementById('sd-assigned-workshop').textContent = tx.assigned_workshop || 'Belum Ditugaskan';
+                showToast(`Foto Realpict perbaikan ${repairNumber} ditolak!`, 'warning');
+                await showSalesDetailModal(repairNumber);
+                await refreshAllData();
+            } catch (err) {
+                console.error(err);
+                showToast('Gagal menolak realpict cincin.', 'error');
+            }
+        });
 
-    // 3D Render block
-    const renderBlock = document.getElementById('sd-render-block');
-    const renderImg = document.getElementById('sd-render-img');
-    const renderBadge = document.getElementById('sd-render-approval-badge');
-    const renderActions = document.getElementById('sd-render-actions');
+        // File input changes for Pelunasan
+        document.getElementById('sd-pelunasan-file').addEventListener('change', async (e) => {
+            const file = e.target.files[0];
+            if (file) {
+                try {
+                    const base64Str = await getFileBase64(file);
+                    document.getElementById('sd-pelunasan-base64').value = base64Str;
+                } catch (err) {
+                    console.error(err);
+                    showToast('Gagal membaca berkas gambar pelunasan.', 'error');
+                }
+            } else {
+                document.getElementById('sd-pelunasan-base64').value = '';
+            }
+        });
 
-    if (tx.render_model_url && tx.render_model_url !== '' && tx.render_model_url !== '[Gagal Upload]') {
-        renderBlock.classList.remove('hidden');
-        renderImg.src = tx.render_model_url;
-        renderImg.dataset.url = tx.render_model_url;
-        renderImg.dataset.caption = `Pratinjau Desain 3D Render - ${tx.repair_number}`;
-        renderBadge.textContent = tx.render_approval || 'Pending';
-        
-        if (tx.render_approval === 'Approved') {
-            renderBadge.className = 'badge success';
-            renderActions.classList.add('hidden');
-        } else if (tx.render_approval === 'Rejected') {
-            renderBadge.className = 'badge danger';
-            renderActions.classList.add('hidden');
-        } else {
-            renderBadge.className = 'badge warning';
-            renderActions.classList.remove('hidden');
-        }
-    } else {
-        renderBlock.classList.add('hidden');
-    }
+        // Submit pelunasan payment
+        document.getElementById('btn-sd-submit-pelunasan').addEventListener('click', async () => {
+            const modal = document.getElementById('sales-detail-modal');
+            const repairNumber = modal.dataset.repairNumber;
+            if (!repairNumber) return;
 
-    // Realpict block
-    const realpictBlock = document.getElementById('sd-realpict-block');
-    const realpictImg = document.getElementById('sd-realpict-img');
-    const realpictBadge = document.getElementById('sd-realpict-approval-badge');
-    const realpictActions = document.getElementById('sd-realpict-actions');
+            const method = document.getElementById('sd-pelunasan-method').value;
+            const amount = parseFloat(document.getElementById('sd-pelunasan-amount').value) || 0;
+            const base64Data = document.getElementById('sd-pelunasan-base64').value;
 
-    if (tx.realpict_url && tx.realpict_url !== '' && tx.realpict_url !== '[Gagal Upload]') {
-        realpictBlock.classList.remove('hidden');
-        realpictImg.src = tx.realpict_url;
-        realpictImg.dataset.url = tx.realpict_url;
-        realpictImg.dataset.caption = `Pratinjau Foto Fisik Cincin - ${tx.repair_number}`;
-        realpictBadge.textContent = tx.realpict_approval || 'Pending';
+            if (!method) {
+                showToast('Harap pilih metode pembayaran pelunasan!', 'warning');
+                return;
+            }
+            if (amount <= 0) {
+                showToast('Harap masukkan nominal pelunasan yang valid!', 'warning');
+                return;
+            }
+            if (!base64Data) {
+                showToast('Harap unggah bukti transfer pelunasan!', 'warning');
+                return;
+            }
 
-        if (tx.realpict_approval === 'Approved') {
-            realpictBadge.className = 'badge success';
-            realpictActions.classList.add('hidden');
-        } else if (tx.realpict_approval === 'Rejected') {
-            realpictBadge.className = 'badge danger';
-            realpictActions.classList.add('hidden');
-        } else {
-            realpictBadge.className = 'badge warning';
-            realpictActions.classList.remove('hidden');
-        }
-    } else {
-        realpictBlock.classList.add('hidden');
-    }
+            showToast('Mengunggah pembayaran pelunasan...', 'info');
+            try {
+                const txs = await getLocalData('repair_transactions');
+                const match = txs.find(t => t.repair_number === repairNumber);
+                if (match) {
+                    match.dp2_method = method;
+                    match.dp2_amount = amount;
+                    match.dp2_receipt_url = base64Data;
+                    match.pelunasan_approval = 'Pending';
+                    match.status = 'Pending Sync';
+                    await saveLocalData('repair_transactions', match);
+                }
 
-    // Pelunasan Upload Area
-    const pelunasanUploadArea = document.getElementById('sd-pelunasan-upload-area');
-    if (outstanding > 0 && tx.pelunasan_approval !== 'Approved') {
-        pelunasanUploadArea.classList.remove('hidden');
-        document.getElementById('sd-pelunasan-method').value = '';
-        document.getElementById('sd-pelunasan-amount').value = Math.max(0, outstanding);
-        document.getElementById('sd-pelunasan-file').value = '';
-        document.getElementById('sd-pelunasan-base64').value = '';
-    } else {
-        pelunasanUploadArea.classList.add('hidden');
-    }
+                await queueSyncTask('UPDATE_REPAIR_STATUS', {
+                    repair_number: repairNumber,
+                    pelunasan_method: method,
+                    pelunasan_amount: amount,
+                    pelunasan_receipt_url: base64Data,
+                    pelunasan_approval: 'Pending'
+                });
+                runBackgroundSync();
 
-    // Refund Receipt Area
-    const refundPreviewArea = document.getElementById('sd-refund-preview-area');
-    const refundImg = document.getElementById('sd-refund-receipt-img');
-    if (outstanding < 0 && tx.refund_receipt_url && tx.refund_receipt_url !== '' && tx.refund_receipt_url !== '[Gagal Upload]') {
-        refundPreviewArea.classList.remove('hidden');
-        refundImg.src = tx.refund_receipt_url;
-        refundImg.dataset.url = tx.refund_receipt_url;
-        refundImg.dataset.caption = `Bukti Refund Kelebihan DP - ${tx.repair_number}`;
-    } else {
-        refundPreviewArea.classList.add('hidden');
-    }
+                showToast(`Bukti pelunasan perbaikan ${repairNumber} berhasil diunggah! Menunggu persetujuan Keuangan.`, 'success');
+                await showSalesDetailModal(repairNumber);
+                await refreshAllData();
+            } catch (err) {
+                console.error(err);
+                showToast('Gagal memproses pelunasan.', 'error');
+            }
+        });
 
-    // Serah Terima & Action Buttons
-    const pickupStatusEl = document.getElementById('sd-pickup-status');
-    const isPickedUp = tx.final_pickup_status === 'Picked Up';
-    pickupStatusEl.textContent = isPickedUp ? 'Sudah Diambil (Selesai)' : 'Menunggu Pengambilan';
-    pickupStatusEl.style.color = isPickedUp ? 'var(--green)' : 'var(--red)';
+        // Confirm Pickup Product
+        document.getElementById('btn-sd-pickup-product').addEventListener('click', async () => {
+            const modal = document.getElementById('sales-detail-modal');
+            const repairNumber = modal.dataset.repairNumber;
+            if (!repairNumber) return;
 
-    const btnPickup = document.getElementById('btn-sd-pickup-product');
-    
-    // Pickup button conditions
-    const isDpApproved = tx.dp_approval === 'Approved';
-    const isRenderApproved = tx.render_model_url ? tx.render_approval === 'Approved' : true;
-    const isRealpictApproved = tx.realpict_url ? tx.realpict_approval === 'Approved' : true;
-    const isFinancialOk = outstanding <= 0 && (outstanding === 0 || tx.pelunasan_approval === 'Approved' || tx.dp1_amount >= tx.total_price);
+            if (confirm(`Konfirmasi bahwa perhiasan repair dengan nomor ${repairNumber} telah diserahterimakan secara sah kepada customer?`)) {
+                showToast('Memproses serah terima...', 'info');
+                try {
+                    const txs = await getLocalData('repair_transactions');
+                    const match = txs.find(t => t.repair_number === repairNumber);
+                    if (match) {
+                        match.final_pickup_status = 'Picked Up';
+                        match.status = 'Pending Sync';
+                        await saveLocalData('repair_transactions', match);
+                    }
 
-    if (isDpApproved && isRenderApproved && isRealpictApproved && isFinancialOk && !isPickedUp) {
-        btnPickup.removeAttribute('disabled');
-        btnPickup.style.opacity = '1';
-        btnPickup.style.cursor = 'pointer';
-    } else {
-        btnPickup.setAttribute('disabled', 'true');
-        btnPickup.style.opacity = '0.5';
-        btnPickup.style.cursor = 'not-allowed';
-    }
+                    await queueSyncTask('UPDATE_REPAIR_STATUS', {
+                        repair_number: repairNumber,
+                        final_pickup_status: 'Picked Up',
+                        status: 'Completed'
+                    });
+                    runBackgroundSync();
 
-    // Update stepper
-    updateStepperProgress(tx);
+                    showToast(`Serah terima perbaikan ${repairNumber} berhasil dikonfirmasi!`, 'success');
+                    await showSalesDetailModal(repairNumber);
+                    await refreshAllData();
+                } catch (err) {
+                    console.error(err);
+                    showToast('Gagal memproses serah terima.', 'error');
+                }
+            }
+        });
 
-    modal.classList.remove('hidden');
-}
+        // Print Final Invoice
+        document.getElementById('btn-sd-print-final-invoice').addEventListener('click', () => {
+            const modal = document.getElementById('sales-detail-modal');
+            const repairNumber = modal.dataset.repairNumber;
+            if (!repairNumber) return;
+            showReceiptPrintModal(repairNumber, 'RECEIPT');
+        });
 
-function updateStepperProgress(tx) {
-    const steps = [
-        document.getElementById('step-1'),
-        document.getElementById('step-2'),
-        document.getElementById('step-3'),
-        document.getElementById('step-4'),
-        document.getElementById('step-5'),
-        document.getElementById('step-6'),
-        document.getElementById('step-7')
-    ];
-    
-    // Clear all previous classes
-    steps.forEach(step => {
-        if (step) {
-            step.classList.remove('active', 'completed');
-        }
+        // Initialize lightbox events globally
+        initLightboxEvents();
+
+        // 3. Initiate background sync loops periodically (every 15 seconds)
+        setInterval(() => {
+            runBackgroundSync();
+        }, 15000);
+
+        // Initial form setup
+        resetForm();
     });
 
-    const isDpApproved = tx.dp_approval === 'Approved';
-    const hasRender = tx.render_model_url && tx.render_model_url !== '' && tx.render_model_url !== '[Gagal Upload]';
-    const isRenderApproved = tx.render_approval === 'Approved';
-    const isProdCompleted = tx.production_status === 'Completed';
-    const hasRealpict = tx.realpict_url && tx.realpict_url !== '' && tx.realpict_url !== '[Gagal Upload]';
-    const isRealpictApproved = tx.realpict_approval === 'Approved';
-    
-    const dpTotal = (parseFloat(tx.dp1_amount) || 0) + (parseFloat(tx.dp2_amount) || 0);
-    const totalPrice = parseFloat(tx.total_price) || 0;
-    const outstanding = totalPrice - dpTotal;
-    const isPaid = outstanding <= 0 && (outstanding === 0 || tx.pelunasan_approval === 'Approved' || tx.dp1_amount >= tx.total_price);
-    const isPickedUp = tx.final_pickup_status === 'Picked Up';
+    // --- AUXILIARY HELPERS FOR ADVANCED FINANCIALS & LIGHTBOX ---
 
-    let currentStepIndex = 0; // 0-indexed
-
-    // Step 1: Input Repair (Always Completed)
-    steps[0].classList.add('completed');
-    currentStepIndex = 1;
-
-    // Step 2: Approval DP
-    if (isDpApproved) {
-        steps[1].classList.add('completed');
-        currentStepIndex = 2;
-    } else {
-        steps[1].classList.add('active');
-    }
-
-    // Step 3: Desain 3D
-    if (isDpApproved) {
-        if (hasRender && isRenderApproved) {
-            steps[2].classList.add('completed');
-            currentStepIndex = 3;
-        } else if (hasRender) {
-            steps[2].classList.add('active');
-        } else {
-            steps[2].classList.add('active'); // active waiting for upload
-        }
-    }
-
-    // Step 4: Produksi
-    if (isDpApproved && isRenderApproved) {
-        if (isProdCompleted) {
-            steps[3].classList.add('completed');
-            currentStepIndex = 4;
-        } else {
-            steps[3].classList.add('active');
-        }
-    }
-
-    // Step 5: Realpict
-    if (isDpApproved && isRenderApproved && isProdCompleted) {
-        if (hasRealpict && isRealpictApproved) {
-            steps[4].classList.add('completed');
-            currentStepIndex = 5;
-        } else {
-            steps[4].classList.add('active');
-        }
-    }
-
-    // Step 6: Pelunasan
-    if (isDpApproved && isRenderApproved && isProdCompleted && isRealpictApproved) {
-        if (isPaid) {
-            steps[5].classList.add('completed');
-            currentStepIndex = 6;
-        } else {
-            steps[5].classList.add('active');
-        }
-    }
-
-    // Step 7: Selesai / Pickup
-    if (isDpApproved && isRenderApproved && isProdCompleted && isRealpictApproved && isPaid) {
-        if (isPickedUp) {
-            steps[6].classList.add('completed');
-            currentStepIndex = 7;
-        } else {
-            steps[6].classList.add('active');
-        }
-    }
-
-    // Set stepper track width dynamically based on progress
-    // There are 6 track segments between 7 steps
-    const percent = Math.min(100, Math.max(0, ((currentStepIndex - 1) / 6) * 100));
-    const track = document.getElementById('sales-stepper-track');
-    if (track) {
-        track.style.width = `${percent}%`;
-    }
-}
-
-function initLightboxEvents() {
-    document.body.addEventListener('click', (e) => {
-        const target = e.target.closest('.img-thumbnail-link');
-        if (target) {
-            const url = target.dataset.url || target.src;
-            const caption = target.dataset.caption || target.title || 'Pratinjau Gambar';
-            
-            const modal = document.getElementById('image-lightbox-modal');
-            const img = document.getElementById('lightbox-img');
-            const cap = document.getElementById('lightbox-caption');
-            
-            if (modal && img) {
-                img.src = url;
-                if (cap) cap.textContent = caption;
-                modal.classList.add('active');
+    function calculateTransactionHPP(tx) {
+        let cowokHpp = 0;
+        if (tx.cowok_active === 'TRUE') {
+            const metal = State.masterData.metals.find(m => m.id === tx.cowok_material);
+            if (metal) {
+                cowokHpp = (parseFloat(tx.cowok_weight) || 0) * (parseFloat(metal.price_per_gram) || 0) + ((parseFloat(metal.custom_fee) || 0) * 0.5);
             }
         }
-    });
-}
 
+        let cewekHpp = 0;
+        if (tx.cewek_active === 'TRUE') {
+            const metal = State.masterData.metals.find(m => m.id === tx.cewek_material);
+            if (metal) {
+                cewekHpp = (parseFloat(tx.cewek_weight) || 0) * (parseFloat(metal.price_per_gram) || 0) + ((parseFloat(metal.custom_fee) || 0) * 0.5);
+            }
+        }
+
+        let cowokRepHpp = 0;
+        if (tx.cowok_active === 'TRUE') {
+            const rep = State.masterData.repairs.find(r => r.id === tx.cowok_repair_type);
+            if (rep) {
+                cowokRepHpp = (parseFloat(rep.repair_fee) || 0) * 0.4;
+            }
+        }
+
+        let cewekRepHpp = 0;
+        if (tx.cewek_active === 'TRUE') {
+            const rep = State.masterData.repairs.find(r => r.id === tx.cewek_repair_type);
+            if (rep) {
+                cewekRepHpp = (parseFloat(rep.repair_fee) || 0) * 0.4;
+            }
+        }
+
+        let additionalHpp = 0;
+        try {
+            const addItems = JSON.parse(tx.additional_items_json || '[]');
+            addItems.forEach(item => {
+                const catItem = State.masterData.catalog.find(c => c.name === item.name);
+                const category = catItem ? catItem.category : 'Barang';
+                const multiplier = category === 'Jasa' ? 0.45 : 0.60;
+                additionalHpp += (parseFloat(item.price) || 0) * (parseInt(item.qty) || 0) * multiplier;
+            });
+        } catch (e) {
+            console.error("Error parsing additional items for HPP: ", e);
+        }
+
+        return cowokHpp + cewekHpp + cowokRepHpp + cewekRepHpp + additionalHpp;
+    }
+
+    function getFileBase64(file) {
+        return new Promise((resolve, reject) => {
+            if (!file) {
+                return resolve('');
+            }
+            const reader = new FileReader();
+            reader.onload = () => resolve(reader.result);
+            reader.onerror = (error) => reject(error);
+            reader.readAsDataURL(file);
+        });
+    }
+
+    async function showSalesDetailModal(repairNumber) {
+        const txs = await getLocalData('repair_transactions');
+        const tx = txs.find(t => t.repair_number === repairNumber);
+        if (!tx) {
+            showToast("Transaksi tidak ditemukan!", "error");
+            return;
+        }
+
+        const modal = document.getElementById('sales-detail-modal');
+        modal.dataset.repairNumber = repairNumber;
+
+        // Bind basic info
+        document.getElementById('sd-repair-num').textContent = tx.repair_number;
+        document.getElementById('sd-cust-name').textContent = tx.customer_name;
+        document.getElementById('sd-cust-phone').textContent = tx.customer_phone;
+        document.getElementById('sd-store-sales').textContent = tx.store_sales_name;
+        document.getElementById('sd-date').textContent = formatSimpleDate(tx.date);
+        document.getElementById('sd-deadline').textContent = formatSimpleDate(tx.deadline);
+
+        // Bind ring cowok details
+        const cowokBlock = document.getElementById('sd-cowok-block');
+        if (tx.cowok_active === 'TRUE') {
+            cowokBlock.classList.remove('hidden');
+            const metal = State.masterData.metals.find(m => m.id === tx.cowok_material);
+            const rep = State.masterData.repairs.find(r => r.id === tx.cowok_repair_type);
+            document.getElementById('sd-cowok-mat').textContent = metal ? metal.name : tx.cowok_material;
+            document.getElementById('sd-cowok-weight').textContent = tx.cowok_weight;
+            document.getElementById('sd-cowok-size').textContent = tx.cowok_size;
+            document.getElementById('sd-cowok-type').textContent = rep ? rep.name : tx.cowok_repair_type;
+            document.getElementById('sd-cowok-engrave').textContent = tx.cowok_engraving || 'Tidak ada';
+            document.getElementById('sd-cowok-notes').textContent = tx.cowok_notes || 'Tidak ada catatan';
+        } else {
+            cowokBlock.classList.add('hidden');
+        }
+
+        // Bind ring cewek details
+        const cewekBlock = document.getElementById('sd-cewek-block');
+        if (tx.cewek_active === 'TRUE') {
+            cewekBlock.classList.remove('hidden');
+            const metal = State.masterData.metals.find(m => m.id === tx.cewek_material);
+            const rep = State.masterData.repairs.find(r => r.id === tx.cewek_repair_type);
+            document.getElementById('sd-cewek-mat').textContent = metal ? metal.name : tx.cewek_material;
+            document.getElementById('sd-cewek-weight').textContent = tx.cewek_weight;
+            document.getElementById('sd-cewek-size').textContent = tx.cewek_size;
+            document.getElementById('sd-cewek-type').textContent = rep ? rep.name : tx.cewek_repair_type;
+            document.getElementById('sd-cewek-engrave').textContent = tx.cewek_engraving || 'Tidak ada';
+            document.getElementById('sd-cewek-notes').textContent = tx.cewek_notes || 'Tidak ada catatan';
+        } else {
+            cewekBlock.classList.add('hidden');
+        }
+
+        // Bind financials
+        const dpTotal = (parseFloat(tx.dp1_amount) || 0) + (parseFloat(tx.dp2_amount) || 0);
+        const totalPrice = parseFloat(tx.total_price) || 0;
+        const outstanding = totalPrice - dpTotal;
+
+        document.getElementById('sd-total-price').textContent = formatRupiah(totalPrice);
+        document.getElementById('sd-remaining-price').textContent = formatRupiah(Math.max(0, outstanding));
+
+        // DP approval badge
+        const dpApprovalBadge = document.getElementById('sd-dp-approval-badge');
+        dpApprovalBadge.textContent = tx.dp_approval || 'Pending';
+        if (tx.dp_approval === 'Approved') {
+            dpApprovalBadge.className = 'badge success';
+        } else {
+            dpApprovalBadge.className = 'badge warning';
+        }
+
+        // Pelunasan approval badge
+        const pelunasanApprovalBadge = document.getElementById('sd-pelunasan-approval-badge');
+        if (tx.pelunasan_approval === 'Approved') {
+            pelunasanApprovalBadge.textContent = 'Approved';
+            pelunasanApprovalBadge.className = 'badge success';
+        } else if (tx.pelunasan_approval === 'Pending' && (tx.dp2_amount > 0 || tx.dp2_receipt_url)) {
+            pelunasanApprovalBadge.textContent = 'Pending';
+            pelunasanApprovalBadge.className = 'badge warning';
+        } else {
+            pelunasanApprovalBadge.textContent = outstanding <= 0 ? 'Approved (Lunas DP)' : 'Belum Lunas';
+            pelunasanApprovalBadge.className = outstanding <= 0 ? 'badge success' : 'badge secondary';
+        }
+
+        // Alur Bengkel (Workshop)
+        document.getElementById('sd-assigned-workshop').textContent = tx.assigned_workshop || 'Belum Ditugaskan';
+
+        // 3D Render block
+        const renderBlock = document.getElementById('sd-render-block');
+        const renderImg = document.getElementById('sd-render-img');
+        const renderBadge = document.getElementById('sd-render-approval-badge');
+        const renderActions = document.getElementById('sd-render-actions');
+
+        if (tx.render_model_url && tx.render_model_url !== '' && tx.render_model_url !== '[Gagal Upload]') {
+            renderBlock.classList.remove('hidden');
+            renderImg.src = resolveImageUrl(tx.render_model_url);
+            renderImg.dataset.url = tx.render_model_url;
+            renderImg.dataset.caption = `Pratinjau Desain 3D Render - ${tx.repair_number}`;
+            renderBadge.textContent = tx.render_approval || 'Pending';
+
+            if (tx.render_approval === 'Approved') {
+                renderBadge.className = 'badge success';
+                renderActions.classList.add('hidden');
+            } else if (tx.render_approval === 'Rejected') {
+                renderBadge.className = 'badge danger';
+                renderActions.classList.add('hidden');
+            } else {
+                renderBadge.className = 'badge warning';
+                renderActions.classList.remove('hidden');
+            }
+        } else {
+            renderBlock.classList.add('hidden');
+        }
+
+        // Realpict block
+        const realpictBlock = document.getElementById('sd-realpict-block');
+        const realpictImg = document.getElementById('sd-realpict-img');
+        const realpictBadge = document.getElementById('sd-realpict-approval-badge');
+        const realpictActions = document.getElementById('sd-realpict-actions');
+
+        if (tx.realpict_url && tx.realpict_url !== '' && tx.realpict_url !== '[Gagal Upload]') {
+            realpictBlock.classList.remove('hidden');
+            realpictImg.src = resolveImageUrl(tx.realpict_url);
+            realpictImg.dataset.url = tx.realpict_url;
+            realpictImg.dataset.caption = `Pratinjau Foto Fisik Cincin - ${tx.repair_number}`;
+            realpictBadge.textContent = tx.realpict_approval || 'Pending';
+
+            if (tx.realpict_approval === 'Approved') {
+                realpictBadge.className = 'badge success';
+                realpictActions.classList.add('hidden');
+            } else if (tx.realpict_approval === 'Rejected') {
+                realpictBadge.className = 'badge danger';
+                realpictActions.classList.add('hidden');
+            } else {
+                realpictBadge.className = 'badge warning';
+                realpictActions.classList.remove('hidden');
+            }
+        } else {
+            realpictBlock.classList.add('hidden');
+        }
+
+        // Pelunasan Upload Area
+        const pelunasanUploadArea = document.getElementById('sd-pelunasan-upload-area');
+        if (outstanding > 0 && tx.pelunasan_approval !== 'Approved') {
+            pelunasanUploadArea.classList.remove('hidden');
+            document.getElementById('sd-pelunasan-method').value = '';
+            document.getElementById('sd-pelunasan-amount').value = Math.max(0, outstanding);
+            document.getElementById('sd-pelunasan-file').value = '';
+            document.getElementById('sd-pelunasan-base64').value = '';
+        } else {
+            pelunasanUploadArea.classList.add('hidden');
+        }
+
+        // Refund Receipt Area
+        const refundPreviewArea = document.getElementById('sd-refund-preview-area');
+        const refundImg = document.getElementById('sd-refund-receipt-img');
+        if (outstanding < 0 && tx.refund_receipt_url && tx.refund_receipt_url !== '' && tx.refund_receipt_url !== '[Gagal Upload]') {
+            refundPreviewArea.classList.remove('hidden');
+            refundImg.src = resolveImageUrl(tx.refund_receipt_url);
+            refundImg.dataset.url = tx.refund_receipt_url;
+            refundImg.dataset.caption = `Bukti Refund Kelebihan DP - ${tx.repair_number}`;
+        } else {
+            refundPreviewArea.classList.add('hidden');
+        }
+
+        // Serah Terima & Action Buttons
+        const pickupStatusEl = document.getElementById('sd-pickup-status');
+        const isPickedUp = tx.final_pickup_status === 'Picked Up';
+        pickupStatusEl.textContent = isPickedUp ? 'Sudah Diambil (Selesai)' : 'Menunggu Pengambilan';
+        pickupStatusEl.style.color = isPickedUp ? 'var(--green)' : 'var(--red)';
+
+        const btnPickup = document.getElementById('btn-sd-pickup-product');
+
+        // Pickup button conditions
+        const isDpApproved = tx.dp_approval === 'Approved';
+        const isRenderApproved = tx.render_model_url ? tx.render_approval === 'Approved' : true;
+        const isRealpictApproved = tx.realpict_url ? tx.realpict_approval === 'Approved' : true;
+        const isFinancialOk = outstanding <= 0 && (outstanding === 0 || tx.pelunasan_approval === 'Approved' || tx.dp1_amount >= tx.total_price);
+
+        if (isDpApproved && isRenderApproved && isRealpictApproved && isFinancialOk && !isPickedUp) {
+            btnPickup.removeAttribute('disabled');
+            btnPickup.style.opacity = '1';
+            btnPickup.style.cursor = 'pointer';
+        } else {
+            btnPickup.setAttribute('disabled', 'true');
+            btnPickup.style.opacity = '0.5';
+            btnPickup.style.cursor = 'not-allowed';
+        }
+
+        // Update stepper
+        updateStepperProgress(tx);
+
+        modal.classList.remove('hidden');
+    }
+
+    function updateStepperProgress(tx) {
+        const steps = [
+            document.getElementById('step-1'),
+            document.getElementById('step-2'),
+            document.getElementById('step-3'),
+            document.getElementById('step-4'),
+            document.getElementById('step-5'),
+            document.getElementById('step-6'),
+            document.getElementById('step-7')
+        ];
+
+        // Clear all previous classes
+        steps.forEach(step => {
+            if (step) {
+                step.classList.remove('active', 'completed');
+            }
+        });
+
+        const isDpApproved = tx.dp_approval === 'Approved';
+        const hasRender = tx.render_model_url && tx.render_model_url !== '' && tx.render_model_url !== '[Gagal Upload]';
+        const isRenderApproved = tx.render_approval === 'Approved';
+        const isProdCompleted = tx.production_status === 'Completed';
+        const hasRealpict = tx.realpict_url && tx.realpict_url !== '' && tx.realpict_url !== '[Gagal Upload]';
+        const isRealpictApproved = tx.realpict_approval === 'Approved';
+
+        const dpTotal = (parseFloat(tx.dp1_amount) || 0) + (parseFloat(tx.dp2_amount) || 0);
+        const totalPrice = parseFloat(tx.total_price) || 0;
+        const outstanding = totalPrice - dpTotal;
+        const isPaid = outstanding <= 0 && (outstanding === 0 || tx.pelunasan_approval === 'Approved' || tx.dp1_amount >= tx.total_price);
+        const isPickedUp = tx.final_pickup_status === 'Picked Up';
+
+        let currentStepIndex = 0; // 0-indexed
+
+        // Step 1: Input Repair (Always Completed)
+        steps[0].classList.add('completed');
+        currentStepIndex = 1;
+
+        // Step 2: Approval DP
+        if (isDpApproved) {
+            steps[1].classList.add('completed');
+            currentStepIndex = 2;
+        } else {
+            steps[1].classList.add('active');
+        }
+
+        // Step 3: Desain 3D
+        if (isDpApproved) {
+            if (hasRender && isRenderApproved) {
+                steps[2].classList.add('completed');
+                currentStepIndex = 3;
+            } else if (hasRender) {
+                steps[2].classList.add('active');
+            } else {
+                steps[2].classList.add('active'); // active waiting for upload
+            }
+        }
+
+        // Step 4: Produksi
+        if (isDpApproved && isRenderApproved) {
+            if (isProdCompleted) {
+                steps[3].classList.add('completed');
+                currentStepIndex = 4;
+            } else {
+                steps[3].classList.add('active');
+            }
+        }
+
+        // Step 5: Realpict
+        if (isDpApproved && isRenderApproved && isProdCompleted) {
+            if (hasRealpict && isRealpictApproved) {
+                steps[4].classList.add('completed');
+                currentStepIndex = 5;
+            } else {
+                steps[4].classList.add('active');
+            }
+        }
+
+        // Step 6: Pelunasan
+        if (isDpApproved && isRenderApproved && isProdCompleted && isRealpictApproved) {
+            if (isPaid) {
+                steps[5].classList.add('completed');
+                currentStepIndex = 6;
+            } else {
+                steps[5].classList.add('active');
+            }
+        }
+
+        // Step 7: Selesai / Pickup
+        if (isDpApproved && isRenderApproved && isProdCompleted && isRealpictApproved && isPaid) {
+            if (isPickedUp) {
+                steps[6].classList.add('completed');
+                currentStepIndex = 7;
+            } else {
+                steps[6].classList.add('active');
+            }
+        }
+
+        // Set stepper track width dynamically based on progress
+        // There are 6 track segments between 7 steps
+        const percent = Math.min(100, Math.max(0, ((currentStepIndex - 1) / 6) * 100));
+        const track = document.getElementById('sales-stepper-track');
+        if (track) {
+            track.style.width = `${percent}%`;
+        }
+    }
+
+    function initLightboxEvents() {
+        document.body.addEventListener('click', (e) => {
+            const target = e.target.closest('.img-thumbnail-link');
+            if (target) {
+                const url = target.dataset.url || target.src;
+                const caption = target.dataset.caption || target.title || 'Pratinjau Gambar';
+
+                const modal = document.getElementById('image-lightbox-modal');
+                const img = document.getElementById('lightbox-img');
+                const cap = document.getElementById('lightbox-caption');
+
+                if (modal && img) {
+                    img.src = resolveImageUrl(url);
+                    if (cap) cap.textContent = caption;
+                    modal.classList.add('active');
+                }
+            }
+        });
+    }
+}
