@@ -2149,6 +2149,7 @@ async function renderLogisticBoard() {
         const printModal = document.getElementById('print-modal');
         if (printModal) printModal.classList.remove('hidden');
     }
+}
 
 
 
@@ -4142,4 +4143,3 @@ async function renderLogisticBoard() {
             }
         });
     }
-}
