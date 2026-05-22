@@ -437,6 +437,13 @@
                                             </select>
                                             <span class="form-help-text" id="cowok-repair-fee-preview">Biaya repair: Rp 0</span>
                                         </div>
+                                        <div class="form-group" style="background: rgba(197,168,92,0.08); border: 1px solid rgba(197,168,92,0.3); border-radius: var(--border-radius-sm); padding: 10px;">
+                                            <div style="display:flex; align-items:center; gap:8px;">
+                                                <input type="checkbox" id="cowok-is-reproduct" style="width:16px;height:16px;cursor:pointer;">
+                                                <label for="cowok-is-reproduct" style="font-weight:600; color:var(--gold); cursor:pointer; margin:0;"><i class="fa-solid fa-rotate"></i> Produksi Ulang (kenakan biaya logam)</label>
+                                            </div>
+                                            <small style="color:var(--text-muted); display:block; margin-top:4px;">Centang jika cincin perlu diproduksi ulang dari awal (bukan repair biasa)</small>
+                                        </div>
                                         <div class="form-group">
                                             <label for="cowok-engraving">Ukir Nama (Opsional)</label>
                                             <input type="text" id="cowok-engraving" placeholder="Teks ukir nama">
@@ -495,6 +502,13 @@
                                                 <!-- Dynamic repairs -->
                                             </select>
                                             <span class="form-help-text" id="cewek-repair-fee-preview">Biaya repair: Rp 0</span>
+                                        </div>
+                                        <div class="form-group" style="background: rgba(197,168,92,0.08); border: 1px solid rgba(197,168,92,0.3); border-radius: var(--border-radius-sm); padding: 10px;">
+                                            <div style="display:flex; align-items:center; gap:8px;">
+                                                <input type="checkbox" id="cewek-is-reproduct" style="width:16px;height:16px;cursor:pointer;">
+                                                <label for="cewek-is-reproduct" style="font-weight:600; color:var(--gold); cursor:pointer; margin:0;"><i class="fa-solid fa-rotate"></i> Produksi Ulang (kenakan biaya logam)</label>
+                                            </div>
+                                            <small style="color:var(--text-muted); display:block; margin-top:4px;">Centang jika cincin perlu diproduksi ulang dari awal (bukan repair biasa)</small>
                                         </div>
                                         <div class="form-group">
                                             <label for="cewek-engraving">Ukir Nama (Opsional)</label>
@@ -835,6 +849,34 @@
                         <h1>Panel Manajemen Produksi & Pengrajin</h1>
                         <p>Alokasi penugasan pengerjaan repair cincin ke pihak pengrajin (workshop) serta monitoring status pengerjaan.</p>
                     </div>
+
+                    <!-- V2: Sub-Table for Designer Rendering Assignments -->
+                    <div class="premium-card">
+                        <h3>Penugasan & Proses Desain Render</h3>
+                        <p>Kelola alokasi desainer 3D dan proses upload render model 3D (untuk remake/produksi ulang).</p>
+                        <br>
+                        <div class="table-scroll-container">
+                            <table class="premium-table" id="table-production-designers">
+                                <thead>
+                                    <tr>
+                                        <th>Nomor Repair</th>
+                                        <th>Customer</th>
+                                        <th>Desainer Ditugaskan</th>
+                                        <th>Model Render Cincin (Co / Ce)</th>
+                                        <th>Status Approval Render</th>
+                                        <th>Komentar Sales (Revisi)</th>
+                                        <th>Aksi</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="tbody-production-designers">
+                                    <tr class="table-empty-row">
+                                        <td colspan="7">Memuat data desainer...</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
                     <div class="premium-card">
                         <h3>Penugasan Pengrajin Cincin</h3>
                         <p>Kelola perbaikan cincin dan tentukan status pengerjaan fisik di bengkel/workshop.</p>
@@ -861,6 +903,67 @@
                             </table>
                         </div>
                     </div>
+
+                    <!-- QA - Quality Assurance Panel -->
+                    <div class="premium-card">
+                        <div style="display:flex; align-items:center; gap:10px; margin-bottom:8px;">
+                            <div style="width:38px;height:38px;border-radius:50%;background:linear-gradient(135deg,#27ae60,#2ecc71);display:flex;align-items:center;justify-content:center;">
+                                <i class="fa-solid fa-magnifying-glass-chart" style="color:#fff;font-size:16px;"></i>
+                            </div>
+                            <div>
+                                <h3 style="margin:0;">Quality Assurance (QA)</h3>
+                                <p style="margin:0;font-size:12px;color:var(--text-muted);">Pemeriksaan kualitas fisik cincin setelah selesai produksi di workshop.</p>
+                            </div>
+                        </div>
+                        <div class="table-scroll-container">
+                            <table class="premium-table">
+                                <thead>
+                                    <tr>
+                                        <th>Nomor Repair</th>
+                                        <th>Workshop</th>
+                                        <th>Deadline</th>
+                                        <th>Status QA</th>
+                                        <th>Catatan QA</th>
+                                        <th>Aksi</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="tbody-qa-list">
+                                    <tr class="table-empty-row"><td colspan="6">Memuat data QA...</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <!-- QC - Quality Control Panel -->
+                    <div class="premium-card">
+                        <div style="display:flex; align-items:center; gap:10px; margin-bottom:8px;">
+                            <div style="width:38px;height:38px;border-radius:50%;background:linear-gradient(135deg,#1a6b96,#2980b9);display:flex;align-items:center;justify-content:center;">
+                                <i class="fa-solid fa-shield-halved" style="color:#fff;font-size:16px;"></i>
+                            </div>
+                            <div>
+                                <h3 style="margin:0;">Quality Control (QC)</h3>
+                                <p style="margin:0;font-size:12px;color:var(--text-muted);">Final check sebelum produk dikirim ke logistik — packaging, label, dan kesesuaian produk.</p>
+                            </div>
+                        </div>
+                        <div class="table-scroll-container">
+                            <table class="premium-table">
+                                <thead>
+                                    <tr>
+                                        <th>Nomor Repair</th>
+                                        <th>Dicek QA Oleh</th>
+                                        <th>Realpict</th>
+                                        <th>Deadline</th>
+                                        <th>Status QC</th>
+                                        <th>Catatan QC</th>
+                                        <th>Aksi</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="tbody-qc-list">
+                                    <tr class="table-empty-row"><td colspan="7">Memuat data QC...</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
                 </div>
 
                 <!-- 5. LOGISTIC VIEW -->
@@ -870,26 +973,31 @@
                         <p>Penyusunan label pengiriman, verifikasi alamat ekspedisi customer, dan input nomor resi pengiriman kurir.</p>
                     </div>
                     <div class="premium-card">
-                        <h3>Daftar Pengiriman Cincin Selesai Repair</h3>
-                        <p>Kelola pengiriman cincin yang sudah selesai didelegasikan oleh bagian produksi.</p>
-                        <br>
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; flex-wrap: wrap; gap: 15px;">
+                            <div>
+                                <h3 style="margin-bottom: 5px;">Daftar Pengiriman Cincin Selesai Repair</h3>
+                                <p style="font-size: 13px; color: var(--text-muted);">Kelola pengiriman cincin yang sudah selesai didelegasikan oleh bagian produksi.</p>
+                            </div>
+                            <button class="premium-btn" id="btn-logistic-print-collective"><i class="fa-solid fa-print"></i> Cetak Surat Jalan & Label Kolektif</button>
+                        </div>
                         <div class="table-scroll-container">
                             <table class="premium-table">
                                 <thead>
                                     <tr>
+                                        <th class="logistic-checkbox-col" style="text-align: center;"><input type="checkbox" id="chk-logistic-select-all" class="logistic-checkbox"></th>
                                         <th>Nomor Repair</th>
                                         <th>Customer</th>
                                         <th>Alamat & Kota Tujuan</th>
                                         <th>Ekspedisi & Ongkir</th>
                                         <th>Status Paket</th>
-                                        <th>Nomor Resi</th>
+                                        <th>Nomor Resi / Aksi Retur</th>
                                         <th>Aksi</th>
                                     </tr>
                                 </thead>
                                 <tbody id="tbody-logistic-list">
                                     <!-- Dynamic shipping records -->
                                     <tr class="table-empty-row">
-                                        <td colspan="7">Memuat data logistik...</td>
+                                        <td colspan="8">Memuat data logistik...</td>
                                     </tr>
                                 </tbody>
                             </table>
@@ -971,6 +1079,7 @@
                                         <th>Nama Layanan/Barang</th>
                                         <th>Kategori</th>
                                         <th>Harga Satuan (Rp)</th>
+                                        <th>Harga Modal HPP (Rp)</th>
                                         <th style="width: 130px;">Aksi</th>
                                     </tr>
                                 </thead>
@@ -991,6 +1100,7 @@
                                         <th>Nama Logam</th>
                                         <th>Harga per Gram (Rp)</th>
                                         <th>Jasa Custom / Pembuatan (Rp)</th>
+                                        <th>Harga Modal per Gram (Rp)</th>
                                         <th style="width: 130px;">Aksi</th>
                                     </tr>
                                 </thead>
@@ -1030,6 +1140,8 @@
                                         <th>Nama Workshop/Pengrajin</th>
                                         <th>No. Handphone</th>
                                         <th>Alamat</th>
+                                        <th>Modal Repair Cowok (Rp)</th>
+                                        <th>Modal Repair Cewek (Rp)</th>
                                         <th style="width: 130px;">Aksi</th>
                                     </tr>
                                 </thead>
@@ -1336,6 +1448,25 @@
                         </div>
                     </div>
 
+                    <!-- V2: Branch Verification Box -->
+                    <div id="sd-branch-verification-area" class="branch-verification-box hidden" style="margin-bottom: 15px;">
+                        <h4><i class="fa-solid fa-store"></i> Verifikasi Penerimaan Toko Cabang</h4>
+                        <p style="font-size: 12.5px; color: var(--text-muted); margin-bottom: 12px;">Barang telah dikirim oleh logistik pusat ke cabang Anda. Silakan periksa kondisi barang fisik sebelum melakukan approval.</p>
+                        
+                        <div class="form-group" style="margin-bottom: 12px;">
+                            <label for="sd-branch-comment">Catatan Kerusakan / Selisih Berat (Jika Ada)</label>
+                            <textarea id="sd-branch-comment" placeholder="Tulis catatan di sini jika ada kerusakan cincin atau ketidaksesuaian berat..." style="width:100%; min-height:60px; padding:10px; border-radius:var(--border-radius-sm); border:1px solid var(--border-color);"></textarea>
+                        </div>
+                        <div class="verification-action-group">
+                            <button class="premium-btn btn-sec btn-danger" id="btn-sd-branch-reject" style="background-color: rgba(231, 76, 60, 0.1); border-color: var(--red); color: var(--red); padding: 8px 16px;"><i class="fa-solid fa-circle-xmark"></i> Terima Bermasalah</button>
+                            <button class="premium-btn" id="btn-sd-branch-approve" style="padding: 8px 16px;"><i class="fa-solid fa-circle-check"></i> Konfirmasi Terima (OK)</button>
+                        </div>
+                        <div id="sd-branch-receipt-status-display" style="margin-top: 12px; font-weight: bold; font-size: 13px;" class="hidden">
+                            Status Penerimaan Cabang: <span id="sd-branch-status-badge">-</span>
+                            <div id="sd-branch-comment-display" style="font-size: 12px; color: var(--text-muted); font-weight: normal; margin-top: 4px; border-top: 1px dashed var(--border-color); padding-top: 4px;">Catatan: <span>-</span></div>
+                        </div>
+                    </div>
+
                     <!-- Delivery & Handover status -->
                     <div style="display: flex; justify-content: space-between; align-items: center; background-color: var(--card-bg-dark); padding: 15px; border-radius: var(--border-radius-sm); border: 1px solid var(--border-color);">
                         <div>
@@ -1355,6 +1486,33 @@
         </div>
     </div>
 
+    <!-- 7. PRODUCTION COMPLETE MODAL (WEIGHT INPUT) -->
+    <div id="production-complete-modal" class="modal-overlay hidden">
+        <div class="modal-card modal-small">
+            <div class="modal-header">
+                <h2><i class="fa-solid fa-scale-balanced"></i> Input Berat Akhir Produksi</h2>
+                <button class="modal-close-btn" id="btn-close-prod-complete-modal">&times;</button>
+            </div>
+            <div class="modal-body">
+                <p style="font-size: 13px; color: var(--text-muted); margin-bottom: 15px;">Silakan input berat final cincin setelah selesai diproduksi untuk residu logam dan kalkulasi harga final otomatis.</p>
+                <input type="hidden" id="prod-complete-id">
+                
+                <div id="prod-complete-cowok-group" class="form-group hidden" style="margin-bottom: 15px;">
+                    <label for="prod-complete-cowok-weight">Berat Final Cincin Cowok (gram)</label>
+                    <input type="number" id="prod-complete-cowok-weight" step="0.01" placeholder="Contoh: 4.35" style="width: 100%;">
+                </div>
+                <div id="prod-complete-cewek-group" class="form-group hidden" style="margin-bottom: 15px;">
+                    <label for="prod-complete-cewek-weight">Berat Final Cincin Cewek (gram)</label>
+                    <input type="number" id="prod-complete-cewek-weight" step="0.01" placeholder="Contoh: 3.20" style="width: 100%;">
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="premium-btn btn-sec" id="btn-cancel-prod-complete">Batal</button>
+                <button class="premium-btn" id="btn-save-prod-complete"><i class="fa-solid fa-floppy-disk"></i> Simpan & Selesai</button>
+            </div>
+        </div>
+    </div>
+
     <!-- 6. IMAGE LIGHTBOX OVERLAY MODAL -->
     <div id="image-lightbox-modal" class="lightbox-modal">
         <span class="lightbox-close" id="btn-close-lightbox">&times;</span>
@@ -1362,8 +1520,40 @@
         <div class="lightbox-caption" id="lightbox-caption">Bukti Pembayaran</div>
     </div>
 
+    <!-- 7. PRINT INDIVIDUAL LOGISTIC MODAL -->
+    <div id="print-modal" class="modal-overlay hidden" style="z-index:9999;">
+        <div class="modal-card" style="max-width:680px; width:95%;">
+            <div class="modal-header">
+                <h2><i class="fa-solid fa-file-invoice"></i> Preview Surat Jalan & Label</h2>
+                <button class="modal-close-btn" onclick="document.getElementById('print-modal').classList.add('hidden')">&times;</button>
+            </div>
+            <div class="modal-body" style="max-height:70vh;overflow-y:auto;">
+                <div id="print-receipt-body" style="background:#fff;color:#000;padding:16px;border-radius:var(--border-radius-sm);">
+                    <!-- Print content injected by printIndividualLogistic() -->
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="premium-btn btn-sec" onclick="document.getElementById('print-modal').classList.add('hidden')">Tutup</button>
+                <button class="premium-btn" onclick="printReceiptContent()"><i class="fa-solid fa-print"></i> Cetak Sekarang</button>
+            </div>
+        </div>
+    </div>
+
     <!-- Core App Logic Script -->
     <script src="app.js"></script>
+    <script>
+        function printReceiptContent() {
+            const content = document.getElementById('print-receipt-body').innerHTML;
+            const w = window.open('', '_blank', 'width=800,height=600');
+            w.document.write(`<!DOCTYPE html><html><head><title>Surat Jalan Sovia Jewelry</title>
+                <style>body{font-family:Arial,sans-serif;margin:0;padding:0;}@media print{body{margin:0;}}</style>
+                </head><body>${content}</body></html>`);
+            w.document.close();
+            w.focus();
+            w.print();
+            w.close();
+        }
+    </script>
     <script>
         // Register Service Worker for Offline-First Support
         if ('serviceWorker' in navigator) {
