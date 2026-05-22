@@ -1,0 +1,1131 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sistem Informasi Repair Cincin | SOVIA JEWELRY</title>
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <!-- FontAwesome for Premium Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Main Style Sheet -->
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body class="light-theme">
+    <!-- Loading Overlay -->
+    <div id="loading-overlay" class="hidden">
+        <div class="spinner-container">
+            <div class="premium-spinner"></div>
+            <div class="logo-spinner">
+                <img src="https://soviajewelry.com/wp-content/uploads/2022/08/NEW-LOGO-SOVIA-COLOUR-4.png" alt="Sovia Logo">
+            </div>
+            <p id="loading-text">Memuat Sistem...</p>
+        </div>
+    </div>
+
+    <!-- Notification Toast Container -->
+    <div id="toast-container"></div>
+
+    <!-- ==================== VIEW 1: PORTAL HUB ==================== -->
+    <div id="hub-view" class="view-section active">
+        <div class="hub-container">
+            <header class="hub-header">
+                <img src="https://soviajewelry.com/wp-content/uploads/2022/08/NEW-LOGO-SOVIA-COLOUR-4.png" alt="Sovia Logo" class="hub-logo">
+                <h1>PORTAL INTERNAL CORPORATE</h1>
+                <p>Silakan pilih sistem informasi divisi untuk masuk</p>
+            </header>
+            
+            <div class="hub-grid">
+                <!-- Active System Card -->
+                <div class="hub-card active" id="btn-enter-repair">
+                    <div class="hub-card-icon">
+                        <i class="fa-solid fa-screwdriver-wrench"></i>
+                    </div>
+                    <div class="hub-card-content">
+                        <h3>Sistem Informasi Repair</h3>
+                        <p>Kelola data perbaikan, resize, poles, dan ukir nama cincin customer secara real-time.</p>
+                        <span class="hub-status-badge active"><i class="fa-solid fa-circle-check"></i> Aktif</span>
+                    </div>
+                    <div class="hub-card-arrow">
+                        <i class="fa-solid fa-chevron-right"></i>
+                    </div>
+                </div>
+
+                <!-- Upcoming System 1 -->
+                <div class="hub-card disabled">
+                    <div class="hub-card-icon">
+                        <i class="fa-solid fa-ring"></i>
+                    </div>
+                    <div class="hub-card-content">
+                        <h3>Sistem Order Handmade</h3>
+                        <p>Pembuatan cincin custom secara manual oleh pengrajin profesional dengan detail tinggi.</p>
+                        <span class="hub-status-badge pending"><i class="fa-solid fa-clock"></i> Segera Hadir</span>
+                    </div>
+                </div>
+
+                <!-- Upcoming System 2 -->
+                <div class="hub-card disabled">
+                    <div class="hub-card-icon">
+                        <i class="fa-solid fa-gem"></i>
+                    </div>
+                    <div class="hub-card-content">
+                        <h3>Sistem Order Casting</h3>
+                        <p>Produksi cincin skala besar menggunakan metode cetak lilin presisi tinggi.</p>
+                        <span class="hub-status-badge pending"><i class="fa-solid fa-clock"></i> Segera Hadir</span>
+                    </div>
+                </div>
+            </div>
+            
+            <footer class="hub-footer">
+                <p>&copy; 2026 SOVIA JEWELRY. All Rights Reserved.</p>
+                <p class="footer-address"><i class="fa-solid fa-map-location-dot"></i> Jl. Mertosanan, Kel. Potorono, Kec. Banguntapan, Kab. Bantul</p>
+            </footer>
+        </div>
+    </div>
+
+    <!-- ==================== VIEW 2: LOGIN SCREEN ==================== -->
+    <div id="login-view" class="view-section hidden">
+        <div class="login-wrapper">
+            <div class="login-glass-card">
+                <button class="back-to-hub-btn" id="btn-login-back">
+                    <i class="fa-solid fa-arrow-left"></i> Kembali ke Portal
+                </button>
+                <div class="login-header">
+                    <img src="https://soviajewelry.com/wp-content/uploads/2022/08/NEW-LOGO-SOVIA-COLOUR-4.png" alt="Sovia Logo" class="login-logo">
+                    <h2>Sistem Repair Cincin</h2>
+                    <p>Masukkan kredensial Anda untuk masuk ke sistem</p>
+                </div>
+                
+                <form id="login-form" autocomplete="off">
+                    <div class="input-group">
+                        <label for="login-username"><i class="fa-solid fa-user"></i> Username</label>
+                        <input type="text" id="login-username" placeholder="Masukkan username" required autocomplete="username">
+                    </div>
+                    <div class="input-group">
+                        <label for="login-password"><i class="fa-solid fa-lock"></i> Password</label>
+                        <div class="password-wrapper">
+                            <input type="password" id="login-password" placeholder="Masukkan password" required autocomplete="current-password">
+                            <button type="button" class="toggle-password-btn" id="btn-toggle-password">
+                                <i class="fa-regular fa-eye"></i>
+                            </button>
+                        </div>
+                    </div>
+                    <button type="submit" class="premium-btn btn-login" id="btn-submit-login">
+                        <span>Masuk Sistem <i class="fa-solid fa-sign-in-alt"></i></span>
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- ==================== VIEW 3: MAIN APP LAYOUT ==================== -->
+    <div id="app-layout" class="view-section hidden">
+        <!-- Sidebar Navigation -->
+        <aside id="app-sidebar">
+            <div class="sidebar-brand">
+                <img src="https://soviajewelry.com/wp-content/uploads/2022/08/NEW-LOGO-SOVIA-COLOUR-4.png" alt="Sovia Logo" class="sidebar-logo">
+                <span class="brand-name">SOVIA JEWELRY</span>
+            </div>
+            
+            <div class="user-profile-badge">
+                <div class="profile-avatar">
+                    <i class="fa-solid fa-user-tie"></i>
+                </div>
+                <div class="profile-info">
+                    <h4 id="user-display-name">Guest User</h4>
+                    <span id="user-display-role">Sales Bekasi</span>
+                </div>
+            </div>
+
+            <nav class="sidebar-menu">
+                <a href="#" class="menu-item active" data-target="dashboard-panel">
+                    <i class="fa-solid fa-chart-pie"></i>
+                    <span>Dashboard</span>
+                </a>
+                <a href="#" class="menu-item" data-target="sales-panel">
+                    <i class="fa-solid fa-receipt"></i>
+                    <span>Sales (Form Repair)</span>
+                </a>
+                <a href="#" class="menu-item" data-target="accounting-panel">
+                    <i class="fa-solid fa-calculator"></i>
+                    <span>Accounting</span>
+                </a>
+                <a href="#" class="menu-item" data-target="production-panel">
+                    <i class="fa-solid fa-industry"></i>
+                    <span>Production</span>
+                </a>
+                <a href="#" class="menu-item" data-target="logistic-panel">
+                    <i class="fa-solid fa-truck-ramp-box"></i>
+                    <span>Logistic</span>
+                </a>
+                <a href="#" class="menu-item" data-target="admin-panel" id="menu-item-admin">
+                    <i class="fa-solid fa-user-gear"></i>
+                    <span>Administrator</span>
+                </a>
+            </nav>
+
+            <div class="sidebar-footer">
+                <button class="logout-btn" id="btn-logout">
+                    <i class="fa-solid fa-power-off"></i>
+                    <span>Keluar Sistem</span>
+                </button>
+            </div>
+        </aside>
+
+        <!-- Main Body Wrapper -->
+        <main id="app-main">
+            <!-- Top Navigation Bar -->
+            <header id="app-topbar">
+                <div class="topbar-left">
+                    <button class="toggle-sidebar-btn" id="btn-sidebar-toggle">
+                        <i class="fa-solid fa-bars-staggered"></i>
+                    </button>
+                    <h2 id="topbar-title">Dashboard</h2>
+                </div>
+                <div class="topbar-right">
+                    <!-- Network Status & Sync Queue -->
+                    <div class="network-status-indicator" id="network-indicator">
+                        <span class="status-dot online"></span>
+                        <span class="status-label" id="network-text">Online</span>
+                    </div>
+
+                    <button class="sync-queue-badge" id="btn-sync-trigger" title="Sinkronisasi Data">
+                        <i class="fa-solid fa-rotate"></i>
+                        <span class="badge-count hidden" id="sync-badge-count">0</span>
+                    </button>
+
+                    <!-- Theme Toggle -->
+                    <button class="theme-toggle-btn" id="btn-theme-toggle" title="Ubah Tema">
+                        <i class="fa-solid fa-moon"></i>
+                    </button>
+                </div>
+            </header>
+
+            <!-- Scrollable Content Panel -->
+            <div id="content-panel">
+                
+                <!-- 1. DASHBOARD VIEW -->
+                <div id="dashboard-panel" class="app-panel active">
+                    <div class="panel-header-section">
+                        <h1>Halo, <span class="text-gradient" id="dashboard-user-greeting">User</span>!</h1>
+                        <p>Berikut ringkasan operasional sistem repair cincin hari ini.</p>
+                    </div>
+
+                    <!-- Key Stats Grid -->
+                    <div class="stats-grid">
+                        <div class="stat-card">
+                            <div class="stat-icon purple"><i class="fa-solid fa-file-invoice"></i></div>
+                            <div class="stat-data">
+                                <h3>Total Transaksi</h3>
+                                <h1 id="stat-total-repairs">0</h1>
+                                <p>Transaksi repair terdaftar</p>
+                            </div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-icon orange"><i class="fa-solid fa-clock-rotate-left"></i></div>
+                            <div class="stat-data">
+                                <h3>Proses Produksi</h3>
+                                <h1 id="stat-production-repairs">0</h1>
+                                <p>Sedang dikerjakan pengrajin</p>
+                            </div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-icon green"><i class="fa-solid fa-circle-check"></i></div>
+                            <div class="stat-data">
+                                <h3>Selesai & Dikirim</h3>
+                                <h1 id="stat-completed-repairs">0</h1>
+                                <p>Sudah selesai & dikirim</p>
+                            </div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-icon gold"><i class="fa-solid fa-coins"></i></div>
+                            <div class="stat-data">
+                                <h3>Pending Sync</h3>
+                                <h1 id="stat-pending-sync">0</h1>
+                                <p>Data tersimpan di perangkat</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Dashboard Layout Flex -->
+                    <div class="dashboard-body">
+                        <!-- Left Block: Quick Action & Charts -->
+                        <div class="dashboard-left">
+                            <div class="premium-card">
+                                <h3>Aksi Cepat</h3>
+                                <div class="quick-actions-flex">
+                                    <button class="action-card-btn" id="btn-quick-new-repair">
+                                        <i class="fa-solid fa-circle-plus"></i>
+                                        <span>Buat Form Repair</span>
+                                    </button>
+                                    <button class="action-card-btn" id="btn-quick-sync">
+                                        <i class="fa-solid fa-sync"></i>
+                                        <span>Sinkronisasi Data</span>
+                                    </button>
+                                    <button class="action-card-btn" id="btn-quick-admin">
+                                        <i class="fa-solid fa-gears"></i>
+                                        <span>Kelola Bahan & Jasa</span>
+                                    </button>
+                                </div>
+                            </div>
+
+                            <div class="premium-card chart-card">
+                                <h3>Statistik Tipe Repair Cincin</h3>
+                                <div class="custom-chart-container">
+                                    <div class="custom-progress-bars" id="dashboard-repair-types-list">
+                                        <!-- Will be filled dynamically -->
+                                        <div class="progress-bar-row">
+                                            <span class="bar-label">Resize Cincin</span>
+                                            <div class="bar-track">
+                                                <div class="bar-fill" style="width: 70%"></div>
+                                            </div>
+                                            <span class="bar-value">70%</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Right Block: Sync Monitor & Latest Sync Logs -->
+                        <div class="dashboard-right">
+                            <div class="premium-card sync-monitor-card">
+                                <h3>Status Koneksi & Antrean Sinkronisasi</h3>
+                                <div class="sync-status-details">
+                                    <div class="sync-row">
+                                        <span>Database Online:</span>
+                                        <strong id="sync-db-status" class="online">Tersambung (Sheets DB)</strong>
+                                    </div>
+                                    <div class="sync-row">
+                                        <span>Media Storage:</span>
+                                        <strong id="sync-drive-status" class="online">Tersambung (Drive API)</strong>
+                                    </div>
+                                    <div class="sync-row">
+                                        <span>Kunci Sinkronisasi (Service Lock):</span>
+                                        <strong id="sync-lock-status" class="unlocked">Bebas (Idle)</strong>
+                                    </div>
+                                    <div class="sync-row">
+                                        <span>Antrean Pending:</span>
+                                        <strong id="sync-queue-status">0 item menunggu sinkronisasi</strong>
+                                    </div>
+                                </div>
+                                <div class="sync-queue-list-container">
+                                    <h4>Daftar Antrean Transaksi:</h4>
+                                    <ul id="sync-queue-list" class="sync-queue-list">
+                                        <li class="empty-list-placeholder">Tidak ada antrean tertunda.</li>
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 2. SALES VIEW (FORM REPAIR & HISTORY TABLE) -->
+                <div id="sales-panel" class="app-panel">
+                    <div class="panel-header-section">
+                        <h1>Formulir Repair Cincin</h1>
+                        <p>Input data perbaikan cincin cowok/cewek, kalkulasi biaya otomatis, dan kelola histori transaksi.</p>
+                    </div>
+
+                    <!-- Dynamic Form Repair Card -->
+                    <div class="premium-card">
+                        <form id="repair-entry-form" novalidate>
+                            <!-- Tab header / Section Header -->
+                            <div class="form-section-title">
+                                <span class="step-num">1</span>
+                                <h3>Informasi Transaksi & Toko</h3>
+                            </div>
+
+                            <div class="form-row-three">
+                                <div class="form-group">
+                                    <label for="rep-date"><i class="fa-regular fa-calendar"></i> Tanggal Repair</label>
+                                    <input type="date" id="rep-date" required>
+                                </div>
+                                <div class="form-group">
+                                    <label for="rep-deadline"><i class="fa-regular fa-calendar-check"></i> Tanggal Deadline</label>
+                                    <input type="date" id="rep-deadline" required>
+                                </div>
+                                <div class="form-group">
+                                    <label for="rep-number"><i class="fa-solid fa-hashtag"></i> Nomor Repair (Otomatis)</label>
+                                    <input type="text" id="rep-number" readonly class="readonly-input" placeholder="REP-STORE-YYMMDD-HHMMSS">
+                                </div>
+                                <div class="form-group">
+                                    <label for="rep-sales-store"><i class="fa-solid fa-store"></i> Nama Store / Sales</label>
+                                    <input type="text" id="rep-sales-store" readonly class="readonly-input" placeholder="Nama Store & Sales">
+                                </div>
+                            </div>
+
+                            <div class="form-section-title">
+                                <span class="step-num">2</span>
+                                <h3>Data Pelanggan (Customer)</h3>
+                            </div>
+
+                            <div class="form-row-two">
+                                <div class="form-group">
+                                    <label for="cust-name"><i class="fa-solid fa-user-pen"></i> Nama Lengkap Customer</label>
+                                    <input type="text" id="cust-name" required placeholder="Nama customer">
+                                </div>
+                                <div class="form-group">
+                                    <label for="cust-phone"><i class="fa-brands fa-whatsapp"></i> Nomor WhatsApp/HP</label>
+                                    <input type="tel" id="cust-phone" required placeholder="08xxxxxxxxxx">
+                                </div>
+                            </div>
+                            <div class="form-row-two">
+                                <div class="form-group">
+                                    <label for="cust-address"><i class="fa-solid fa-map-pin"></i> Alamat Lengkap Pengiriman</label>
+                                    <textarea id="cust-address" required placeholder="Jalan, RT/RW, Dusun, Kecamatan, Kabupaten..."></textarea>
+                                </div>
+                                <div class="form-group">
+                                    <label for="cust-city"><i class="fa-solid fa-city"></i> Kabupaten / Kota Pengiriman</label>
+                                    <select id="cust-city" required>
+                                        <option value="" disabled selected>Pilih Kabupaten/Kota</option>
+                                        <!-- Will be filled from city db -->
+                                    </select>
+                                    <span class="form-help-text" id="shipping-fee-preview">Ongkos kirim: Rp 0</span>
+                                </div>
+                            </div>
+
+                            <div class="form-section-title">
+                                <span class="step-num">3</span>
+                                <h3>Informasi Produk Cincin Cowok & Cewek</h3>
+                            </div>
+
+                            <!-- Dual Cards Layout for Cowok & Cewek Rings -->
+                            <div class="dual-ring-layout">
+                                <!-- Ring Cowok Card -->
+                                <div class="ring-card" id="card-ring-cowok">
+                                    <div class="ring-card-header">
+                                        <div class="ring-toggle-wrap">
+                                            <input type="checkbox" id="ring-cowok-active" checked>
+                                            <label for="ring-cowok-active">Cincin Cowok (Aktif)</label>
+                                        </div>
+                                        <i class="fa-solid fa-mars ring-gender-icon icon-mars"></i>
+                                    </div>
+                                    <div class="ring-card-body" id="body-ring-cowok">
+                                        <div class="form-group">
+                                            <label for="cowok-material">Bahan & Kadar Logam</label>
+                                            <select id="cowok-material">
+                                                <option value="" disabled selected>Pilih Bahan</option>
+                                                <!-- Dynamic metals -->
+                                            </select>
+                                            <span class="form-help-text" id="cowok-material-price-preview">Harga: Rp 0/gr | Jasa: Rp 0</span>
+                                        </div>
+                                        <div class="form-row-two">
+                                            <div class="form-group">
+                                                <label for="cowok-weight">Berat Awal (Gram)</label>
+                                                <input type="number" step="0.01" min="0" id="cowok-weight" placeholder="0.00">
+                                            </div>
+                                            <div class="form-group">
+                                                <label for="cowok-size">Ukuran Cincin</label>
+                                                <select id="cowok-size">
+                                                    <!-- Generated dynamically 4.0 - 35.5 -->
+                                                </select>
+                                            </div>
+                                        </div>
+                                        <div class="form-group">
+                                            <label for="cowok-repair-type">Jenis Perbaikan (Repair)</label>
+                                            <select id="cowok-repair-type">
+                                                <option value="" disabled selected>Pilih Jenis Repair</option>
+                                                <!-- Dynamic repairs -->
+                                            </select>
+                                            <span class="form-help-text" id="cowok-repair-fee-preview">Biaya repair: Rp 0</span>
+                                        </div>
+                                        <div class="form-group">
+                                            <label for="cowok-engraving">Ukir Nama (Opsional)</label>
+                                            <input type="text" id="cowok-engraving" placeholder="Teks ukir nama">
+                                        </div>
+                                        <div class="form-group">
+                                            <label>Foto Model Cincin</label>
+                                            <div class="image-upload-wrapper">
+                                                <div class="image-preview" id="cowok-image-preview">
+                                                    <i class="fa-solid fa-cloud-arrow-up"></i>
+                                                    <span>Klik untuk unggah foto cincin cowok</span>
+                                                </div>
+                                                <input type="file" id="cowok-image" accept="image/*" class="image-file-input">
+                                            </div>
+                                        </div>
+                                        <div class="form-group">
+                                            <label for="cowok-notes">Catatan Desain / Model</label>
+                                            <textarea id="cowok-notes" rows="2" placeholder="Keterangan tambahan cincin cowok..."></textarea>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Ring Cewek Card -->
+                                <div class="ring-card" id="card-ring-cewek">
+                                    <div class="ring-card-header">
+                                        <div class="ring-toggle-wrap">
+                                            <input type="checkbox" id="ring-cewek-active" checked>
+                                            <label for="ring-cewek-active">Cincin Cewek (Aktif)</label>
+                                        </div>
+                                        <i class="fa-solid fa-venus ring-gender-icon icon-venus"></i>
+                                    </div>
+                                    <div class="ring-card-body" id="body-ring-cewek">
+                                        <div class="form-group">
+                                            <label for="cewek-material">Bahan & Kadar Logam</label>
+                                            <select id="cewek-material">
+                                                <option value="" disabled selected>Pilih Bahan</option>
+                                                <!-- Dynamic metals -->
+                                            </select>
+                                            <span class="form-help-text" id="cewek-material-price-preview">Harga: Rp 0/gr | Jasa: Rp 0</span>
+                                        </div>
+                                        <div class="form-row-two">
+                                            <div class="form-group">
+                                                <label for="cewek-weight">Berat Awal (Gram)</label>
+                                                <input type="number" step="0.01" min="0" id="cewek-weight" placeholder="0.00">
+                                            </div>
+                                            <div class="form-group">
+                                                <label for="cewek-size">Ukuran Cincin</label>
+                                                <select id="cewek-size">
+                                                    <!-- Generated dynamically 4.0 - 35.5 -->
+                                                </select>
+                                            </div>
+                                        </div>
+                                        <div class="form-group">
+                                            <label for="cewek-repair-type">Jenis Perbaikan (Repair)</label>
+                                            <select id="cewek-repair-type">
+                                                <option value="" disabled selected>Pilih Jenis Repair</option>
+                                                <!-- Dynamic repairs -->
+                                            </select>
+                                            <span class="form-help-text" id="cewek-repair-fee-preview">Biaya repair: Rp 0</span>
+                                        </div>
+                                        <div class="form-group">
+                                            <label for="cewek-engraving">Ukir Nama (Opsional)</label>
+                                            <input type="text" id="cewek-engraving" placeholder="Teks ukir nama">
+                                        </div>
+                                        <div class="form-group">
+                                            <label>Foto Model Cincin</label>
+                                            <div class="image-upload-wrapper">
+                                                <div class="image-preview" id="cewek-image-preview">
+                                                    <i class="fa-solid fa-cloud-arrow-up"></i>
+                                                    <span>Klik untuk unggah foto cincin cewek</span>
+                                                </div>
+                                                <input type="file" id="cewek-image" accept="image/*" class="image-file-input">
+                                            </div>
+                                        </div>
+                                        <div class="form-group">
+                                            <label for="cewek-notes">Catatan Desain / Model</label>
+                                            <textarea id="cewek-notes" rows="2" placeholder="Keterangan tambahan cincin cewek..."></textarea>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="form-section-title">
+                                <span class="step-num">4</span>
+                                <h3>Barang / Jasa Tambahan (Opsional)</h3>
+                            </div>
+
+                            <div class="additional-items-console">
+                                <table class="premium-table font-compact" id="table-additional-items">
+                                    <thead>
+                                        <tr>
+                                            <th>Nama Barang / Jasa</th>
+                                            <th style="width: 120px;">Qty</th>
+                                            <th style="width: 200px;">Harga Satuan (Rp)</th>
+                                            <th style="width: 200px;">Total (Rp)</th>
+                                            <th style="width: 60px;">Aksi</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="tbody-additional-items">
+                                        <!-- Dynamic items rows -->
+                                    </tbody>
+                                </table>
+                                <button type="button" class="premium-btn btn-sec btn-add-row" id="btn-add-item-row">
+                                    <i class="fa-solid fa-plus-circle"></i> Tambah Baris Layanan
+                                </button>
+                            </div>
+
+                            <div class="form-section-title">
+                                <span class="step-num">5</span>
+                                <h3>Ringkasan Harga & Kalkulasi</h3>
+                            </div>
+
+                            <div class="pricing-summary-grid">
+                                <div class="pricing-summary-card">
+                                    <h4>Rincian Ring Cowok</h4>
+                                    <div class="summary-line">
+                                        <span>Bahan Logam (Berat x Rp/gr):</span>
+                                        <span id="calc-cowok-metal-cost">Rp 0</span>
+                                    </div>
+                                    <div class="summary-line">
+                                        <span>Biaya Jasa Custom:</span>
+                                        <span id="calc-cowok-custom-fee">Rp 0</span>
+                                    </div>
+                                    <div class="summary-line">
+                                        <span>Biaya Repair Jasa:</span>
+                                        <span id="calc-cowok-repair-fee">Rp 0</span>
+                                    </div>
+                                    <div class="summary-line highlight-subtotal">
+                                        <span>Subtotal Cowok:</span>
+                                        <strong id="calc-cowok-subtotal">Rp 0</strong>
+                                    </div>
+                                </div>
+
+                                <div class="pricing-summary-card">
+                                    <h4>Rincian Ring Cewek</h4>
+                                    <div class="summary-line">
+                                        <span>Bahan Logam (Berat x Rp/gr):</span>
+                                        <span id="calc-cewek-metal-cost">Rp 0</span>
+                                    </div>
+                                    <div class="summary-line">
+                                        <span>Biaya Jasa Custom:</span>
+                                        <span id="calc-cewek-custom-fee">Rp 0</span>
+                                    </div>
+                                    <div class="summary-line">
+                                        <span>Biaya Repair Jasa:</span>
+                                        <span id="calc-cewek-repair-fee">Rp 0</span>
+                                    </div>
+                                    <div class="summary-line highlight-subtotal">
+                                        <span>Subtotal Cewek:</span>
+                                        <strong id="calc-cewek-subtotal">Rp 0</strong>
+                                    </div>
+                                </div>
+
+                                <div class="pricing-summary-card result-pricing-card">
+                                    <h4>Total Akumulasi Pembayaran</h4>
+                                    <div class="summary-line">
+                                        <span>Subtotal Cincin (Co + Ce):</span>
+                                        <span id="calc-rings-total">Rp 0</span>
+                                    </div>
+                                    <div class="summary-line">
+                                        <span>Total Layanan Tambahan:</span>
+                                        <span id="calc-additional-total">Rp 0</span>
+                                    </div>
+                                    <div class="summary-line">
+                                        <span>Ongkos Kirim Pengiriman:</span>
+                                        <span id="calc-shipping-total">Rp 0</span>
+                                    </div>
+                                    <hr>
+                                    <div class="summary-line total-price-line">
+                                        <span>Total Harga:</span>
+                                        <h2 id="calc-grand-total">Rp 0</h2>
+                                    </div>
+                                    <div class="summary-line dp-rule-line">
+                                        <span>DP Minimal (80%):</span>
+                                        <strong id="calc-min-dp">Rp 0</strong>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="form-section-title">
+                                <span class="step-num">6</span>
+                                <h3>Informasi Pembayaran & Kartu Garansi</h3>
+                            </div>
+
+                            <div class="payment-upload-grid">
+                                <!-- Kartu Garansi Upload -->
+                                <div class="upload-box-card">
+                                    <h4><i class="fa-solid fa-id-card"></i> Kartu Garansi (Fisik)</h4>
+                                    <div class="image-upload-wrapper">
+                                        <div class="image-preview" id="warranty-image-preview">
+                                            <i class="fa-solid fa-cloud-arrow-up"></i>
+                                            <span>Klik untuk unggah foto kartu garansi</span>
+                                        </div>
+                                        <input type="file" id="warranty-image" accept="image/*" class="image-file-input">
+                                    </div>
+                                </div>
+
+                                <!-- DP ke-1 Card -->
+                                <div class="upload-box-card">
+                                    <h4><i class="fa-solid fa-money-bill-wave"></i> Pembayaran DP Ke-1</h4>
+                                    <div class="form-group">
+                                        <label for="dp1-method">Metode Pembayaran</label>
+                                        <select id="dp1-method">
+                                            <option value="" disabled selected>Pilih Pembayaran</option>
+                                            <!-- Payments -->
+                                        </select>
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="dp1-amount">Jumlah Pembayaran DP 1 (Rp)</label>
+                                        <input type="number" id="dp1-amount" placeholder="0">
+                                    </div>
+                                    <div class="form-group">
+                                        <label>Bukti Resi DP 1</label>
+                                        <div class="image-upload-wrapper">
+                                            <div class="image-preview" id="dp1-image-preview">
+                                                <i class="fa-solid fa-cloud-arrow-up"></i>
+                                                <span>Klik untuk unggah resi DP 1</span>
+                                            </div>
+                                            <input type="file" id="dp1-image" accept="image/*" class="image-file-input">
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- DP ke-2 Card -->
+                                <div class="upload-box-card">
+                                    <h4><i class="fa-solid fa-money-bill-wave"></i> Pembayaran DP Ke-2 (Opsional / Pelunasan)</h4>
+                                    <div class="form-group">
+                                        <label for="dp2-method">Metode Pembayaran</label>
+                                        <select id="dp2-method">
+                                            <option value="" disabled selected>Pilih Pembayaran</option>
+                                            <!-- Payments -->
+                                        </select>
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="dp2-amount">Jumlah Pembayaran DP 2 (Rp)</label>
+                                        <input type="number" id="dp2-amount" placeholder="0">
+                                    </div>
+                                    <div class="form-group">
+                                        <label>Bukti Resi DP 2</label>
+                                        <div class="image-upload-wrapper">
+                                            <div class="image-preview" id="dp2-image-preview">
+                                                <i class="fa-solid fa-cloud-arrow-up"></i>
+                                                <span>Klik untuk unggah resi DP 2</span>
+                                            </div>
+                                            <input type="file" id="dp2-image" accept="image/*" class="image-file-input">
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Action Bar -->
+                            <div class="form-action-bar">
+                                <button type="button" class="premium-btn btn-danger" id="btn-form-delete">
+                                    <i class="fa-regular fa-trash-can"></i> Hapus Inputan
+                                </button>
+                                <button type="button" class="premium-btn btn-sec" id="btn-form-preview">
+                                    <i class="fa-regular fa-eye"></i> Preview Formulir
+                                </button>
+                                <button type="submit" class="premium-btn" id="btn-form-save">
+                                    <i class="fa-regular fa-floppy-disk"></i> Simpan Transaksi Repair
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+
+                    <!-- Recent Repair History -->
+                    <div class="panel-header-section" style="margin-top: 50px;">
+                        <h2>Daftar Histori Repair Terbaru</h2>
+                        <p>Melihat, mencari, mencetak form/nota, membagikan ke WhatsApp, serta mengedit/menghapus riwayat transaksi perbaikan cincin.</p>
+                    </div>
+
+                    <div class="premium-card">
+                        <!-- Table Filter Controls -->
+                        <div class="table-controls">
+                            <div class="search-input-wrap">
+                                <i class="fa-solid fa-magnifying-glass"></i>
+                                <input type="text" id="history-search" placeholder="Cari berdasarkan Nomor Repair atau Nama Customer...">
+                            </div>
+                            <div class="filter-select-wrap">
+                                <select id="history-status-filter">
+                                    <option value="ALL">Semua Status</option>
+                                    <option value="Draft">Draft</option>
+                                    <option value="Synced">Synced (Sheets)</option>
+                                    <option value="Pending Sync">Pending Sync (Lokal)</option>
+                                    <option value="Completed">Selesai</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <!-- History Table -->
+                        <div class="table-scroll-container">
+                            <table class="premium-table" id="table-repair-history">
+                                <thead>
+                                    <tr>
+                                        <th>No. Repair</th>
+                                        <th>Tanggal</th>
+                                        <th>Deadline</th>
+                                        <th>Pelanggan</th>
+                                        <th>Toko / Sales</th>
+                                        <th>Total Biaya</th>
+                                        <th>DP Dibayar</th>
+                                        <th>Status</th>
+                                        <th style="width: 260px;">Aksi</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="tbody-repair-history">
+                                    <!-- Dynamic rows loaded from IndexedDB -->
+                                    <tr class="table-empty-row">
+                                        <td colspan="9">Tidak ada data transaksi repair ditemukan.</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 3. ACCOUNTING VIEW -->
+                <div id="accounting-panel" class="app-panel">
+                    <div class="panel-header-section">
+                        <h1>Panel Keuangan & Accounting</h1>
+                        <p>Halaman pemantauan keuangan, pelunasan tagihan, verifikasi pembayaran deposit, dan total omset.</p>
+                    </div>
+                    <div class="premium-card">
+                        <h3>Daftar Penerimaan Piutang / Pelunasan</h3>
+                        <p>Kondisi keuangan transaksi terkini (hanya Admin dan Accounting yang dapat memvalidasi data keuangan secara global).</p>
+                        <br>
+                        <div class="table-scroll-container">
+                            <table class="premium-table">
+                                <thead>
+                                    <tr>
+                                        <th>Nomor Repair</th>
+                                        <th>Nama Customer</th>
+                                        <th>Total Tagihan</th>
+                                        <th>DP 1 + DP 2</th>
+                                        <th>Sisa Pelunasan</th>
+                                        <th>Status Pembayaran</th>
+                                        <th>Aksi</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="tbody-accounting-repairs">
+                                    <!-- Dynamic list of payments and outstanding balances -->
+                                    <tr class="table-empty-row">
+                                        <td colspan="7">Memuat data keuangan...</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 4. PRODUCTION VIEW -->
+                <div id="production-panel" class="app-panel">
+                    <div class="panel-header-section">
+                        <h1>Panel Manajemen Produksi & Pengrajin</h1>
+                        <p>Alokasi penugasan pengerjaan repair cincin ke pihak pengrajin (workshop) serta monitoring status pengerjaan.</p>
+                    </div>
+                    <div class="premium-card">
+                        <h3>Penugasan Pengrajin Cincin</h3>
+                        <p>Kelola perbaikan cincin dan tentukan status pengerjaan fisik di bengkel/workshop.</p>
+                        <br>
+                        <div class="table-scroll-container">
+                            <table class="premium-table">
+                                <thead>
+                                    <tr>
+                                        <th>Nomor Repair</th>
+                                        <th>Cincin Cowok</th>
+                                        <th>Cincin Cewek</th>
+                                        <th>Penugasan Pengrajin</th>
+                                        <th>Batas Deadline</th>
+                                        <th>Status Produksi</th>
+                                        <th>Aksi</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="tbody-production-list">
+                                    <!-- Dynamic repair orders for production assignment -->
+                                    <tr class="table-empty-row">
+                                        <td colspan="7">Memuat data produksi...</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 5. LOGISTIC VIEW -->
+                <div id="logistic-panel" class="app-panel">
+                    <div class="panel-header-section">
+                        <h1>Panel Pengiriman & Logistik</h1>
+                        <p>Penyusunan label pengiriman, verifikasi alamat ekspedisi customer, dan input nomor resi pengiriman kurir.</p>
+                    </div>
+                    <div class="premium-card">
+                        <h3>Daftar Pengiriman Cincin Selesai Repair</h3>
+                        <p>Kelola pengiriman cincin yang sudah selesai didelegasikan oleh bagian produksi.</p>
+                        <br>
+                        <div class="table-scroll-container">
+                            <table class="premium-table">
+                                <thead>
+                                    <tr>
+                                        <th>Nomor Repair</th>
+                                        <th>Customer</th>
+                                        <th>Alamat & Kota Tujuan</th>
+                                        <th>Ekspedisi & Ongkir</th>
+                                        <th>Status Paket</th>
+                                        <th>Nomor Resi</th>
+                                        <th>Aksi</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="tbody-logistic-list">
+                                    <!-- Dynamic shipping records -->
+                                    <tr class="table-empty-row">
+                                        <td colspan="7">Memuat data logistik...</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 6. ADMINISTRATOR VIEW (8 SUB-TABS) -->
+                <div id="admin-panel" class="app-panel">
+                    <div class="panel-header-section">
+                        <h1>Manajemen Kontrol Administrator</h1>
+                        <p>Halaman konfigurasi database master sistem informasi SOVIA JEWELRY secara global.</p>
+                    </div>
+
+                    <!-- Inner Navigation Sub-Tabs -->
+                    <div class="admin-tab-bar">
+                        <button class="admin-tab-btn active" data-tab="tab-users">Manajemen User</button>
+                        <button class="admin-tab-btn" data-tab="tab-stores">Store & Sales</button>
+                        <button class="admin-tab-btn" data-tab="tab-catalog">Katalog Barang & Jasa</button>
+                        <button class="admin-tab-btn" data-tab="tab-metals">Bahan Logam</button>
+                        <button class="admin-tab-btn" data-tab="tab-repairs">Manajemen Repair</button>
+                        <button class="admin-tab-btn" data-tab="tab-workshops">Pengrajin & Workshop</button>
+                        <button class="admin-tab-btn" data-tab="tab-cities">Kab/Kota Pengiriman</button>
+                        <button class="admin-tab-btn" data-tab="tab-payments">Sistem Pembayaran</button>
+                    </div>
+
+                    <!-- Admin Sub-Panel Containers -->
+                    <div class="admin-tab-content">
+                        <!-- Sub-tab 1: Users -->
+                        <div class="admin-tab-pane active" id="tab-users">
+                            <div class="admin-pane-header">
+                                <h3>Data User & Akun Karyawan</h3>
+                                <button class="premium-btn btn-sec font-compact btn-admin-add" data-type="user"><i class="fa-solid fa-plus"></i> Tambah User</button>
+                            </div>
+                            <table class="premium-table font-compact" id="table-admin-users">
+                                <thead>
+                                    <tr>
+                                        <th>ID</th>
+                                        <th>Username</th>
+                                        <th>Role Akses</th>
+                                        <th>Kode Store</th>
+                                        <th style="width: 130px;">Aksi</th>
+                                    </tr>
+                                </thead>
+                                <tbody></tbody>
+                            </table>
+                        </div>
+
+                        <!-- Sub-tab 2: Stores -->
+                        <div class="admin-tab-pane" id="tab-stores">
+                            <div class="admin-pane-header">
+                                <h3>Daftar Cabang Toko / Store Sales</h3>
+                                <button class="premium-btn btn-sec font-compact btn-admin-add" data-type="store"><i class="fa-solid fa-plus"></i> Tambah Store</button>
+                            </div>
+                            <table class="premium-table font-compact" id="table-admin-stores">
+                                <thead>
+                                    <tr>
+                                        <th>Kode Store</th>
+                                        <th>Nama Store</th>
+                                        <th>Alamat</th>
+                                        <th>Telepon / WA</th>
+                                        <th style="width: 130px;">Aksi</th>
+                                    </tr>
+                                </thead>
+                                <tbody></tbody>
+                            </table>
+                        </div>
+
+                        <!-- Sub-tab 3: Catalog -->
+                        <div class="admin-tab-pane" id="tab-catalog">
+                            <div class="admin-pane-header">
+                                <h3>Katalog Barang & Jasa Tambahan</h3>
+                                <button class="premium-btn btn-sec font-compact btn-admin-add" data-type="catalog"><i class="fa-solid fa-plus"></i> Tambah Katalog</button>
+                            </div>
+                            <table class="premium-table font-compact" id="table-admin-catalog">
+                                <thead>
+                                    <tr>
+                                        <th>ID</th>
+                                        <th>Nama Layanan/Barang</th>
+                                        <th>Kategori</th>
+                                        <th>Harga Satuan (Rp)</th>
+                                        <th style="width: 130px;">Aksi</th>
+                                    </tr>
+                                </thead>
+                                <tbody></tbody>
+                            </table>
+                        </div>
+
+                        <!-- Sub-tab 4: Metals -->
+                        <div class="admin-tab-pane" id="tab-metals">
+                            <div class="admin-pane-header">
+                                <h3>Data Bahan & Kadar Logam Cincin</h3>
+                                <button class="premium-btn btn-sec font-compact btn-admin-add" data-type="metal"><i class="fa-solid fa-plus"></i> Tambah Bahan</button>
+                            </div>
+                            <table class="premium-table font-compact" id="table-admin-metals">
+                                <thead>
+                                    <tr>
+                                        <th>ID</th>
+                                        <th>Nama Logam</th>
+                                        <th>Harga per Gram (Rp)</th>
+                                        <th>Jasa Custom / Pembuatan (Rp)</th>
+                                        <th style="width: 130px;">Aksi</th>
+                                    </tr>
+                                </thead>
+                                <tbody></tbody>
+                            </table>
+                        </div>
+
+                        <!-- Sub-tab 5: Repairs -->
+                        <div class="admin-tab-pane" id="tab-repairs">
+                            <div class="admin-pane-header">
+                                <h3>Kategori & Jenis Repair Jasa Cincin</h3>
+                                <button class="premium-btn btn-sec font-compact btn-admin-add" data-type="repair"><i class="fa-solid fa-plus"></i> Tambah Jenis Repair</button>
+                            </div>
+                            <table class="premium-table font-compact" id="table-admin-repairs">
+                                <thead>
+                                    <tr>
+                                        <th>ID</th>
+                                        <th>Nama Repair</th>
+                                        <th>Biaya Repair Jasa (Rp)</th>
+                                        <th style="width: 130px;">Aksi</th>
+                                    </tr>
+                                </thead>
+                                <tbody></tbody>
+                            </table>
+                        </div>
+
+                        <!-- Sub-tab 6: Workshops -->
+                        <div class="admin-tab-pane" id="tab-workshops">
+                            <div class="admin-pane-header">
+                                <h3>Daftar Mitra Pengrajin & Workshop</h3>
+                                <button class="premium-btn btn-sec font-compact btn-admin-add" data-type="workshop"><i class="fa-solid fa-plus"></i> Tambah Pengrajin</button>
+                            </div>
+                            <table class="premium-table font-compact" id="table-admin-workshops">
+                                <thead>
+                                    <tr>
+                                        <th>ID</th>
+                                        <th>Nama Workshop/Pengrajin</th>
+                                        <th>No. Handphone</th>
+                                        <th>Alamat</th>
+                                        <th style="width: 130px;">Aksi</th>
+                                    </tr>
+                                </thead>
+                                <tbody></tbody>
+                            </table>
+                        </div>
+
+                        <!-- Sub-tab 7: Cities -->
+                        <div class="admin-tab-pane" id="tab-cities">
+                            <div class="admin-pane-header">
+                                <h3>Database Kabupaten / Kota Pengiriman</h3>
+                                <button class="premium-btn btn-sec font-compact btn-admin-add" data-type="city"><i class="fa-solid fa-plus"></i> Tambah Kab/Kota</button>
+                            </div>
+                            <table class="premium-table font-compact" id="table-admin-cities">
+                                <thead>
+                                    <tr>
+                                        <th>ID</th>
+                                        <th>Kabupaten / Kota</th>
+                                        <th>Provinsi</th>
+                                        <th>Ongkos Kirim Jasa (Rp)</th>
+                                        <th style="width: 130px;">Aksi</th>
+                                    </tr>
+                                </thead>
+                                <tbody></tbody>
+                            </table>
+                        </div>
+
+                        <!-- Sub-tab 8: Payments -->
+                        <div class="admin-tab-pane" id="tab-payments">
+                            <div class="admin-pane-header">
+                                <h3>Metode & Sistem Pembayaran Kasir</h3>
+                                <button class="premium-btn btn-sec font-compact btn-admin-add" data-type="payment"><i class="fa-solid fa-plus"></i> Tambah Metode Pembayaran</button>
+                            </div>
+                            <table class="premium-table font-compact" id="table-admin-payments">
+                                <thead>
+                                    <tr>
+                                        <th>ID</th>
+                                        <th>Metode Pembayaran</th>
+                                        <th style="width: 130px;">Aksi</th>
+                                    </tr>
+                                </thead>
+                                <tbody></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+        </main>
+    </div>
+
+    <!-- ==================== PREMIUM OVERLAY MODALS ==================== -->
+
+    <!-- 1. PREVIEW FORM REPAIR MODAL -->
+    <div id="preview-modal" class="modal-overlay hidden">
+        <div class="modal-card modal-large">
+            <div class="modal-header">
+                <h2><i class="fa-regular fa-eye"></i> Preview Formulir Repair Cincin</h2>
+                <button class="modal-close-btn" id="btn-close-preview-modal">&times;</button>
+            </div>
+            <div class="modal-body" id="preview-modal-body">
+                <!-- Will be rendered dynamically via javascript template -->
+            </div>
+            <div class="modal-footer">
+                <button class="premium-btn btn-sec" id="btn-modal-preview-close">Tutup Preview</button>
+                <button class="premium-btn" id="btn-modal-preview-confirm"><i class="fa-regular fa-circle-check"></i> Simpan Transaksi</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 2. ADMIN VERIFICATION MODAL (PASSWORD CHALLENGE) -->
+    <div id="admin-auth-modal" class="modal-overlay hidden">
+        <div class="modal-card modal-small">
+            <div class="modal-header">
+                <h2><i class="fa-solid fa-shield-halved"></i> Verifikasi Otoritas Admin</h2>
+                <button class="modal-close-btn" id="btn-close-auth-modal">&times;</button>
+            </div>
+            <div class="modal-body">
+                <p>Fitur ini memerlukan verifikasi otorisasi dari Administrator. Silakan masukkan kredensial Admin Anda.</p>
+                <br>
+                <div class="input-group">
+                    <label for="auth-admin-username">Username Admin</label>
+                    <input type="text" id="auth-admin-username" placeholder="Username admin">
+                </div>
+                <div class="input-group">
+                    <label for="auth-admin-password">Password Admin</label>
+                    <input type="password" id="auth-admin-password" placeholder="••••••••">
+                </div>
+                <span class="error-text hidden" id="auth-error-msg">Password atau username admin salah!</span>
+            </div>
+            <div class="modal-footer">
+                <button class="premium-btn btn-sec" id="btn-auth-cancel">Batal</button>
+                <button class="premium-btn" id="btn-auth-submit">Verifikasi Akses</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 3. ADD/EDIT MASTER RECORD MODAL (DYNAMIC CRUD PANEL) -->
+    <div id="crud-modal" class="modal-overlay hidden">
+        <div class="modal-card modal-medium">
+            <div class="modal-header">
+                <h2 id="crud-modal-title">Tambah Data Master</h2>
+                <button class="modal-close-btn" id="btn-close-crud-modal">&times;</button>
+            </div>
+            <div class="modal-body">
+                <form id="crud-form">
+                    <!-- Dynamic inputs based on item being edited/created -->
+                    <div id="crud-form-fields"></div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button class="premium-btn btn-sec" id="btn-crud-cancel">Batal</button>
+                <button class="premium-btn" id="btn-crud-submit">Simpan Perubahan</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 4. PRINT PREVIEW MODAL & PRINT ELEMENT -->
+    <div id="print-modal" class="modal-overlay hidden">
+        <div class="modal-card modal-large print-modal-card">
+            <div class="modal-header no-print">
+                <h2>Cetak Form / Nota Repair</h2>
+                <button class="modal-close-btn" id="btn-close-print-modal">&times;</button>
+            </div>
+            <div class="modal-body printable-area" id="print-receipt-body">
+                <!-- Printable form will go here -->
+            </div>
+            <div class="modal-footer no-print">
+                <button class="premium-btn btn-sec" id="btn-print-cancel">Tutup</button>
+                <button class="premium-btn" id="btn-print-execute"><i class="fa-solid fa-print"></i> Cetak Sekarang</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Core App Logic Script -->
+    <script src="app.js"></script>
+    <script>
+        // Register Service Worker for Offline-First Support
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('sw.js')
+                    .then(reg => console.log('Service Worker Registered Successfully! Scope: ', reg.scope))
+                    .catch(err => console.error('Service Worker Registration Failed: ', err));
+            });
+        }
+    </script>
+</body>
+</html>
