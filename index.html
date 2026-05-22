@@ -100,16 +100,22 @@
                 
                 <form id="login-form" autocomplete="off">
                     <div class="input-group">
-                        <label for="login-username"><i class="fa-solid fa-user"></i> Username</label>
-                        <input type="text" id="login-username" placeholder="Masukkan username" required autocomplete="username">
+                        <label for="login-username">Username</label>
+                        <div class="input-group-input-wrapper">
+                            <input type="text" id="login-username" placeholder="Masukkan username" required autocomplete="username">
+                            <i class="fa-solid fa-user input-icon"></i>
+                        </div>
                     </div>
                     <div class="input-group">
-                        <label for="login-password"><i class="fa-solid fa-lock"></i> Password</label>
-                        <div class="password-wrapper">
-                            <input type="password" id="login-password" placeholder="Masukkan password" required autocomplete="current-password">
-                            <button type="button" class="toggle-password-btn" id="btn-toggle-password">
-                                <i class="fa-regular fa-eye"></i>
-                            </button>
+                        <label for="login-password">Password</label>
+                        <div class="input-group-input-wrapper">
+                            <div class="password-wrapper">
+                                <input type="password" id="login-password" placeholder="Masukkan password" required autocomplete="current-password" style="padding-left: 45px;">
+                                <i class="fa-solid fa-lock input-icon"></i>
+                                <button type="button" class="toggle-password-btn" id="btn-toggle-password">
+                                    <i class="fa-regular fa-eye"></i>
+                                </button>
+                            </div>
                         </div>
                     </div>
                     <button type="submit" class="premium-btn btn-login" id="btn-submit-login">
@@ -752,6 +758,47 @@
                         <h1>Panel Keuangan & Accounting</h1>
                         <p>Halaman pemantauan keuangan, pelunasan tagihan, verifikasi pembayaran deposit, dan total omset.</p>
                     </div>
+
+                    <!-- P&L Dashboard Row -->
+                    <div class="stats-row" style="margin-bottom: 25px;">
+                        <div class="stat-card">
+                            <div class="stat-icon green">
+                                <i class="fa-solid fa-wallet"></i>
+                            </div>
+                            <div class="stat-info">
+                                <span class="stat-label">Total Omset</span>
+                                <h2 class="stat-value" id="acc-stat-total-omset">Rp 0</h2>
+                            </div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-icon orange">
+                                <i class="fa-solid fa-money-bill-wave"></i>
+                            </div>
+                            <div class="stat-info">
+                                <span class="stat-label">Total Piutang</span>
+                                <h2 class="stat-value" id="acc-stat-total-piutang">Rp 0</h2>
+                            </div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-icon purple">
+                                <i class="fa-solid fa-box"></i>
+                            </div>
+                            <div class="stat-info">
+                                <span class="stat-label">Total Modal HPP</span>
+                                <h2 class="stat-value" id="acc-stat-total-hpp">Rp 0</h2>
+                            </div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-icon green" style="background-color: rgba(197, 168, 92, 0.1); color: var(--gold);">
+                                <i class="fa-solid fa-chart-line"></i>
+                            </div>
+                            <div class="stat-info">
+                                <span class="stat-label">Estimasi Laba Kotor</span>
+                                <h2 class="stat-value" id="acc-stat-total-laba">Rp 0</h2>
+                            </div>
+                        </div>
+                    </div>
+
                     <div class="premium-card">
                         <h3>Daftar Penerimaan Piutang / Pelunasan</h3>
                         <p>Kondisi keuangan transaksi terkini (hanya Admin dan Accounting yang dapat memvalidasi data keuangan secara global).</p>
@@ -762,7 +809,9 @@
                                     <tr>
                                         <th>Nomor Repair</th>
                                         <th>Nama Customer</th>
+                                        <th>Bukti Bayar / Fisik</th>
                                         <th>Total Tagihan</th>
+                                        <th>Modal HPP</th>
                                         <th>DP 1 + DP 2</th>
                                         <th>Sisa Pelunasan</th>
                                         <th>Status Pembayaran</th>
@@ -772,7 +821,7 @@
                                 <tbody id="tbody-accounting-repairs">
                                     <!-- Dynamic list of payments and outstanding balances -->
                                     <tr class="table-empty-row">
-                                        <td colspan="7">Memuat data keuangan...</td>
+                                        <td colspan="9">Memuat data keuangan...</td>
                                     </tr>
                                 </tbody>
                             </table>
@@ -1113,6 +1162,204 @@
                 <button class="premium-btn" id="btn-print-execute"><i class="fa-solid fa-print"></i> Cetak Sekarang</button>
             </div>
         </div>
+    </div>
+
+    <!-- 5. SALES PROGRESS TRACKING MODAL -->
+    <div id="sales-detail-modal" class="modal-overlay hidden">
+        <div class="modal-card modal-large" style="max-height: 90vh; overflow-y: auto;">
+            <div class="modal-header">
+                <h2><i class="fa-solid fa-bars-progress"></i> Progress & Detail Pelacakan Repair</h2>
+                <button class="modal-close-btn" id="btn-close-sales-detail-modal">&times;</button>
+            </div>
+            <div class="modal-body" id="sales-detail-modal-body">
+                <!-- Stepper Progress Tracker -->
+                <div class="stepper-progress" id="sales-stepper">
+                    <div class="stepper-track-active" id="sales-stepper-track"></div>
+                    <div class="stepper-step" id="step-1">
+                        <div class="stepper-icon"><i class="fa-solid fa-file-invoice"></i></div>
+                        <div class="stepper-label">Form Input</div>
+                    </div>
+                    <div class="stepper-step" id="step-2">
+                        <div class="stepper-icon"><i class="fa-solid fa-coins"></i></div>
+                        <div class="stepper-label">Approval DP</div>
+                    </div>
+                    <div class="stepper-step" id="step-3">
+                        <div class="stepper-icon"><i class="fa-solid fa-cube"></i></div>
+                        <div class="stepper-label">Desain 3D</div>
+                    </div>
+                    <div class="stepper-step" id="step-4">
+                        <div class="stepper-icon"><i class="fa-solid fa-hammer"></i></div>
+                        <div class="stepper-label">Produksi</div>
+                    </div>
+                    <div class="stepper-step" id="step-5">
+                        <div class="stepper-icon"><i class="fa-solid fa-camera"></i></div>
+                        <div class="stepper-label">Realpict</div>
+                    </div>
+                    <div class="stepper-step" id="step-6">
+                        <div class="stepper-icon"><i class="fa-solid fa-receipt"></i></div>
+                        <div class="stepper-label">Pelunasan</div>
+                    </div>
+                    <div class="stepper-step" id="step-7">
+                        <div class="stepper-icon"><i class="fa-solid fa-handshake"></i></div>
+                        <div class="stepper-label">Selesai</div>
+                    </div>
+                </div>
+
+                <div class="premium-layout-grid" style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-top: 25px;">
+                    <!-- Left Column: Transaction & Ring Detail -->
+                    <div class="premium-card" style="margin: 0;">
+                        <h4 style="color: var(--gold); border-bottom: 1px solid var(--border-color); padding-bottom: 8px; margin-bottom: 12px;">Detail Transaksi & Cincin</h4>
+                        <div class="detail-info-list" style="display: flex; flex-direction: column; gap: 10px; font-size: 13px;">
+                            <div><strong>Nomor Repair:</strong> <span id="sd-repair-num">-</span></div>
+                            <div><strong>Customer:</strong> <span id="sd-cust-name">-</span> (<span id="sd-cust-phone">-</span>)</div>
+                            <div><strong>Store / Sales:</strong> <span id="sd-store-sales">-</span></div>
+                            <div><strong>Tanggal Masuk:</strong> <span id="sd-date">-</span></div>
+                            <div><strong>Batas Deadline:</strong> <span id="sd-deadline" style="color: var(--red); font-weight: bold;">-</span></div>
+                            <hr style="border: 0; border-top: 1px dashed var(--border-color);">
+                            <!-- Cowok Detail -->
+                            <div id="sd-cowok-block" class="hidden">
+                                <strong>Cincin Cowok:</strong>
+                                <div style="padding-left: 10px; margin-top: 5px; color: var(--text-muted);">
+                                    Material: <span id="sd-cowok-mat">-</span> | Berat: <span id="sd-cowok-weight">-</span> gr | Ukuran: <span id="sd-cowok-size">-</span><br>
+                                    Jenis: <span id="sd-cowok-type">-</span> | Gravir: <span id="sd-cowok-engrave">-</span><br>
+                                    Catatan: <span id="sd-cowok-notes">-</span>
+                                </div>
+                            </div>
+                            <!-- Cewek Detail -->
+                            <div id="sd-cewek-block" class="hidden" style="margin-top: 8px;">
+                                <strong>Cincin Cewek:</strong>
+                                <div style="padding-left: 10px; margin-top: 5px; color: var(--text-muted);">
+                                    Material: <span id="sd-cewek-mat">-</span> | Berat: <span id="sd-cewek-weight">-</span> gr | Ukuran: <span id="sd-cewek-size">-</span><br>
+                                    Jenis: <span id="sd-cewek-type">-</span> | Gravir: <span id="sd-cewek-engrave">-</span><br>
+                                    Catatan: <span id="sd-cewek-notes">-</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Right Column: Status Keuangan & Bengkel -->
+                    <div class="premium-card" style="margin: 0; display: flex; flex-direction: column; gap: 15px;">
+                        <h4 style="color: var(--gold); border-bottom: 1px solid var(--border-color); padding-bottom: 8px; margin-bottom: 0;">Keuangan & Alur Bengkel</h4>
+                        
+                        <!-- Finance Section -->
+                        <div class="finance-status-area" style="font-size: 13px;">
+                            <div><strong>Status Approval DP:</strong> <span id="sd-dp-approval-badge">-</span></div>
+                            <div style="margin-top: 8px;"><strong>Status Approval Pelunasan:</strong> <span id="sd-pelunasan-approval-badge">-</span></div>
+                            <div style="margin-top: 10px; display: grid; grid-template-columns: 1fr 1fr; gap: 10px; background-color: var(--card-bg-dark); padding: 12px; border-radius: var(--border-radius-sm); border: 1px solid var(--border-color);">
+                                <div>Total Tagihan:<br><strong style="font-size: 15px; color: var(--text-main);" id="sd-total-price">Rp 0</strong></div>
+                                <div>Sisa Pelunasan:<br><strong style="font-size: 15px; color: var(--red);" id="sd-remaining-price">Rp 0</strong></div>
+                            </div>
+                        </div>
+
+                        <!-- Production Stepper Approvals -->
+                        <div class="production-status-area" style="display: flex; flex-direction: column; gap: 12px; font-size: 13px; border-top: 1px solid var(--border-color); padding-top: 12px;">
+                            <div><strong>Workshop Ditugaskan:</strong> <span id="sd-assigned-workshop" style="font-weight: 600; color: var(--text-main);">-</span></div>
+                            
+                            <!-- Design 3D Render Preview & Approval -->
+                            <div id="sd-render-block" class="hidden" style="background: var(--card-bg-dark); padding: 10px; border-radius: var(--border-radius-sm); border: 1px solid var(--border-color);">
+                                <strong>Preview Model 3D Render:</strong>
+                                <div style="display: flex; gap: 10px; align-items: center; margin-top: 8px;">
+                                    <img id="sd-render-img" src="" class="img-thumbnail-link" alt="Desain Render 3D" style="width: 60px; height: 60px;">
+                                    <div style="flex: 1;">
+                                        <div style="margin-bottom: 6px;">Status: <span id="sd-render-approval-badge">-</span></div>
+                                        <div id="sd-render-actions" class="hidden" style="display: flex; gap: 5px;">
+                                            <button class="premium-btn btn-sec" id="btn-sd-reject-render" style="padding: 4px 8px; font-size: 11px; background-color: rgba(220,53,69,0.1); border-color: var(--red); color: var(--red);"><i class="fa-solid fa-xmark"></i> Tolak</button>
+                                            <button class="premium-btn" id="btn-sd-approve-render" style="padding: 4px 8px; font-size: 11px;"><i class="fa-solid fa-check"></i> Setujui</button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Production Realpict Physical Preview & Approval -->
+                            <div id="sd-realpict-block" class="hidden" style="background: var(--card-bg-dark); padding: 10px; border-radius: var(--border-radius-sm); border: 1px solid var(--border-color);">
+                                <strong>Preview Fisik Realpict Cincin:</strong>
+                                <div style="display: flex; gap: 10px; align-items: center; margin-top: 8px;">
+                                    <img id="sd-realpict-img" src="" class="img-thumbnail-link" alt="Fisik Cincin" style="width: 60px; height: 60px;">
+                                    <div style="flex: 1;">
+                                        <div style="margin-bottom: 6px;">Status: <span id="sd-realpict-approval-badge">-</span></div>
+                                        <div id="sd-realpict-actions" class="hidden" style="display: flex; gap: 5px;">
+                                            <button class="premium-btn btn-sec" id="btn-sd-reject-realpict" style="padding: 4px 8px; font-size: 11px; background-color: rgba(220,53,69,0.1); border-color: var(--red); color: var(--red);"><i class="fa-solid fa-xmark"></i> Tolak</button>
+                                            <button class="premium-btn" id="btn-sd-approve-realpict" style="padding: 4px 8px; font-size: 11px;"><i class="fa-solid fa-check"></i> Setujui</button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Final Process Section (Pelunasan, Refund, Pickup, Cetak) -->
+                <div class="premium-card" style="margin-top: 20px;">
+                    <h4 style="color: var(--gold); border-bottom: 1px solid var(--border-color); padding-bottom: 8px; margin-bottom: 12px;">Penyelesaian / Serah Terima Produk</h4>
+                    
+                    <!-- Upload Pelunasan Area (If outstanding balance is > 0) -->
+                    <div id="sd-pelunasan-upload-area" class="hidden" style="background: rgba(197, 168, 92, 0.05); border: 1px dashed var(--gold); padding: 15px; border-radius: var(--border-radius-md); margin-bottom: 15px;">
+                        <h5 style="margin-bottom: 8px; color: var(--gold);"><i class="fa-solid fa-cloud-arrow-up"></i> Pembayaran Pelunasan</h5>
+                        <p style="font-size: 12.5px; margin-bottom: 12px; color: var(--text-muted);">Transaksi memiliki sisa kekurangan pelunasan. Silakan unggah bukti pelunasan di bawah ini untuk diverifikasi oleh Accounting.</p>
+                        
+                        <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 15px;">
+                            <div class="input-group" style="margin-bottom: 0;">
+                                <label for="sd-pelunasan-method">Metode Pembayaran</label>
+                                <select id="sd-pelunasan-method" style="width: 100%; padding: 8px; border-radius: var(--border-radius-sm); border: 1px solid var(--border-color);">
+                                    <option value="">-- Pilih Pembayaran --</option>
+                                    <option value="PAY-001">BCA Transfer (CV Sovia Group)</option>
+                                    <option value="PAY-002">Mandiri Transfer (CV Sovia Group)</option>
+                                    <option value="PAY-003">QRIS Gopay/Dana Sovia</option>
+                                    <option value="PAY-004">Tunai Kasir Toko</option>
+                                </select>
+                            </div>
+                            <div class="input-group" style="margin-bottom: 0;">
+                                <label for="sd-pelunasan-amount">Jumlah Bayar Pelunasan (Rp)</label>
+                                <input type="number" id="sd-pelunasan-amount" placeholder="Contoh: 1500000" style="width: 100%; padding: 8px; border-radius: var(--border-radius-sm); border: 1px solid var(--border-color);">
+                            </div>
+                            <div class="input-group" style="margin-bottom: 0;">
+                                <label for="sd-pelunasan-file">Bukti Pelunasan (.jpg, .png)</label>
+                                <input type="file" id="sd-pelunasan-file" accept="image/*" style="width: 100%; font-size: 12px;">
+                                <input type="hidden" id="sd-pelunasan-base64">
+                            </div>
+                        </div>
+                        <div style="text-align: right; margin-top: 12px;">
+                            <button class="premium-btn" id="btn-sd-submit-pelunasan" style="padding: 8px 16px;"><i class="fa-solid fa-paper-plane"></i> Unggah Pelunasan</button>
+                        </div>
+                    </div>
+
+                    <!-- Refund Receipt Area (If outstanding balance is < 0) -->
+                    <div id="sd-refund-preview-area" class="hidden" style="background: rgba(40,167,69,0.05); border: 1px dashed var(--green); padding: 15px; border-radius: var(--border-radius-md); margin-bottom: 15px; display: flex; gap: 15px; align-items: center;">
+                        <i class="fa-solid fa-hand-holding-dollar" style="font-size: 35px; color: var(--green);"></i>
+                        <div style="flex: 1;">
+                            <h5 style="margin-bottom: 4px; color: var(--green);">Pengembalian Kelebihan Pembayaran (Refund)</h5>
+                            <p style="font-size: 12.5px; color: var(--text-muted);">Sisa nominal transaksi minus (Kelebihan pembayaran DP). Accounting telah mengunggah bukti pengembalian transfer.</p>
+                        </div>
+                        <div style="text-align: right;">
+                            <strong>Bukti Refund:</strong><br>
+                            <img id="sd-refund-receipt-img" src="" class="img-thumbnail-link" alt="Bukti Refund" style="width: 50px; height: 50px; margin-top: 5px;">
+                        </div>
+                    </div>
+
+                    <!-- Delivery & Handover status -->
+                    <div style="display: flex; justify-content: space-between; align-items: center; background-color: var(--card-bg-dark); padding: 15px; border-radius: var(--border-radius-sm); border: 1px solid var(--border-color);">
+                        <div>
+                            <div>Status Serah Terima: <strong id="sd-pickup-status">-</strong></div>
+                            <div style="font-size: 12px; color: var(--text-muted); margin-top: 4px;">Cincin diambil oleh customer di toko atau dikirim kurir resmi.</div>
+                        </div>
+                        <div style="display: flex; gap: 8px;">
+                            <button class="premium-btn btn-sec" id="btn-sd-print-final-invoice"><i class="fa-solid fa-print"></i> Cetak Nota Final (Lunas)</button>
+                            <button class="premium-btn" id="btn-sd-pickup-product" style="background-color: var(--green); border-color: var(--green);"><i class="fa-solid fa-handshake"></i> Konfirmasi Pengambilan Produk</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="premium-btn btn-sec" id="btn-close-sales-detail-modal-footer">Tutup Detail</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 6. IMAGE LIGHTBOX OVERLAY MODAL -->
+    <div id="image-lightbox-modal" class="lightbox-modal">
+        <span class="lightbox-close" id="btn-close-lightbox">&times;</span>
+        <img class="lightbox-content" id="lightbox-img" src="">
+        <div class="lightbox-caption" id="lightbox-caption">Bukti Pembayaran</div>
     </div>
 
     <!-- Core App Logic Script -->
