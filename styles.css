@@ -453,6 +453,40 @@ input, select, textarea, button {
 .badge.warning { background-color: var(--orange-light); color: var(--orange); }
 .badge.primary { background-color: var(--purple-light); color: var(--purple); }
 
+/* QA / QC Badges */
+.badge-qa, .badge-qc {
+    display: inline-flex;
+    align-items: center;
+    padding: 2px 7px;
+    border-radius: 12px;
+    font-size: 10px;
+    font-weight: 800;
+    letter-spacing: 0.5px;
+    margin-left: 3px;
+    vertical-align: middle;
+}
+.badge-qa.passed { background: rgba(39,174,96,0.18); color: #27ae60; border: 1px solid rgba(39,174,96,0.4); }
+.badge-qa.failed  { background: rgba(231,76,60,0.18);  color: #e74c3c; border: 1px solid rgba(231,76,60,0.4); }
+.badge-qa.pending { background: rgba(243,156,18,0.18); color: #f39c12; border: 1px solid rgba(243,156,18,0.4); }
+.badge-qc.passed { background: rgba(26,107,150,0.18); color: #2980b9; border: 1px solid rgba(26,107,150,0.4); }
+.badge-qc.failed  { background: rgba(231,76,60,0.18);  color: #e74c3c; border: 1px solid rgba(231,76,60,0.4); }
+.badge-qc.pending { background: rgba(155,89,182,0.18); color: #9b59b6; border: 1px solid rgba(155,89,182,0.4); }
+
+/* Revision note block */
+.revision-note {
+    margin-top: 6px;
+    padding: 6px 10px;
+    border-left: 3px solid var(--red);
+    background: rgba(231,76,60,0.08);
+    border-radius: 0 var(--border-radius-sm) var(--border-radius-sm) 0;
+    font-size: 11px;
+    color: var(--red);
+    display: flex;
+    gap: 6px;
+    align-items: flex-start;
+}
+
+
 /* ==========================================================================
    VIEW 1: PORTAL HUB VIEW
    ========================================================================== */
@@ -2236,6 +2270,10 @@ input, select, textarea, button {
 /* ==========================================================================
    RESPONSIVE MEDIA CONTEXTS
    ========================================================================== */
+
+/* ==========================================================================
+   RESPONSIVE MEDIA CONTEXTS
+   ========================================================================== */
 @media (max-width: 850px) {
     #app-sidebar {
         position: fixed;
@@ -2258,3 +2296,204 @@ input, select, textarea, button {
         padding: 20px;
     }
 }
+
+/* ==========================================================================
+   V2 EXTENSION STYLES
+   ========================================================================== */
+
+/* Universal exact color adjustments for printing image tags */
+@media print {
+    img {
+        -webkit-print-color-adjust: exact !important;
+        print-color-adjust: exact !important;
+    }
+}
+
+/* Glassmorphic rejection alert */
+.rejection-comment-alert {
+    background: rgba(231, 76, 60, 0.08);
+    border: 1px dashed rgba(231, 76, 60, 0.3);
+    border-radius: var(--border-radius-sm);
+    padding: 12px 16px;
+    margin-bottom: 15px;
+    color: #e74c3c;
+    font-size: 13.5px;
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    animation: fadeIn 0.3s ease;
+}
+.rejection-comment-alert i {
+    margin-top: 2px;
+    font-size: 16px;
+}
+.dark-theme .rejection-comment-alert {
+    background: rgba(231, 76, 60, 0.15);
+    border-color: rgba(231, 76, 60, 0.4);
+    color: #ff6b6b;
+}
+
+/* Branch verification box */
+.branch-verification-box {
+    background: var(--primary-bg);
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius-md);
+    padding: 20px;
+    margin-top: 25px;
+    position: relative;
+    box-shadow: var(--shadow-sm);
+    transition: var(--transition-smooth);
+}
+.branch-verification-box h4 {
+    font-size: 15px;
+    margin-bottom: 12px;
+    color: var(--text-main);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+.branch-verification-box h4 i {
+    color: var(--gold);
+}
+.verification-action-group {
+    display: flex;
+    gap: 12px;
+    margin-top: 15px;
+}
+
+/* Action button container alignment */
+.action-buttons-flex {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    flex-wrap: wrap;
+}
+
+/* Logistics column checkboxes */
+.logistic-checkbox-col {
+    width: 40px;
+    text-align: center;
+}
+.logistic-checkbox {
+    width: 18px;
+    height: 18px;
+    cursor: pointer;
+    accent-color: var(--gold);
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+}
+
+/* Printable manifest and label page formats (A4) */
+.print-manifest-page {
+    page-break-after: always;
+    break-after: page;
+    font-family: 'Inter', Arial, sans-serif;
+    color: #000000 !important;
+    background: #ffffff !important;
+    padding: 30px;
+    box-sizing: border-box;
+}
+.print-manifest-header {
+    border-bottom: 2px solid #000000;
+    padding-bottom: 15px;
+    margin-bottom: 20px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+.print-manifest-header h2 {
+    font-size: 20px;
+    font-weight: 800;
+    margin: 0;
+    text-transform: uppercase;
+}
+.print-manifest-header p {
+    font-size: 12px;
+    margin: 3px 0 0 0;
+    color: #444;
+}
+.print-manifest-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 15px;
+    margin-bottom: 30px;
+}
+.print-manifest-table th, .print-manifest-table td {
+    border: 1px solid #000000 !important;
+    padding: 10px;
+    font-size: 11.5px;
+    text-align: left;
+    color: #000000 !important;
+}
+.print-manifest-table th {
+    background-color: #f2f2f2 !important;
+    font-weight: bold;
+    text-transform: uppercase;
+}
+.print-manifest-footer {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 50px;
+    margin-top: 50px;
+}
+.print-signature-box {
+    text-align: center;
+}
+.print-signature-line {
+    margin-top: 60px;
+    border-top: 1px solid #000000;
+    width: 200px;
+    margin-left: auto;
+    margin-right: auto;
+}
+
+/* Print Large Shipping Label Container Box */
+.print-label-page {
+    page-break-after: always;
+    break-after: page;
+    font-family: 'Inter', Arial, sans-serif;
+    color: #000000 !important;
+    background: #ffffff !important;
+    padding: 40px;
+    border: 4px dashed #000000 !important;
+    max-width: 650px;
+    margin: 40px auto;
+    border-radius: 12px;
+    box-sizing: border-box;
+}
+.print-label-header {
+    border-bottom: 3px solid #000000;
+    padding-bottom: 15px;
+    margin-bottom: 25px;
+    text-align: center;
+}
+.print-label-header h1 {
+    font-size: 26px;
+    font-weight: 900;
+    letter-spacing: 1.5px;
+    margin: 0;
+}
+.print-label-body {
+    font-size: 15px;
+    line-height: 1.8;
+}
+.print-label-body td {
+    padding: 8px;
+    font-size: 16px;
+    color: #000000 !important;
+}
+.print-label-body tr:hover td {
+    background: transparent !important;
+}
+.print-label-badge {
+    display: inline-block;
+    padding: 8px 16px;
+    background-color: #000000 !important;
+    color: #ffffff !important;
+    font-weight: 800;
+    font-size: 18px;
+    border-radius: 4px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
