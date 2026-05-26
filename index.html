@@ -1368,16 +1368,37 @@
                             <div><strong>Workshop Ditugaskan:</strong> <span id="sd-assigned-workshop" style="font-weight: 600; color: var(--text-main);">-</span></div>
                             
                             <!-- Design 3D Render Preview & Approval -->
-                            <div id="sd-render-block" class="hidden" style="background: var(--card-bg-dark); padding: 10px; border-radius: var(--border-radius-sm); border: 1px solid var(--border-color);">
+                            <div id="sd-render-block" class="hidden" style="background: var(--card-bg-dark); padding: 12px; border-radius: var(--border-radius-sm); border: 1px solid var(--border-color);">
                                 <strong>Preview Model 3D Render:</strong>
-                                <div style="display: flex; gap: 10px; align-items: center; margin-top: 8px;">
-                                    <img id="sd-render-img" src="" class="img-thumbnail-link" alt="Desain Render 3D" style="width: 60px; height: 60px;">
-                                    <div style="flex: 1;">
-                                        <div style="margin-bottom: 6px;">Status: <span id="sd-render-approval-badge">-</span></div>
-                                        <div id="sd-render-actions" class="hidden" style="display: flex; gap: 5px;">
-                                            <button class="premium-btn btn-sec" id="btn-sd-reject-render" style="padding: 4px 8px; font-size: 11px; background-color: rgba(220,53,69,0.1); border-color: var(--red); color: var(--red);"><i class="fa-solid fa-xmark"></i> Tolak</button>
-                                            <button class="premium-btn" id="btn-sd-approve-render" style="padding: 4px 8px; font-size: 11px;"><i class="fa-solid fa-check"></i> Setujui</button>
+                                <div style="display: flex; flex-direction: column; gap: 10px; width: 100%; margin-top: 8px;">
+                                    <!-- Container split 2 Render -->
+                                    <div style="display: flex; gap: 15px; flex-wrap: wrap;">
+                                        <div id="sd-render-cowok-container" style="text-align: center; display: none;">
+                                            <div style="font-size: 11px; font-weight: 600; margin-bottom: 4px; color: var(--text-muted);">Render Cowok</div>
+                                            <img id="sd-render-cowok-img" src="" class="img-thumbnail-link" alt="Render Cowok" style="width: 60px; height: 60px; border-radius: var(--border-radius-sm); border: 1px solid var(--border-color); object-fit: cover; cursor: pointer;">
                                         </div>
+                                        <div id="sd-render-cewek-container" style="text-align: center; display: none;">
+                                            <div style="font-size: 11px; font-weight: 600; margin-bottom: 4px; color: var(--text-muted);">Render Cewek</div>
+                                            <img id="sd-render-cewek-img" src="" class="img-thumbnail-link" alt="Render Cewek" style="width: 60px; height: 60px; border-radius: var(--border-radius-sm); border: 1px solid var(--border-color); object-fit: cover; cursor: pointer;">
+                                        </div>
+                                    </div>
+                                    
+                                    <!-- Badge Status -->
+                                    <div style="font-size: 12px; margin-top: 5px;">Status: <span id="sd-render-approval-badge">-</span></div>
+
+                                    <!-- Catatan Rejection Lama jika Ditolak -->
+                                    <div id="sd-render-rejection-reason-display" class="revision-note hidden" style="font-size: 11.5px; padding: 6px 10px; margin-top: 5px; border-radius: 4px; background: rgba(220,53,69,0.08); border-left: 3px solid var(--red); color: var(--red);"></div>
+
+                                    <!-- Input Komentar Sales untuk Desainer -->
+                                    <div id="sd-render-comment-group" class="hidden" style="margin-top: 5px;">
+                                        <label for="sd-render-comment" style="font-size: 11px; font-weight: 600; color: var(--text-muted); display: block; margin-bottom: 4px;">Catatan Revisi / Masukan untuk Desainer:</label>
+                                        <textarea id="sd-render-comment" placeholder="Wajib diisi jika menolak render! Tulis instruksi revisi yang jelas untuk desainer di sini..." style="width: 100%; min-height: 50px; padding: 8px; border-radius: var(--border-radius-sm); border: 1px solid var(--border-color); background: var(--surface); color: var(--text-primary); font-size: 12px; resize: vertical; box-sizing: border-box;"></textarea>
+                                    </div>
+
+                                    <!-- Aksi Approval -->
+                                    <div id="sd-render-actions" class="hidden" style="display: flex; gap: 5px; margin-top: 5px;">
+                                        <button class="premium-btn btn-sec" id="btn-sd-reject-render" style="padding: 6px 12px; font-size: 11.5px; background-color: rgba(220,53,69,0.1); border-color: var(--red); color: var(--red);"><i class="fa-solid fa-xmark"></i> Tolak Render</button>
+                                        <button class="premium-btn" id="btn-sd-approve-render" style="padding: 6px 12px; font-size: 11.5px;"><i class="fa-solid fa-check"></i> Setujui Render</button>
                                     </div>
                                 </div>
                             </div>
