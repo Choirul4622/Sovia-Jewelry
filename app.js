@@ -940,7 +940,7 @@ async function populateFormForEdit(tx) {
 function setUploadPreview(previewId, imgUrl, textLabel) {
     const p = document.getElementById(previewId);
     if (imgUrl) {
-        p.innerHTML = `<img src="${imgUrl}" alt="Preview ${textLabel}"><span style="margin-top:6px; font-size:10px; color:var(--text-muted);">Ubah Foto</span>`;
+        p.innerHTML = `<img src="${resolveImageUrl(imgUrl)}" alt="Preview ${textLabel}"><span style="margin-top:6px; font-size:10px; color:var(--text-muted);">Ubah Foto</span>`;
     } else {
         p.innerHTML = `<i class="fa-solid fa-cloud-arrow-up"></i><span>Klik untuk unggah foto ${textLabel}</span>`;
     }
@@ -1279,19 +1279,19 @@ async function renderAccountingBoard() {
         let mediaHtml = '<div style="display:flex; gap:6px; flex-wrap:wrap;">';
         let mediaCount = 0;
         if (tx.dp1_receipt_url && tx.dp1_receipt_url !== '[Gagal Upload Gambar]') {
-            mediaHtml += `<img src="${tx.dp1_receipt_url}" class="img-thumbnail-link" data-url="${tx.dp1_receipt_url}" data-caption="Bukti DP 1 - ${tx.repair_number}" title="Bukti DP 1">`;
+            mediaHtml += `<img src="${resolveImageUrl(tx.dp1_receipt_url)}" class="img-thumbnail-link" data-url="${tx.dp1_receipt_url}" data-caption="Bukti DP 1 - ${tx.repair_number}" title="Bukti DP 1" style="width:30px; height:30px; border-radius:4px; object-fit:cover; border:1px solid var(--border-color); cursor:pointer;">`;
             mediaCount++;
         }
         if (tx.dp2_receipt_url && tx.dp2_receipt_url !== '[Gagal Upload Gambar]') {
-            mediaHtml += `<img src="${tx.dp2_receipt_url}" class="img-thumbnail-link" data-url="${tx.dp2_receipt_url}" data-caption="Bukti DP 2 / Pelunasan - ${tx.repair_number}" title="Bukti DP 2 / Pelunasan">`;
+            mediaHtml += `<img src="${resolveImageUrl(tx.dp2_receipt_url)}" class="img-thumbnail-link" data-url="${tx.dp2_receipt_url}" data-caption="Bukti DP 2 / Pelunasan - ${tx.repair_number}" title="Bukti DP 2 / Pelunasan" style="width:30px; height:30px; border-radius:4px; object-fit:cover; border:1px solid var(--border-color); cursor:pointer;">`;
             mediaCount++;
         }
         if (tx.warranty_image_url && tx.warranty_image_url !== '[Gagal Upload Gambar]') {
-            mediaHtml += `<img src="${tx.warranty_image_url}" class="img-thumbnail-link" data-url="${tx.warranty_image_url}" data-caption="Kartu Garansi - ${tx.repair_number}" title="Kartu Garansi">`;
+            mediaHtml += `<img src="${resolveImageUrl(tx.warranty_image_url)}" class="img-thumbnail-link" data-url="${tx.warranty_image_url}" data-caption="Kartu Garansi - ${tx.repair_number}" title="Kartu Garansi" style="width:30px; height:30px; border-radius:4px; object-fit:cover; border:1px solid var(--border-color); cursor:pointer;">`;
             mediaCount++;
         }
         if (tx.refund_receipt_url && tx.refund_receipt_url !== '[Gagal Upload]') {
-            mediaHtml += `<img src="${tx.refund_receipt_url}" class="img-thumbnail-link" data-url="${tx.refund_receipt_url}" data-caption="Bukti Refund DP - ${tx.repair_number}" title="Bukti Refund DP">`;
+            mediaHtml += `<img src="${resolveImageUrl(tx.refund_receipt_url)}" class="img-thumbnail-link" data-url="${tx.refund_receipt_url}" data-caption="Bukti Refund DP - ${tx.repair_number}" title="Bukti Refund DP" style="width:30px; height:30px; border-radius:4px; object-fit:cover; border:1px solid var(--border-color); cursor:pointer;">`;
             mediaCount++;
         }
         if (mediaCount === 0) {
@@ -1464,18 +1464,18 @@ async function renderProductionBoard() {
         const cowokDesc = tx.cowok_active === 'TRUE' ? `
             <div>${cowokMetal?.name || ''} (Sz: ${tx.cowok_size}) - ${cowokRep?.name || ''}</div>
             <div style="display:flex; gap:6px; margin-top:4px; flex-wrap:wrap;">
-                ${tx.cowok_image_url && tx.cowok_image_url !== '[Gagal Upload Gambar]' ? `<img src="${tx.cowok_image_url}" class="img-thumbnail-link" data-url="${tx.cowok_image_url}" data-caption="Foto Model Cowok - ${tx.repair_number}" title="Foto Model Cowok" style="width:30px; height:30px; border-radius:4px; object-fit:cover; border:1px solid var(--border-color); cursor:pointer;">` : ''}
-                ${tx.render_model_url && tx.render_model_url !== '[Gagal Upload]' ? `<img src="${tx.render_model_url}" class="img-thumbnail-link" data-url="${tx.render_model_url}" data-caption="Render 3D Cowok - ${tx.repair_number}" title="Render 3D" style="width:30px; height:30px; border-radius:4px; object-fit:cover; border:1px solid var(--border-color); cursor:pointer;">` : ''}
-                ${tx.realpict_url && tx.realpict_url !== '[Gagal Upload]' ? `<img src="${tx.realpict_url}" class="img-thumbnail-link" data-url="${tx.realpict_url}" data-caption="Realpict Cowok - ${tx.repair_number}" title="Realpict" style="width:30px; height:30px; border-radius:4px; object-fit:cover; border:1px solid var(--border-color); cursor:pointer;">` : ''}
+                ${tx.cowok_image_url && tx.cowok_image_url !== '[Gagal Upload Gambar]' ? `<img src="${resolveImageUrl(tx.cowok_image_url)}" class="img-thumbnail-link" data-url="${tx.cowok_image_url}" data-caption="Foto Model Cowok - ${tx.repair_number}" title="Foto Model Cowok" style="width:30px; height:30px; border-radius:4px; object-fit:cover; border:1px solid var(--border-color); cursor:pointer;">` : ''}
+                ${tx.render_cowok_url && tx.render_cowok_url !== '[Gagal Upload]' ? `<img src="${resolveImageUrl(tx.render_cowok_url)}" class="img-thumbnail-link" data-url="${tx.render_cowok_url}" data-caption="Render 3D Cowok - ${tx.repair_number}" title="Render 3D Cowok" style="width:30px; height:30px; border-radius:4px; object-fit:cover; border:1px solid var(--border-color); cursor:pointer;">` : ''}
+                ${tx.realpict_url && tx.realpict_url !== '[Gagal Upload]' ? `<img src="${resolveImageUrl(tx.realpict_url)}" class="img-thumbnail-link" data-url="${tx.realpict_url}" data-caption="Realpict Cowok - ${tx.repair_number}" title="Realpict" style="width:30px; height:30px; border-radius:4px; object-fit:cover; border:1px solid var(--border-color); cursor:pointer;">` : ''}
             </div>
         ` : '<em>Nonaktif</em>';
 
         let cewekDesc = tx.cewek_active === 'TRUE' ? `
             <div>${cewekMetal?.name || ''} (Sz: ${tx.cewek_size}) - ${cewekRep?.name || ''}</div>
             <div style="display:flex; gap:6px; margin-top:4px; flex-wrap:wrap;">
-                ${tx.cewek_image_url && tx.cewek_image_url !== '[Gagal Upload Gambar]' ? `<img src="${tx.cewek_image_url}" class="img-thumbnail-link" data-url="${tx.cewek_image_url}" data-caption="Foto Model Cewek - ${tx.repair_number}" title="Foto Model Cewek" style="width:30px; height:30px; border-radius:4px; object-fit:cover; border:1px solid var(--border-color); cursor:pointer;">` : ''}
-                ${tx.render_model_url && tx.render_model_url !== '[Gagal Upload]' ? `<img src="${tx.render_model_url}" class="img-thumbnail-link" data-url="${tx.render_model_url}" data-caption="Render 3D Cewek - ${tx.repair_number}" title="Render 3D" style="width:30px; height:30px; border-radius:4px; object-fit:cover; border:1px solid var(--border-color); cursor:pointer;">` : ''}
-                ${tx.realpict_url && tx.realpict_url !== '[Gagal Upload]' ? `<img src="${tx.realpict_url}" class="img-thumbnail-link" data-url="${tx.realpict_url}" data-caption="Realpict Cewek - ${tx.repair_number}" title="Realpict" style="width:30px; height:30px; border-radius:4px; object-fit:cover; border:1px solid var(--border-color); cursor:pointer;">` : ''}
+                ${tx.cewek_image_url && tx.cewek_image_url !== '[Gagal Upload Gambar]' ? `<img src="${resolveImageUrl(tx.cewek_image_url)}" class="img-thumbnail-link" data-url="${tx.cewek_image_url}" data-caption="Foto Model Cewek - ${tx.repair_number}" title="Foto Model Cewek" style="width:30px; height:30px; border-radius:4px; object-fit:cover; border:1px solid var(--border-color); cursor:pointer;">` : ''}
+                ${tx.render_cewek_url && tx.render_cewek_url !== '[Gagal Upload]' ? `<img src="${resolveImageUrl(tx.render_cewek_url)}" class="img-thumbnail-link" data-url="${tx.render_cewek_url}" data-caption="Render 3D Cewek - ${tx.repair_number}" title="Render 3D Cewek" style="width:30px; height:30px; border-radius:4px; object-fit:cover; border:1px solid var(--border-color); cursor:pointer;">` : ''}
+                ${tx.realpict_url && tx.realpict_url !== '[Gagal Upload]' ? `<img src="${resolveImageUrl(tx.realpict_url)}" class="img-thumbnail-link" data-url="${tx.realpict_url}" data-caption="Realpict Cewek - ${tx.repair_number}" title="Realpict" style="width:30px; height:30px; border-radius:4px; object-fit:cover; border:1px solid var(--border-color); cursor:pointer;">` : ''}
             </div>
         ` : '<em>Nonaktif</em>';
 
@@ -2643,6 +2643,24 @@ async function renderLogisticBoard() {
                         if (result.data.final_pickup_status) match.final_pickup_status = result.data.final_pickup_status;
                         if (result.data.pelunasan_receipt_url) match.dp2_receipt_url = result.data.pelunasan_receipt_url;
 
+                        if (result.data.assigned_designer) match.assigned_designer = result.data.assigned_designer;
+                        if (result.data.render_cowok_url) match.render_cowok_url = result.data.render_cowok_url;
+                        if (result.data.render_cewek_url) match.render_cewek_url = result.data.render_cewek_url;
+                        if (result.data.render_rejection_reason) match.render_rejection_reason = result.data.render_rejection_reason;
+                        if (result.data.cowok_weight_final) match.cowok_weight_final = result.data.cowok_weight_final;
+                        if (result.data.cewek_weight_final) match.cewek_weight_final = result.data.cewek_weight_final;
+                        if (result.data.branch_receipt_status) match.branch_receipt_status = result.data.branch_receipt_status;
+                        if (result.data.branch_receipt_comment) match.branch_receipt_comment = result.data.branch_receipt_comment;
+                        if (result.data.is_reproduct) match.is_reproduct = result.data.is_reproduct;
+                        if (result.data.qa_status) match.qa_status = result.data.qa_status;
+                        if (result.data.qa_notes) match.qa_notes = result.data.qa_notes;
+                        if (result.data.qa_checked_by) match.qa_checked_by = result.data.qa_checked_by;
+                        if (result.data.qa_checked_at) match.qa_checked_at = result.data.qa_checked_at;
+                        if (result.data.qc_status) match.qc_status = result.data.qc_status;
+                        if (result.data.qc_notes) match.qc_notes = result.data.qc_notes;
+                        if (result.data.qc_checked_by) match.qc_checked_by = result.data.qc_checked_by;
+                        if (result.data.qc_checked_at) match.qc_checked_at = result.data.qc_checked_at;
+
                         if (payload.assigned_workshop !== undefined) match.assigned_workshop = payload.assigned_workshop;
                         if (payload.production_status !== undefined) match.production_status = payload.production_status;
                         if (payload.logistic_status !== undefined) match.logistic_status = payload.logistic_status;
@@ -3541,11 +3559,12 @@ async function renderLogisticBoard() {
                 const match = txs.find(t => t.repair_number === repairNumber);
                 if (match) {
                     match.render_approval = 'Approved';
+                    match.render_rejection_reason = '';
                     match.status = 'Pending Sync';
                     await saveLocalData('repair_transactions', match);
                 }
 
-                await queueSyncTask('UPDATE_REPAIR_STATUS', { repair_number: repairNumber, render_approval: 'Approved' });
+                await queueSyncTask('UPDATE_REPAIR_STATUS', { repair_number: repairNumber, render_approval: 'Approved', render_rejection_reason: '' });
                 runBackgroundSync();
 
                 showToast(`Render Model 3D perbaikan ${repairNumber} disetujui!`, 'success');
@@ -3562,17 +3581,25 @@ async function renderLogisticBoard() {
             const repairNumber = modal.dataset.repairNumber;
             if (!repairNumber) return;
 
+            const comment = document.getElementById('sd-render-comment').value.trim();
+            if (!comment) {
+                showToast('Komentar/catatan revisi wajib diisi jika menolak render!', 'warning');
+                document.getElementById('sd-render-comment').focus();
+                return;
+            }
+
             showToast('Menolak model render 3D...', 'info');
             try {
                 const txs = await getLocalData('repair_transactions');
                 const match = txs.find(t => t.repair_number === repairNumber);
                 if (match) {
                     match.render_approval = 'Rejected';
+                    match.render_rejection_reason = comment;
                     match.status = 'Pending Sync';
                     await saveLocalData('repair_transactions', match);
                 }
 
-                await queueSyncTask('UPDATE_REPAIR_STATUS', { repair_number: repairNumber, render_approval: 'Rejected' });
+                await queueSyncTask('UPDATE_REPAIR_STATUS', { repair_number: repairNumber, render_approval: 'Rejected', render_rejection_reason: comment });
                 runBackgroundSync();
 
                 showToast(`Render Model 3D perbaikan ${repairNumber} ditolak!`, 'warning');
@@ -3912,26 +3939,81 @@ async function renderLogisticBoard() {
 
         // 3D Render block
         const renderBlock = document.getElementById('sd-render-block');
-        const renderImg = document.getElementById('sd-render-img');
         const renderBadge = document.getElementById('sd-render-approval-badge');
         const renderActions = document.getElementById('sd-render-actions');
+        const cowokContainer = document.getElementById('sd-render-cowok-container');
+        const cewekContainer = document.getElementById('sd-render-cewek-container');
+        const cowokImg = document.getElementById('sd-render-cowok-img');
+        const cewekImg = document.getElementById('sd-render-cewek-img');
+        const rejectionDisplay = document.getElementById('sd-render-rejection-reason-display');
+        const commentGroup = document.getElementById('sd-render-comment-group');
 
-        if (tx.render_model_url && tx.render_model_url !== '' && tx.render_model_url !== '[Gagal Upload]') {
+        const hasCowokRender = tx.render_cowok_url && tx.render_cowok_url !== '' && tx.render_cowok_url !== '[Gagal Upload]';
+        const hasCewekRender = tx.render_cewek_url && tx.render_cewek_url !== '' && tx.render_cewek_url !== '[Gagal Upload]';
+        const hasModelRender = tx.render_model_url && tx.render_model_url !== '' && tx.render_model_url !== '[Gagal Upload]';
+
+        if (hasCowokRender || hasCewekRender || hasModelRender) {
             renderBlock.classList.remove('hidden');
-            renderImg.src = resolveImageUrl(tx.render_model_url);
-            renderImg.dataset.url = tx.render_model_url;
-            renderImg.dataset.caption = `Pratinjau Desain 3D Render - ${tx.repair_number}`;
+
+            // Show or hide containers
+            if (hasCowokRender) {
+                cowokContainer.style.display = 'block';
+                cowokContainer.querySelector('div').textContent = 'Render Cowok';
+                cowokImg.src = resolveImageUrl(tx.render_cowok_url);
+                cowokImg.dataset.url = tx.render_cowok_url;
+                cowokImg.dataset.caption = `Render 3D Cowok - ${tx.repair_number}`;
+            } else if (hasModelRender && !hasCewekRender) {
+                // Fallback show model render in cowok slot if cewek is empty too
+                cowokContainer.style.display = 'block';
+                cowokContainer.querySelector('div').textContent = 'Render Model';
+                cowokImg.src = resolveImageUrl(tx.render_model_url);
+                cowokImg.dataset.url = tx.render_model_url;
+                cowokImg.dataset.caption = `Render 3D Model - ${tx.repair_number}`;
+            } else {
+                cowokContainer.style.display = 'none';
+            }
+
+            if (hasCewekRender) {
+                cewekContainer.style.display = 'block';
+                cewekImg.src = resolveImageUrl(tx.render_cewek_url);
+                cewekImg.dataset.url = tx.render_cewek_url;
+                cewekImg.dataset.caption = `Render 3D Cewek - ${tx.repair_number}`;
+            } else if (hasModelRender && hasCowokRender) {
+                // Show general model render in cewek container if cewek render is empty
+                cewekContainer.style.display = 'block';
+                cewekContainer.querySelector('div').textContent = 'Render Model';
+                cewekImg.src = resolveImageUrl(tx.render_model_url);
+                cewekImg.dataset.url = tx.render_model_url;
+                cewekImg.dataset.caption = `Render 3D Model - ${tx.repair_number}`;
+            } else {
+                cewekContainer.style.display = 'none';
+            }
+
             renderBadge.textContent = tx.render_approval || 'Pending';
 
+            // Show/Hide comment and actions based on approval status
             if (tx.render_approval === 'Approved') {
                 renderBadge.className = 'badge success';
                 renderActions.classList.add('hidden');
+                commentGroup.classList.add('hidden');
+                rejectionDisplay.classList.add('hidden');
             } else if (tx.render_approval === 'Rejected') {
                 renderBadge.className = 'badge danger';
                 renderActions.classList.add('hidden');
+                commentGroup.classList.add('hidden');
+                rejectionDisplay.classList.remove('hidden');
+                rejectionDisplay.innerHTML = `<i class="fa-solid fa-comment-dots"></i> <strong>Revisi:</strong> ${tx.render_rejection_reason || 'Tidak ada catatan'}`;
             } else {
                 renderBadge.className = 'badge warning';
                 renderActions.classList.remove('hidden');
+                commentGroup.classList.remove('hidden');
+                document.getElementById('sd-render-comment').value = ''; // Reset input
+                if (tx.render_rejection_reason) {
+                    rejectionDisplay.classList.remove('hidden');
+                    rejectionDisplay.innerHTML = `<i class="fa-solid fa-comment-dots"></i> <strong>Komentar Terakhir:</strong> ${tx.render_rejection_reason}`;
+                } else {
+                    rejectionDisplay.classList.add('hidden');
+                }
             }
         } else {
             renderBlock.classList.add('hidden');
@@ -3998,7 +4080,10 @@ async function renderLogisticBoard() {
 
         // Pickup button conditions
         const isDpApproved = tx.dp_approval === 'Approved';
-        const isRenderApproved = tx.render_model_url ? tx.render_approval === 'Approved' : true;
+        const hasAnyRender = (tx.render_model_url && tx.render_model_url !== '' && tx.render_model_url !== '[Gagal Upload]') ||
+                             (tx.render_cowok_url && tx.render_cowok_url !== '' && tx.render_cowok_url !== '[Gagal Upload]') ||
+                             (tx.render_cewek_url && tx.render_cewek_url !== '' && tx.render_cewek_url !== '[Gagal Upload]');
+        const isRenderApproved = hasAnyRender ? tx.render_approval === 'Approved' : true;
         const isRealpictApproved = tx.realpict_url ? tx.realpict_approval === 'Approved' : true;
         const isFinancialOk = outstanding <= 0 && (outstanding === 0 || tx.pelunasan_approval === 'Approved' || tx.dp1_amount >= tx.total_price);
 
@@ -4037,7 +4122,9 @@ async function renderLogisticBoard() {
         });
 
         const isDpApproved = tx.dp_approval === 'Approved';
-        const hasRender = tx.render_model_url && tx.render_model_url !== '' && tx.render_model_url !== '[Gagal Upload]';
+        const hasRender = (tx.render_model_url && tx.render_model_url !== '' && tx.render_model_url !== '[Gagal Upload]') ||
+                          (tx.render_cowok_url && tx.render_cowok_url !== '' && tx.render_cowok_url !== '[Gagal Upload]') ||
+                          (tx.render_cewek_url && tx.render_cewek_url !== '' && tx.render_cewek_url !== '[Gagal Upload]');
         const isRenderApproved = tx.render_approval === 'Approved';
         const isProdCompleted = tx.production_status === 'Completed';
         const hasRealpict = tx.realpict_url && tx.realpict_url !== '' && tx.realpict_url !== '[Gagal Upload]';
