@@ -24,7 +24,7 @@ const State = {
 // --- CONFIGURATIONS ---
 const CONFIG = {
     DB_NAME: 'SoviaRepairDB',
-    DB_VERSION: 1,
+    DB_VERSION: 2,
     // Google Apps Script Deploy URL
     GAS_API_URL: 'https://script.google.com/macros/s/AKfycbwaJsUPiuxnwVt2Rn_ALJrkUK8aaWwu7E5Z2F7cKkc8s5kuDCyiuif-PKs3dkUY1GJEvw/exec',
 };
@@ -34,9 +34,9 @@ function resolveImageUrl(url) {
     if (!url || typeof url !== 'string') return '';
     if (url.startsWith('data:image')) return url;
     if (url === '[Gagal Upload Gambar]' || url === '[Gagal Upload]') return '';
-    const match = url.match(/(?:id=|file\/d\/)([^&/]+)/);
+    const match = url.match(/(?:id=|file\/d\/|\/d\/)([^&/?#\s]+)/);
     if (match && match[1]) {
-        return `https://lh3.googleusercontent.com/d/${match[1]}`;
+        return `https://drive.google.com/thumbnail?sz=w600&id=${match[1]}`;
     }
     return url;
 }
@@ -90,6 +90,11 @@ function initDatabase() {
                     db.createObjectStore(store.name, { keyPath: store.key });
                 }
             });
+
+            // Create Chat Messages Store
+            if (!db.objectStoreNames.contains('chat_messages')) {
+                db.createObjectStore('chat_messages', { keyPath: 'id' });
+            }
 
             // Seed Data immediately for demo & local robustness
             const transaction = event.target.transaction;
@@ -264,6 +269,30 @@ function seedDatabase(transaction) {
         qc_checked_at: ''
     };
     txnStore.put(mockTx);
+
+    // 10. Predefined Seed Chat Messages
+    if (transaction.objectStoreNames.contains('chat_messages')) {
+        const chatStore = transaction.objectStore('chat_messages');
+        const mockChats = [
+            {
+                id: 'msg_seed_1',
+                timestamp: new Date('2026-05-22T14:00:00Z').toISOString(),
+                sender: 'sales_bekasi',
+                message: 'Halo @production, mohon dicek untuk pengerjaan cincin repair Amelia Lestari ini ya. Terima kasih!',
+                attached_repair_number: 'REP-BEK-260522-133832',
+                mentions: 'production'
+            },
+            {
+                id: 'msg_seed_2',
+                timestamp: new Date('2026-05-22T14:15:00Z').toISOString(),
+                sender: 'production',
+                message: 'Siap @sales_bekasi, antrean aman. Desain render 3D segera kami tugaskan ke desainer.',
+                attached_repair_number: 'REP-BEK-260522-133832',
+                mentions: 'sales_bekasi'
+            }
+        ];
+        mockChats.forEach(c => chatStore.put(c));
+    }
 }
 
 // --- UNIVERSAL INDEXEDDB READ/WRITE HELPER ---
@@ -298,6 +327,88 @@ function deleteLocalData(storeName, key) {
         req.onsuccess = () => resolve();
         req.onerror = () => reject(req.error);
     });
+}
+
+function clearLocalData(storeName) {
+    return new Promise((resolve, reject) => {
+        if (!State.db) return resolve();
+        const tx = State.db.transaction(storeName, 'readwrite');
+        const store = tx.objectStore(storeName);
+        const req = store.clear();
+        req.onsuccess = () => resolve();
+        req.onerror = () => reject(req.error);
+    });
+}
+
+function getSingleLocalData(storeName, key) {
+    return new Promise((resolve) => {
+        if (!State.db) return resolve(null);
+        const tx = State.db.transaction(storeName, 'readonly');
+        const store = tx.objectStore(storeName);
+        const req = store.get(key);
+        req.onsuccess = () => resolve(req.result || null);
+        req.onerror = () => resolve(null);
+    });
+}
+
+async function pullDataFromServer() {
+    if (!navigator.onLine || !CONFIG.GAS_API_URL) return;
+    try {
+        const response = await fetch(CONFIG.GAS_API_URL);
+        const result = await response.json();
+        if (result && result.status === 'success') {
+            const data = result.data;
+            
+            // Clear and reload master tables
+            const masterStores = {
+                'master_users': data.users,
+                'master_stores': data.stores,
+                'master_catalog': data.catalog,
+                'master_metals': data.metals,
+                'master_repairs': data.repairs,
+                'master_workshops': data.workshops,
+                'master_cities': data.cities,
+                'master_payments': data.payments
+            };
+
+            for (const storeName in masterStores) {
+                const items = masterStores[storeName];
+                if (items && Array.isArray(items)) {
+                    await clearLocalData(storeName);
+                    for (const item of items) {
+                        await saveLocalData(storeName, item);
+                    }
+                }
+            }
+
+            // Sync and merge transactions to prevent overwriting pending modifications
+            if (data.repair_transactions && Array.isArray(data.repair_transactions)) {
+                for (const sTx of data.repair_transactions) {
+                    const localMatch = await getSingleLocalData('repair_transactions', sTx.repair_number);
+                    if (!localMatch || localMatch.status !== 'Pending Sync') {
+                        await saveLocalData('repair_transactions', sTx);
+                    }
+                }
+            }
+
+            // Sync and save chat messages
+            if (data.chat_messages && Array.isArray(data.chat_messages)) {
+                await clearLocalData('chat_messages');
+                for (const chat of data.chat_messages) {
+                    await saveLocalData('chat_messages', chat);
+                }
+            }
+
+            // Reload RAM cache & refresh UI
+            await loadAllMasterDataToCache();
+            await refreshAllData();
+            if (typeof renderChatPanel === 'function') {
+                await renderChatPanel();
+            }
+        }
+    } catch (e) {
+        console.warn("Gagal menarik data dari server: ", e);
+    }
 }
 
 // Load all master tables to RAM cache
@@ -437,6 +548,12 @@ function switchPanel(panelId) {
     else if (panelId === 'accounting-panel') title = 'Accounting & Invoice';
     else if (panelId === 'production-panel') title = 'Production & Workshops';
     else if (panelId === 'logistic-panel') title = 'Logistic & Delivery';
+    else if (panelId === 'chat-panel') {
+        title = 'Diskusi Chat';
+        if (typeof renderChatPanel === 'function') {
+            renderChatPanel();
+        }
+    }
     else if (panelId === 'admin-panel') title = 'Administrator Control';
 
     document.getElementById('topbar-title').textContent = title;
@@ -2281,7 +2398,7 @@ async function renderLogisticBoard() {
                         <div style="margin-top:10px;">
                             <span><strong>Model Model Cincin:</strong></span>
                             <div class="preview-ring-model-img">
-                                <img src="${tx.cowok_image_url}" alt="Model Cowok">
+                                <img src="${resolveImageUrl(tx.cowok_image_url)}" alt="Model Cowok">
                             </div>
                         </div>
                         ` : ''}
@@ -2322,7 +2439,7 @@ async function renderLogisticBoard() {
                         <div style="margin-top:10px;">
                             <span><strong>Model Model Cincin:</strong></span>
                             <div class="preview-ring-model-img">
-                                <img src="${tx.cewek_image_url}" alt="Model Cewek">
+                                <img src="${resolveImageUrl(tx.cewek_image_url)}" alt="Model Cewek">
                             </div>
                         </div>
                         ` : ''}
@@ -3250,6 +3367,16 @@ async function renderLogisticBoard() {
         // Set connection status label
         updateConnectionIndicator(navigator.onLine);
 
+        // 3. Pull initial database from Google Sheets server
+        await pullDataFromServer();
+
+        // 4. Start periodic background sync pulling every 15 seconds
+        setInterval(async () => {
+            if (navigator.onLine && State.currentUser) {
+                await pullDataFromServer();
+            }
+        }, 15000);
+
         // --- BINDING: PORTAL HUB & LOGIN ---
         document.getElementById('btn-enter-repair').addEventListener('click', () => {
             showLoginScreen();
@@ -3781,6 +3908,9 @@ async function renderLogisticBoard() {
         // Initialize lightbox events globally
         initLightboxEvents();
 
+        // Initialize chat discussion system
+        initChatSystem();
+
         // 3. Initiate background sync loops periodically (every 15 seconds)
         setInterval(() => {
             runBackgroundSync();
@@ -4230,3 +4360,474 @@ async function renderLogisticBoard() {
             }
         });
     }
+
+// ==========================================================================
+// 11. CHAT DISCUSSION CONTROLLER & MENTIONS SYSTEM
+// ==========================================================================
+
+const ChatState = {
+    activeChannel: 'general', // 'general' or repair_number
+    attachedProject: null, // repair_number if attached
+    mentionSearchActive: false,
+    mentionQuery: '',
+    mentionStartIndex: -1
+};
+
+function initChatSystem() {
+    const searchInput = document.getElementById('chat-project-search');
+    const form = document.getElementById('chat-message-form');
+    const textarea = document.getElementById('chat-input-text');
+    const attachBtn = document.getElementById('btn-chat-attach-project');
+    const dropdown = document.getElementById('chat-attachment-dropdown');
+    const removeAttachBtn = document.getElementById('btn-chat-remove-attachment');
+    const detailBtn = document.getElementById('btn-chat-view-project');
+
+    // Toggle attachment dropdown
+    if (attachBtn && dropdown) {
+        attachBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            dropdown.classList.toggle('hidden');
+            if (!dropdown.classList.contains('hidden')) {
+                populateAttachmentDropdown();
+            }
+        });
+    }
+
+    // Close dropdown on click outside
+    document.addEventListener('click', () => {
+        if (dropdown) dropdown.classList.add('hidden');
+    });
+
+    // Remove attached project
+    if (removeAttachBtn) {
+        removeAttachBtn.addEventListener('click', () => {
+            ChatState.attachedProject = null;
+            document.getElementById('chat-attachment-indicator').classList.add('hidden');
+        });
+    }
+
+    // View project detail modal from chat header
+    if (detailBtn) {
+        detailBtn.addEventListener('click', () => {
+            if (ChatState.activeChannel !== 'general') {
+                showSalesDetailModal(ChatState.activeChannel);
+            }
+        });
+    }
+
+    // Channel selection logic (General or Project channels)
+    const channelsContainer = document.querySelector('.chat-channels-list');
+    if (channelsContainer) {
+        channelsContainer.addEventListener('click', (e) => {
+            const item = e.target.closest('.chat-channel-item');
+            if (item) {
+                document.querySelectorAll('.chat-channel-item').forEach(c => c.classList.remove('active'));
+                item.classList.add('active');
+                
+                const channel = item.dataset.channel;
+                ChatState.activeChannel = channel;
+
+                const titleEl = document.getElementById('chat-active-title');
+                const subtitleEl = document.getElementById('chat-active-subtitle');
+                const detailAction = document.getElementById('chat-project-action-btn');
+
+                if (channel === 'general') {
+                    titleEl.textContent = 'Semua Diskusi';
+                    subtitleEl.textContent = 'Saluran koordinasi umum';
+                    if (detailAction) detailAction.classList.add('hidden');
+                } else {
+                    titleEl.textContent = `Proyek #${channel}`;
+                    subtitleEl.textContent = `Diskusi perbaikan customer: ${item.dataset.customer}`;
+                    if (detailAction) detailAction.classList.remove('hidden');
+                }
+
+                renderChatMessages();
+            }
+        });
+    }
+
+    // Submit chat message
+    if (form) {
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            if (!State.currentUser) {
+                showToast('Silakan login terlebih dahulu untuk mengirim pesan.', 'warning');
+                return;
+            }
+
+            const text = textarea.value.trim();
+            if (!text) return;
+
+            showToast('Mengirim pesan...', 'info');
+
+            const msgId = 'msg_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+            const msgPayload = {
+                id: msgId,
+                timestamp: new Date().toISOString(),
+                sender: State.currentUser.username,
+                message: text,
+                attached_repair_number: ChatState.attachedProject || (ChatState.activeChannel !== 'general' ? ChatState.activeChannel : ''),
+                mentions: parseMentions(text).join(',')
+            };
+
+            // Save to local IndexedDB
+            await saveLocalData('chat_messages', msgPayload);
+
+            // Queue task to sync online
+            await queueSyncTask('SAVE_CHAT_MESSAGE', msgPayload);
+            runBackgroundSync();
+
+            // Clear inputs
+            textarea.value = '';
+            ChatState.attachedProject = null;
+            const attachBar = document.getElementById('chat-attachment-indicator');
+            if (attachBar) attachBar.classList.add('hidden');
+
+            // Render message immediately
+            renderChatMessages();
+            showToast('Pesan dikirim!', 'success');
+        });
+    }
+
+    // Search channels
+    if (searchInput) {
+        searchInput.addEventListener('input', () => {
+            renderChatProjectsList();
+        });
+    }
+
+    // Mentions auto-complete handlers
+    if (textarea) {
+        textarea.addEventListener('input', (e) => {
+            handleMentionTyping(e);
+        });
+
+        textarea.addEventListener('keydown', (e) => {
+            handleMentionKeyDown(e);
+        });
+    }
+}
+
+// Extract usernames mentioned in text (e.g. "@admin" -> "admin")
+function parseMentions(text) {
+    const matches = text.match(/@(\w+)/g);
+    if (!matches) return [];
+    return matches.map(m => m.substring(1).toLowerCase());
+}
+
+// Convert @username to formatted bold gold pill in messages
+function formatMessageText(text) {
+    if (!text) return '';
+    // Escape HTML to prevent injection
+    let clean = text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+    
+    // Replace @username with span pill
+    return clean.replace(/@(\w+)/g, (match, username) => {
+        // Validate if username exists in master users database
+        const userExists = State.masterData.users.some(u => u.username.toLowerCase() === username.toLowerCase());
+        if (userExists) {
+            return `<span class="mention-pill">@${username}</span>`;
+        }
+        return match; // return original if user does not exist
+    });
+}
+
+// Populate the attach project drop-down list
+async function populateAttachmentDropdown() {
+    const list = document.getElementById('chat-attachment-dropdown-list');
+    if (!list) return;
+
+    const txs = await getLocalData('repair_transactions');
+    list.innerHTML = '';
+
+    if (txs.length === 0) {
+        list.innerHTML = '<div class="dropdown-item-empty">Tidak ada proyek perbaikan aktif.</div>';
+        return;
+    }
+
+    txs.forEach(tx => {
+        const item = document.createElement('div');
+        item.className = 'dropdown-item';
+        item.innerHTML = `
+            <strong>${tx.repair_number}</strong>
+            <span>Cust: ${tx.customer_name}</span>
+        `;
+        item.addEventListener('click', () => {
+            ChatState.attachedProject = tx.repair_number;
+            document.getElementById('attached-project-id').textContent = tx.repair_number;
+            document.getElementById('chat-attachment-indicator').classList.remove('hidden');
+            document.getElementById('chat-attachment-dropdown').classList.add('hidden');
+        });
+        list.appendChild(item);
+    });
+}
+
+// Render the list of projects in the left pane of Chat View
+async function renderChatProjectsList() {
+    const listContainer = document.getElementById('chat-projects-list-container');
+    if (!listContainer) return;
+
+    const searchVal = document.getElementById('chat-project-search').value.toLowerCase();
+    const txs = await getLocalData('repair_transactions');
+    
+    // Sort by newest created_at
+    txs.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+
+    listContainer.innerHTML = '';
+    let matches = 0;
+
+    txs.forEach(tx => {
+        const matchText = tx.repair_number.toLowerCase().includes(searchVal) || tx.customer_name.toLowerCase().includes(searchVal);
+        if (matchText) {
+            matches++;
+            const item = document.createElement('div');
+            item.className = `chat-channel-item ${ChatState.activeChannel === tx.repair_number ? 'active' : ''}`;
+            item.dataset.channel = tx.repair_number;
+            item.dataset.customer = tx.customer_name;
+
+            const iconClass = 'fa-solid fa-gem';
+            
+            item.innerHTML = `
+                <div class="channel-icon">
+                    <i class="${iconClass}"></i>
+                </div>
+                <div class="channel-info">
+                    <h4>${tx.repair_number}</h4>
+                    <p>${tx.customer_name} - sz Co: ${tx.cowok_size || '-'} / sz Ce: ${tx.cewek_size || '-'}</p>
+                </div>
+            `;
+            listContainer.appendChild(item);
+        }
+    });
+
+    if (matches === 0) {
+        listContainer.innerHTML = '<div class="chat-channel-empty">Tidak ada proyek yang sesuai filter.</div>';
+    }
+}
+
+// Render Chat Messages in Main Chat Area
+async function renderChatMessages() {
+    const container = document.getElementById('chat-messages-container');
+    if (!container) return;
+
+    const messages = await getLocalData('chat_messages');
+    
+    // Sort chronologically (oldest first)
+    messages.sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
+
+    container.innerHTML = '';
+
+    const activeChan = ChatState.activeChannel;
+    let count = 0;
+
+    for (const msg of messages) {
+        // Filter rules:
+        // - If channel is general: show all messages.
+        // - If channel is a specific project: show general messages that reference it OR messages sent directly in this channel.
+        const isAttachedToActiveProject = msg.attached_repair_number === activeChan;
+        const matchesChannel = (activeChan === 'general') || isAttachedToActiveProject;
+
+        if (matchesChannel) {
+            count++;
+            const bubble = document.createElement('div');
+            const isMe = State.currentUser && (msg.sender === State.currentUser.username);
+            bubble.className = `chat-message-bubble ${isMe ? 'me' : ''}`;
+
+            // Resolve role badge
+            const senderUser = State.masterData.users.find(u => u.username === msg.sender);
+            const roleLabel = senderUser ? senderUser.role : 'Sales';
+            const roleClass = roleLabel.toLowerCase();
+
+            // Format timestamp
+            let timeStr = '';
+            try {
+                timeStr = new Date(msg.timestamp).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
+            } catch(e) {
+                timeStr = msg.timestamp;
+            }
+
+            // Attached project card markup inside chat bubbles
+            let cardHtml = '';
+            if (activeChan === 'general' && msg.attached_repair_number) {
+                cardHtml = `
+                    <div class="attached-project-card" data-id="${msg.attached_repair_number}">
+                        <div class="attached-card-left">
+                            <strong>${msg.attached_repair_number}</strong>
+                            <span>Lihat lampiran proyek produk cincin</span>
+                        </div>
+                        <div class="attached-card-right">
+                            <i class="fa-solid fa-arrow-up-right-from-square" style="color:var(--gold);"></i>
+                        </div>
+                    </div>
+                `;
+            }
+
+            bubble.innerHTML = `
+                <div class="msg-meta-info">
+                    <span class="msg-sender-name">${isMe ? 'Anda' : msg.sender}</span>
+                    <span class="msg-sender-role ${roleClass}">${roleLabel}</span>
+                </div>
+                <div class="msg-body-content">
+                    <div>${formatMessageText(msg.message)}</div>
+                    ${cardHtml}
+                    <span class="msg-timestamp">${timeStr}</span>
+                </div>
+            `;
+
+            // Bind click event to attached project card
+            const projectCard = bubble.querySelector('.attached-project-card');
+            if (projectCard) {
+                projectCard.addEventListener('click', () => {
+                    showSalesDetailModal(projectCard.dataset.id);
+                });
+            }
+
+            container.appendChild(bubble);
+        }
+    }
+
+    if (count === 0) {
+        container.innerHTML = `
+            <div class="chat-channel-empty" style="margin-top:40px;">
+                <i class="fa-regular fa-comments" style="font-size:36px; color:var(--border-color); display:block; margin-bottom:12px;"></i>
+                Belum ada diskusi dalam percakapan ini.<br>Mulai obrolan Anda untuk berkoordinasi.
+            </div>
+        `;
+    }
+
+    // Scroll chat window to bottom
+    container.scrollTo({ top: container.scrollHeight, behavior: 'smooth' });
+}
+
+// Master Render controller for the Chat Tab
+async function renderChatPanel() {
+    await renderChatProjectsList();
+    await renderChatMessages();
+}
+
+// Autocomplete list triggers for @ mentions typing detection
+function handleMentionTyping(e) {
+    const textEl = e.target;
+    const value = textEl.value;
+    const index = textEl.selectionStart;
+
+    const beforeCursor = value.substring(0, index);
+    const lastAt = beforeCursor.lastIndexOf('@');
+
+    if (lastAt !== -1 && !beforeCursor.substring(lastAt).includes(' ')) {
+        ChatState.mentionSearchActive = true;
+        ChatState.mentionStartIndex = lastAt;
+        ChatState.mentionQuery = beforeCursor.substring(lastAt + 1).toLowerCase();
+        
+        showMentionDropdown();
+    } else {
+        closeMentionDropdown();
+    }
+}
+
+// Keyboard shortcuts inside textarea during active mention search
+function handleMentionKeyDown(e) {
+    const autocomplete = document.getElementById('chat-mentions-autocomplete');
+    if (!ChatState.mentionSearchActive || autocomplete.classList.contains('hidden')) return;
+
+    const items = autocomplete.querySelectorAll('.mention-item');
+    if (items.length === 0) return;
+
+    let activeIndex = -1;
+    items.forEach((item, idx) => {
+        if (item.classList.contains('active')) activeIndex = idx;
+    });
+
+    if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        items.forEach(i => i.classList.remove('active'));
+        const next = (activeIndex + 1) % items.length;
+        items[next].classList.add('active');
+        items[next].scrollIntoView({ block: 'nearest' });
+    } else if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        items.forEach(i => i.classList.remove('active'));
+        const prev = (activeIndex - 1 + items.length) % items.length;
+        items[prev].classList.add('active');
+        items[prev].scrollIntoView({ block: 'nearest' });
+    } else if (e.key === 'Enter') {
+        e.preventDefault();
+        const activeItem = autocomplete.querySelector('.mention-item.active') || items[0];
+        if (activeItem) {
+            insertMention(activeItem.dataset.username);
+        }
+    } else if (e.key === 'Escape') {
+        e.preventDefault();
+        closeMentionDropdown();
+    }
+}
+
+// Display autocomplete choices above input field
+function showMentionDropdown() {
+    const autocomplete = document.getElementById('chat-mentions-autocomplete');
+    if (!autocomplete) return;
+
+    // Fetch valid users excluding current user
+    const users = State.masterData.users;
+    const query = ChatState.mentionQuery;
+    
+    const filtered = users.filter(u => {
+        const matchesQuery = u.username.toLowerCase().includes(query);
+        const isCurrent = State.currentUser && (u.username.toLowerCase() === State.currentUser.username.toLowerCase());
+        return matchesQuery && !isCurrent;
+    });
+
+    if (filtered.length === 0) {
+        closeMentionDropdown();
+        return;
+    }
+
+    autocomplete.innerHTML = '';
+    filtered.forEach((user, idx) => {
+        const item = document.createElement('div');
+        item.className = `mention-item ${idx === 0 ? 'active' : ''}`;
+        item.dataset.username = user.username;
+        item.innerHTML = `
+            <div class="mention-item-avatar">
+                <i class="fa-solid fa-user"></i>
+            </div>
+            <div>
+                <strong>${user.username}</strong> (${user.role})
+            </div>
+        `;
+        item.addEventListener('click', () => {
+            insertMention(user.username);
+        });
+        autocomplete.appendChild(item);
+    });
+
+    autocomplete.classList.remove('hidden');
+}
+
+// Close autocomplete suggestions
+function closeMentionDropdown() {
+    ChatState.mentionSearchActive = false;
+    ChatState.mentionStartIndex = -1;
+    ChatState.mentionQuery = '';
+    const autocomplete = document.getElementById('chat-mentions-autocomplete');
+    if (autocomplete) autocomplete.classList.add('hidden');
+}
+
+// Auto-fill selected tag username into textarea
+function insertMention(username) {
+    const textarea = document.getElementById('chat-input-text');
+    const value = textarea.value;
+    const cursor = textarea.selectionStart;
+
+    const before = value.substring(0, ChatState.mentionStartIndex);
+    const after = value.substring(cursor);
+
+    textarea.value = before + '@' + username + ' ' + after;
+    textarea.focus();
+    
+    // Reposition cursor after the mention
+    const newCursorPos = ChatState.mentionStartIndex + username.length + 2;
+    textarea.setSelectionRange(newCursorPos, newCursorPos);
+
+    closeMentionDropdown();
+}
