@@ -166,6 +166,10 @@
                     <i class="fa-solid fa-truck-ramp-box"></i>
                     <span>Logistic</span>
                 </a>
+                <a href="#" class="menu-item" data-target="chat-panel" id="menu-item-chat">
+                    <i class="fa-solid fa-comments"></i>
+                    <span>Diskusi Chat</span>
+                </a>
                 <a href="#" class="menu-item" data-target="admin-panel" id="menu-item-admin">
                     <i class="fa-solid fa-user-gear"></i>
                     <span>Administrator</span>
@@ -1001,6 +1005,92 @@
                                     </tr>
                                 </tbody>
                             </table>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 5.5 CHAT DISCUSSION VIEW -->
+                <div id="chat-panel" class="app-panel">
+                    <div class="panel-header-section">
+                        <h1>Diskusi & Chat Karyawan</h1>
+                        <p>Ruang komunikasi dan koordinasi real-time antar staf, sales, produksi, desainer, logistik, dan finance.</p>
+                    </div>
+
+                    <div class="chat-container-card">
+                        <!-- Left Pane: Channels & Project List -->
+                        <div class="chat-sidebar-pane">
+                            <div class="chat-search-wrap">
+                                <i class="fa-solid fa-magnifying-glass"></i>
+                                <input type="text" id="chat-project-search" placeholder="Cari nomor repair / customer...">
+                            </div>
+                            <div class="chat-channels-list">
+                                <div class="chat-channel-item active" data-channel="general">
+                                    <div class="channel-icon">
+                                        <i class="fa-solid fa-globe"></i>
+                                    </div>
+                                    <div class="channel-info">
+                                        <h4>Semua Diskusi</h4>
+                                        <p>Saluran koordinasi umum</p>
+                                    </div>
+                                </div>
+                                <div class="channels-header">
+                                    <span>Diskusi Proyek Produk</span>
+                                </div>
+                                <div id="chat-projects-list-container" class="project-channels-scroll">
+                                    <!-- Dynamic list of projects from IndexedDB -->
+                                    <div class="chat-channel-empty">Memuat daftar proyek...</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Right Pane: Chat Box -->
+                        <div class="chat-box-pane">
+                            <div class="chat-box-header">
+                                <div class="topic-meta">
+                                    <h3 id="chat-active-title">Semua Diskusi</h3>
+                                    <span id="chat-active-subtitle">Saluran koordinasi umum</span>
+                                </div>
+                                <div class="topic-actions hidden" id="chat-project-action-btn">
+                                    <button class="premium-btn btn-sec font-compact" id="btn-chat-view-project"><i class="fa-solid fa-circle-info"></i> Detail Proyek</button>
+                                </div>
+                            </div>
+
+                            <div class="chat-messages-container" id="chat-messages-container">
+                                <!-- Dynamic chat messages populated by JS -->
+                            </div>
+
+                            <!-- Autocomplete Suggestions List for Mentions -->
+                            <div id="chat-mentions-autocomplete" class="mentions-autocomplete hidden">
+                                <!-- Dynamic dropdown choices e.g. @admin, @production -->
+                            </div>
+
+                            <!-- Attachment preview indicator bar if a project is attached -->
+                            <div id="chat-attachment-indicator" class="chat-attachment-bar hidden">
+                                <div class="attachment-info">
+                                    <i class="fa-solid fa-paperclip"></i>
+                                    <span>Melampirkan Proyek: <strong id="attached-project-id">-</strong></span>
+                                </div>
+                                <button type="button" class="btn-remove-attachment" id="btn-chat-remove-attachment">&times;</button>
+                            </div>
+
+                            <!-- Chat Input Bar -->
+                            <form class="chat-input-bar" id="chat-message-form">
+                                <div class="input-actions">
+                                    <button type="button" class="chat-action-btn" id="btn-chat-attach-project" title="Lampirkan Proyek / Detail Cincin">
+                                        <i class="fa-solid fa-paperclip"></i>
+                                    </button>
+                                    <div class="attachment-dropdown hidden" id="chat-attachment-dropdown">
+                                        <div class="dropdown-header">Pilih Proyek / Repair</div>
+                                        <div class="dropdown-list" id="chat-attachment-dropdown-list">
+                                            <!-- Dynamic options -->
+                                        </div>
+                                    </div>
+                                </div>
+                                <textarea id="chat-input-text" rows="1" placeholder="Tulis pesan... gunakan @ untuk menyapa user lainnya" required></textarea>
+                                <button type="submit" class="premium-btn btn-send-message">
+                                    <i class="fa-regular fa-paper-plane"></i>
+                                </button>
+                            </form>
                         </div>
                     </div>
                 </div>
