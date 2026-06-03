@@ -34,9 +34,12 @@ function resolveImageUrl(url) {
     if (!url || typeof url !== 'string') return '';
     if (url.startsWith('data:image')) return url;
     if (url === '[Gagal Upload Gambar]' || url === '[Gagal Upload]') return '';
-    const match = url.match(/(?:id=|file\/d\/|\/d\/)([^&/?#\s]+)/);
-    if (match && match[1]) {
-        return `https://drive.google.com/thumbnail?sz=w600&id=${match[1]}`;
+    if (url.includes('lh3.googleusercontent.com')) return url;
+    if (url.includes('drive.google.com') || url.includes('google.com')) {
+        const match = url.match(/(?:id=|file\/d\/|\/d\/)([^&/?#\s]+)/);
+        if (match && match[1]) {
+            return `https://lh3.googleusercontent.com/d/${match[1]}`;
+        }
     }
     return url;
 }
