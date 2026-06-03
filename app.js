@@ -299,13 +299,32 @@ function seedDatabase(transaction) {
 }
 
 // --- UNIVERSAL INDEXEDDB READ/WRITE HELPER ---
+function normalizeTransaction(tx) {
+    if (!tx) return tx;
+    if (tx.cowok_active !== undefined) {
+        const val = tx.cowok_active;
+        tx.cowok_active = (val === true || val === 'TRUE' || String(val).toLowerCase() === 'true') ? 'TRUE' : 'FALSE';
+    }
+    if (tx.cewek_active !== undefined) {
+        const val = tx.cewek_active;
+        tx.cewek_active = (val === true || val === 'TRUE' || String(val).toLowerCase() === 'true') ? 'TRUE' : 'FALSE';
+    }
+    return tx;
+}
+
 function getLocalData(storeName) {
     return new Promise((resolve, reject) => {
         if (!State.db) return resolve([]);
         const tx = State.db.transaction(storeName, 'readonly');
         const store = tx.objectStore(storeName);
         const req = store.getAll();
-        req.onsuccess = () => resolve(req.result);
+        req.onsuccess = () => {
+            let res = req.result || [];
+            if (storeName === 'repair_transactions') {
+                res = res.map(normalizeTransaction);
+            }
+            resolve(res);
+        };
         req.onerror = () => reject(req.error);
     });
 }
@@ -315,7 +334,11 @@ function saveLocalData(storeName, dataObject) {
         if (!State.db) return reject('Database not initialized');
         const tx = State.db.transaction(storeName, 'readwrite');
         const store = tx.objectStore(storeName);
-        const req = store.put(dataObject);
+        let obj = dataObject;
+        if (storeName === 'repair_transactions' && obj) {
+            obj = normalizeTransaction(obj);
+        }
+        const req = store.put(obj);
         req.onsuccess = () => resolve(req.result);
         req.onerror = () => reject(req.error);
     });
@@ -349,7 +372,13 @@ function getSingleLocalData(storeName, key) {
         const tx = State.db.transaction(storeName, 'readonly');
         const store = tx.objectStore(storeName);
         const req = store.get(key);
-        req.onsuccess = () => resolve(req.result || null);
+        req.onsuccess = () => {
+            let res = req.result || null;
+            if (storeName === 'repair_transactions' && res) {
+                res = normalizeTransaction(res);
+            }
+            resolve(res);
+        };
         req.onerror = () => resolve(null);
     });
 }
