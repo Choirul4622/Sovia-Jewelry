@@ -720,119 +720,74 @@ function recalculateRowSubtotal(row) {
 }
 
 // Calculate full repair pricing instantly based on selections
+function calculateRingPricing(type) {
+    const active = document.getElementById(`ring-${type}-active`).checked;
+    const isReproduct = document.getElementById(`${type}-is-reproduct`)?.checked || false;
+    let price = 0;
+
+    if (active) {
+        const materialId = document.getElementById(`${type}-material`).value;
+        const weight = parseFloat(document.getElementById(`${type}-weight`).value) || 0;
+        const repairId = document.getElementById(`${type}-repair-type`).value;
+
+        const metal = State.masterData.metals.find(m => m.id === materialId);
+        const repair = State.masterData.repairs.find(r => r.id === repairId);
+
+        let metalPrice = 0;
+        let customFee = 0;
+        let repairFee = 0;
+
+        if (metal) {
+            if (isReproduct) {
+                // Produksi ulang: kenakan biaya logam + jasa
+                metalPrice = metal.price_per_gram * weight;
+                customFee = metal.custom_fee;
+                document.getElementById(`${type}-material-price-preview`).textContent =
+                    `[Produksi Ulang] Logam: ${formatRupiah(metal.price_per_gram)}/gr | Jasa: ${formatRupiah(metal.custom_fee)}`;
+            } else {
+                // Repair biasa: TIDAK dikenakan biaya logam
+                metalPrice = 0;
+                customFee = 0;
+                document.getElementById(`${type}-material-price-preview`).textContent =
+                    `[Repair Biasa] Harga logam tidak dikenakan | Jasa: ${formatRupiah(metal.custom_fee)}/gr (info saja)`;
+            }
+        } else {
+            document.getElementById(`${type}-material-price-preview`).textContent = `Harga: Rp 0/gr | Jasa: Rp 0`;
+        }
+
+        if (repair) {
+            repairFee = repair.repair_fee;
+            document.getElementById(`${type}-repair-fee-preview`).textContent = `Biaya repair: ${formatRupiah(repair.repair_fee)}`;
+        } else {
+            document.getElementById(`${type}-repair-fee-preview`).textContent = `Biaya repair: Rp 0`;
+        }
+
+        price = metalPrice + customFee + repairFee;
+
+        // Populate calculators
+        document.getElementById(`calc-${type}-metal-cost`).textContent = isReproduct ? formatRupiah(metalPrice) : 'Rp 0 (Repair Biasa)';
+        document.getElementById(`calc-${type}-custom-fee`).textContent = isReproduct ? formatRupiah(customFee) : 'Rp 0 (Repair Biasa)';
+        document.getElementById(`calc-${type}-repair-fee`).textContent = formatRupiah(repairFee);
+        document.getElementById(`calc-${type}-subtotal`).textContent = formatRupiah(price);
+    } else {
+        document.getElementById(`calc-${type}-metal-cost`).textContent = 'Rp 0';
+        document.getElementById(`calc-${type}-custom-fee`).textContent = 'Rp 0';
+        document.getElementById(`calc-${type}-repair-fee`).textContent = 'Rp 0';
+        document.getElementById(`calc-${type}-subtotal`).textContent = 'Rp 0';
+    }
+
+    return price;
+}
+
 function calculateFormPricing() {
-    let cowokPrice = 0;
-    let cewekPrice = 0;
     let additionalPrice = 0;
     let shippingFee = 0;
 
     // 1. Ring Cowok Pricing
-    const cowokActive = document.getElementById('ring-cowok-active').checked;
-    const isReproductCowok = document.getElementById('cowok-is-reproduct')?.checked || false;
-    if (cowokActive) {
-        const materialId = document.getElementById('cowok-material').value;
-        const weight = parseFloat(document.getElementById('cowok-weight').value) || 0;
-        const repairId = document.getElementById('cowok-repair-type').value;
-
-        const metal = State.masterData.metals.find(m => m.id === materialId);
-        const repair = State.masterData.repairs.find(r => r.id === repairId);
-
-        let metalPrice = 0;
-        let customFee = 0;
-        let repairFee = 0;
-
-        if (metal) {
-            if (isReproductCowok) {
-                // Produksi ulang: kenakan biaya logam + jasa
-                metalPrice = metal.price_per_gram * weight;
-                customFee = metal.custom_fee;
-                document.getElementById('cowok-material-price-preview').textContent =
-                    `[Produksi Ulang] Logam: ${formatRupiah(metal.price_per_gram)}/gr | Jasa: ${formatRupiah(metal.custom_fee)}`;
-            } else {
-                // Repair biasa: TIDAK dikenakan biaya logam
-                metalPrice = 0;
-                customFee = 0;
-                document.getElementById('cowok-material-price-preview').textContent =
-                    `[Repair Biasa] Harga logam tidak dikenakan | Jasa: ${formatRupiah(metal.custom_fee)}/gr (info saja)`;
-            }
-        } else {
-            document.getElementById('cowok-material-price-preview').textContent = `Harga: Rp 0/gr | Jasa: Rp 0`;
-        }
-
-        if (repair) {
-            repairFee = repair.repair_fee;
-            document.getElementById('cowok-repair-fee-preview').textContent = `Biaya repair: ${formatRupiah(repair.repair_fee)}`;
-        } else {
-            document.getElementById('cowok-repair-fee-preview').textContent = `Biaya repair: Rp 0`;
-        }
-
-        cowokPrice = metalPrice + customFee + repairFee;
-
-        // Populate calculators
-        document.getElementById('calc-cowok-metal-cost').textContent = isReproductCowok ? formatRupiah(metalPrice) : 'Rp 0 (Repair Biasa)';
-        document.getElementById('calc-cowok-custom-fee').textContent = isReproductCowok ? formatRupiah(customFee) : 'Rp 0 (Repair Biasa)';
-        document.getElementById('calc-cowok-repair-fee').textContent = formatRupiah(repairFee);
-        document.getElementById('calc-cowok-subtotal').textContent = formatRupiah(cowokPrice);
-    } else {
-        document.getElementById('calc-cowok-metal-cost').textContent = 'Rp 0';
-        document.getElementById('calc-cowok-custom-fee').textContent = 'Rp 0';
-        document.getElementById('calc-cowok-repair-fee').textContent = 'Rp 0';
-        document.getElementById('calc-cowok-subtotal').textContent = 'Rp 0';
-    }
+    const cowokPrice = calculateRingPricing('cowok');
 
     // 2. Ring Cewek Pricing
-    const cewekActive = document.getElementById('ring-cewek-active').checked;
-    const isReproductCewek = document.getElementById('cewek-is-reproduct')?.checked || false;
-    if (cewekActive) {
-        const materialId = document.getElementById('cewek-material').value;
-        const weight = parseFloat(document.getElementById('cewek-weight').value) || 0;
-        const repairId = document.getElementById('cewek-repair-type').value;
-
-        const metal = State.masterData.metals.find(m => m.id === materialId);
-        const repair = State.masterData.repairs.find(r => r.id === repairId);
-
-        let metalPrice = 0;
-        let customFee = 0;
-        let repairFee = 0;
-
-        if (metal) {
-            if (isReproductCewek) {
-                // Produksi ulang: kenakan biaya logam + jasa
-                metalPrice = metal.price_per_gram * weight;
-                customFee = metal.custom_fee;
-                document.getElementById('cewek-material-price-preview').textContent =
-                    `[Produksi Ulang] Logam: ${formatRupiah(metal.price_per_gram)}/gr | Jasa: ${formatRupiah(metal.custom_fee)}`;
-            } else {
-                // Repair biasa: TIDAK dikenakan biaya logam
-                metalPrice = 0;
-                customFee = 0;
-                document.getElementById('cewek-material-price-preview').textContent =
-                    `[Repair Biasa] Harga logam tidak dikenakan | Jasa: ${formatRupiah(metal.custom_fee)}/gr (info saja)`;
-            }
-        } else {
-            document.getElementById('cewek-material-price-preview').textContent = `Harga: Rp 0/gr | Jasa: Rp 0`;
-        }
-
-        if (repair) {
-            repairFee = repair.repair_fee;
-            document.getElementById('cewek-repair-fee-preview').textContent = `Biaya repair: ${formatRupiah(repair.repair_fee)}`;
-        } else {
-            document.getElementById('cewek-repair-fee-preview').textContent = `Biaya repair: Rp 0`;
-        }
-
-        cewekPrice = metalPrice + customFee + repairFee;
-
-        // Populate calculators
-        document.getElementById('calc-cewek-metal-cost').textContent = isReproductCewek ? formatRupiah(metalPrice) : 'Rp 0 (Repair Biasa)';
-        document.getElementById('calc-cewek-custom-fee').textContent = isReproductCewek ? formatRupiah(customFee) : 'Rp 0 (Repair Biasa)';
-        document.getElementById('calc-cewek-repair-fee').textContent = formatRupiah(repairFee);
-        document.getElementById('calc-cewek-subtotal').textContent = formatRupiah(cewekPrice);
-    } else {
-        document.getElementById('calc-cewek-metal-cost').textContent = 'Rp 0';
-        document.getElementById('calc-cewek-custom-fee').textContent = 'Rp 0';
-        document.getElementById('calc-cewek-repair-fee').textContent = 'Rp 0';
-        document.getElementById('calc-cewek-subtotal').textContent = 'Rp 0';
-    }
+    const cewekPrice = calculateRingPricing('cewek');
 
     // 3. Additional Items pricing
     const rows = document.querySelectorAll('#tbody-additional-items tr');
@@ -905,8 +860,22 @@ async function getTransactionFromForm() {
         }
     });
 
-    const cowokActive = document.getElementById('ring-cowok-active').checked;
-    const cewekActive = document.getElementById('ring-cewek-active').checked;
+    const extractRingData = async (type, imgVar) => {
+        const active = document.getElementById(`ring-${type}-active`).checked;
+        return {
+            [`${type}_active`]: active ? 'TRUE' : 'FALSE',
+            [`${type}_material`]: active ? document.getElementById(`${type}-material`).value : '',
+            [`${type}_weight`]: active ? parseFloat(document.getElementById(`${type}-weight`).value) || 0 : 0,
+            [`${type}_size`]: active ? document.getElementById(`${type}-size`).value : '',
+            [`${type}_repair_type`]: active ? document.getElementById(`${type}-repair-type`).value : '',
+            [`${type}_engraving`]: active ? document.getElementById(`${type}-engraving`).value : '',
+            [`${type}_image_url`]: imgVar || (State.activeEditId ? await getEditImage(`${type}_image_url`) : ''),
+            [`${type}_notes`]: active ? document.getElementById(`${type}-notes`).value : ''
+        };
+    };
+
+    const cowokData = await extractRingData('cowok', cowokImg);
+    const cewekData = await extractRingData('cewek', cewekImg);
 
     // Formulate object
     const tx = {
@@ -919,23 +888,8 @@ async function getTransactionFromForm() {
         customer_address: document.getElementById('cust-address').value,
         customer_city: document.getElementById('cust-city').value,
 
-        cowok_active: cowokActive ? 'TRUE' : 'FALSE',
-        cowok_material: cowokActive ? document.getElementById('cowok-material').value : '',
-        cowok_weight: cowokActive ? parseFloat(document.getElementById('cowok-weight').value) || 0 : 0,
-        cowok_size: cowokActive ? document.getElementById('cowok-size').value : '',
-        cowok_repair_type: cowokActive ? document.getElementById('cowok-repair-type').value : '',
-        cowok_engraving: cowokActive ? document.getElementById('cowok-engraving').value : '',
-        cowok_image_url: cowokImg || (State.activeEditId ? await getEditImage('cowok_image_url') : ''),
-        cowok_notes: cowokActive ? document.getElementById('cowok-notes').value : '',
-
-        cewek_active: cewekActive ? 'TRUE' : 'FALSE',
-        cewek_material: cewekActive ? document.getElementById('cewek-material').value : '',
-        cewek_weight: cewekActive ? parseFloat(document.getElementById('cewek-weight').value) || 0 : 0,
-        cewek_size: cewekActive ? document.getElementById('cewek-size').value : '',
-        cewek_repair_type: cewekActive ? document.getElementById('cewek-repair-type').value : '',
-        cewek_engraving: cewekActive ? document.getElementById('cewek-engraving').value : '',
-        cewek_image_url: cewekImg || (State.activeEditId ? await getEditImage('cewek_image_url') : ''),
-        cewek_notes: cewekActive ? document.getElementById('cewek-notes').value : '',
+        ...cowokData,
+        ...cewekData,
 
         additional_items_json: JSON.stringify(additionalItems),
 
@@ -1031,37 +985,24 @@ async function populateFormForEdit(tx) {
     document.getElementById('cust-address').value = tx.customer_address;
     document.getElementById('cust-city').value = tx.customer_city;
 
-    // Rings cowok
-    const cowokActive = tx.cowok_active === 'TRUE';
-    document.getElementById('ring-cowok-active').checked = cowokActive;
-    toggleRingCardActive('cowok', cowokActive);
-    if (cowokActive) {
-        document.getElementById('cowok-material').value = tx.cowok_material;
-        document.getElementById('cowok-weight').value = tx.cowok_weight;
-        document.getElementById('cowok-size').value = tx.cowok_size;
-        document.getElementById('cowok-repair-type').value = tx.cowok_repair_type;
-        document.getElementById('cowok-engraving').value = tx.cowok_engraving;
-        document.getElementById('cowok-notes').value = tx.cowok_notes;
-        setUploadPreview('cowok-image-preview', tx.cowok_image_url, 'cincin cowok');
-    } else {
-        resetRingCardFields('cowok');
-    }
+    const populateRingEdit = (type, active) => {
+        document.getElementById(`ring-${type}-active`).checked = active;
+        toggleRingCardActive(type, active);
+        if (active) {
+            document.getElementById(`${type}-material`).value = tx[`${type}_material`];
+            document.getElementById(`${type}-weight`).value = tx[`${type}_weight`];
+            document.getElementById(`${type}-size`).value = tx[`${type}_size`];
+            document.getElementById(`${type}-repair-type`).value = tx[`${type}_repair_type`];
+            document.getElementById(`${type}-engraving`).value = tx[`${type}_engraving`];
+            document.getElementById(`${type}-notes`).value = tx[`${type}_notes`];
+            setUploadPreview(`${type}-image-preview`, tx[`${type}_image_url`], `cincin ${type}`);
+        } else {
+            resetRingCardFields(type);
+        }
+    };
 
-    // Rings cewek
-    const cewekActive = tx.cewek_active === 'TRUE';
-    document.getElementById('ring-cewek-active').checked = cewekActive;
-    toggleRingCardActive('cewek', cewekActive);
-    if (cewekActive) {
-        document.getElementById('cewek-material').value = tx.cewek_material;
-        document.getElementById('cewek-weight').value = tx.cewek_weight;
-        document.getElementById('cewek-size').value = tx.cewek_size;
-        document.getElementById('cewek-repair-type').value = tx.cewek_repair_type;
-        document.getElementById('cewek-engraving').value = tx.cewek_engraving;
-        document.getElementById('cewek-notes').value = tx.cewek_notes;
-        setUploadPreview('cewek-image-preview', tx.cewek_image_url, 'cincin cewek');
-    } else {
-        resetRingCardFields('cewek');
-    }
+    populateRingEdit('cowok', tx.cowok_active === 'TRUE');
+    populateRingEdit('cewek', tx.cewek_active === 'TRUE');
 
     // Additional items
     document.getElementById('tbody-additional-items').innerHTML = '';
