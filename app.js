@@ -89,7 +89,10 @@ function initDatabase() {
                 { name: 'master_formulas', key: 'id' },
                 { name: 'master_bundlingrules', key: 'id' },
                 { name: 'master_packaginginventory', key: 'id' },
-                { name: 'master_rawmaterials', key: 'id' }
+                { name: 'master_rawmaterials', key: 'id' },
+                { name: 'master_processedmetals', key: 'id' },
+                { name: 'master_meltingjobs', key: 'id' },
+                { name: 'master_productionjobs', key: 'id' }
             ];
 
             masterStores.forEach((store) => {
@@ -451,7 +454,10 @@ async function pullDataFromServer() {
                 master_formulas: data.formulas,
                 master_bundlingrules: data.bundlingrules,
                 master_packaginginventory: data.packaginginventory,
-                master_rawmaterials: data.rawmaterials
+                master_rawmaterials: data.rawmaterials,
+                master_processedmetals: data.processedmetals,
+                master_meltingjobs: data.meltingjobs,
+                master_productionjobs: data.productionjobs
             };
 
             for (const storeName in masterStores) {
@@ -509,6 +515,9 @@ async function loadAllMasterDataToCache() {
         State.masterData.bundlingrules = await getLocalData('master_bundlingrules');
         State.masterData.packaginginventory = await getLocalData('master_packaginginventory');
         State.masterData.rawmaterials = await getLocalData('master_rawmaterials');
+        State.masterData.processedmetals = await getLocalData('master_processedmetals');
+        State.masterData.meltingjobs = await getLocalData('master_meltingjobs');
+        State.masterData.productionjobs = await getLocalData('master_productionjobs');
     } catch (e) {
         console.error('Gagal membaca master cache: ', e);
     }
@@ -3036,7 +3045,10 @@ async function renderAdminPanels() {
     await loadAdminTable('formulas', 'master_formulas', ['id', 'metal_id', 'raw_material_id', 'percentage']);
     await loadAdminTable('bundles', 'master_bundlingrules', ['id', 'ring_type', 'packaging_id', 'qty']);
     await loadAdminTable('packaging', 'master_packaginginventory', ['id', 'name', 'stock_qty']);
-    await loadAdminTable('rawmaterials', 'master_rawmaterials', ['id', 'name', 'stock_gram']);
+    await loadAdminTable('rawmaterials', 'master_rawmaterials', ['id', 'name', 'stock_gram', 'price_per_gram']);
+    
+    // Processed Metals (Half-finished) Inventory
+    await loadAdminTable('processedmetals', 'master_processedmetals', ['id', 'metal_id', 'type', 'stock_gram', 'average_cost_per_gram']);
 }
 
 async function loadAdminTable(panelSuffix, storeName, keys) {
@@ -3096,6 +3108,37 @@ async function executeAdminDelete(storeName, key) {
         showToast('Data master berhasil dihapus!', 'success');
         await refreshAllData();
     }
+}
+
+function generateNewId(storeName) {
+    let rawStoreName = storeName.replace('master_', '');
+    if (!State.masterData[rawStoreName]) return '';
+    const records = State.masterData[rawStoreName];
+    
+    let prefix = '';
+    if (storeName === 'master_catalog') prefix = 'CAT-';
+    else if (storeName === 'master_metals') prefix = 'MET-';
+    else if (storeName === 'master_repairs') prefix = 'REP-SRV-';
+    else if (storeName === 'master_workshops') prefix = 'WKS-';
+    else if (storeName === 'master_cities') prefix = 'CIT-';
+    else if (storeName === 'master_payments') prefix = 'PAY-';
+    else if (storeName === 'master_formulas') prefix = 'FRM-';
+    else if (storeName === 'master_bundlingrules') prefix = 'BND-';
+    else if (storeName === 'master_packaginginventory') prefix = 'PKG-';
+    else if (storeName === 'master_rawmaterials') prefix = 'RAW-';
+    else return '';
+
+    if (!records || records.length === 0) return prefix + '001';
+    
+    let maxNum = 0;
+    records.forEach(r => {
+        if (r.id && r.id.startsWith(prefix)) {
+            const numPart = parseInt(r.id.replace(prefix, ''), 10);
+            if (!isNaN(numPart) && numPart > maxNum) maxNum = numPart;
+        }
+    });
+    
+    return prefix + String(maxNum + 1).padStart(3, '0');
 }
 
 // Renders CRUD Inputs dynamically based on which table is open
@@ -3165,7 +3208,7 @@ async function showCRUDModal(storeName, key = null, type = 'ADD') {
         fields = `
             <div class="form-group">
                 <label for="c-cat-id">ID Katalog</label>
-                <input type="text" id="c-cat-id" placeholder="E.g., CAT-007" value="${record ? record.id : ''}" ${record ? 'readonly class="readonly-input"' : ''} required>
+                <input type="text" id="c-cat-id" placeholder="E.g., CAT-007" value="${record ? record.id : generateNewId(storeName)}" readonly class="readonly-input" required>
             </div>
             <div class="form-group">
                 <label for="c-cat-name">Nama Layanan / Barang</label>
@@ -3193,7 +3236,7 @@ async function showCRUDModal(storeName, key = null, type = 'ADD') {
         fields = `
             <div class="form-group">
                 <label for="c-met-id">ID Bahan</label>
-                <input type="text" id="c-met-id" placeholder="E.g., MET-006" value="${record ? record.id : ''}" ${record ? 'readonly class="readonly-input"' : ''} required>
+                <input type="text" id="c-met-id" placeholder="E.g., MET-006" value="${record ? record.id : generateNewId(storeName)}" readonly class="readonly-input" required>
             </div>
             <div class="form-group">
                 <label for="c-met-name">Nama Bahan & Kadar Logam</label>
@@ -3210,6 +3253,9 @@ async function showCRUDModal(storeName, key = null, type = 'ADD') {
             <div class="form-group">
                 <label for="c-met-modal">Harga Modal per Gram (Rp)</label>
                 <input type="number" id="c-met-modal" value="${record ? record.modal_per_gram : ''}" required>
+                <button type="button" id="btn-calc-metal-modal" class="premium-btn btn-sec font-compact" style="margin-top: 10px; width: 100%; border-radius: 6px;">
+                    <i class="fa-solid fa-calculator"></i> Hitung Modal dari Resep Formulasi
+                </button>
             </div>
         `;
     }
@@ -3218,7 +3264,7 @@ async function showCRUDModal(storeName, key = null, type = 'ADD') {
         fields = `
             <div class="form-group">
                 <label for="c-rep-id">ID Repair</label>
-                <input type="text" id="c-rep-id" placeholder="E.g., REP-007" value="${record ? record.id : ''}" ${record ? 'readonly class="readonly-input"' : ''} required>
+                <input type="text" id="c-rep-id" placeholder="E.g., REP-007" value="${record ? record.id : generateNewId(storeName)}" readonly class="readonly-input" required>
             </div>
             <div class="form-group">
                 <label for="c-rep-name">Nama / Deskripsi Jenis Repair</label>
@@ -3235,7 +3281,7 @@ async function showCRUDModal(storeName, key = null, type = 'ADD') {
         fields = `
             <div class="form-group">
                 <label for="c-wks-id">ID Workshop</label>
-                <input type="text" id="c-wks-id" placeholder="E.g., WKS-003" value="${record ? record.id : ''}" ${record ? 'readonly class="readonly-input"' : ''} required>
+                <input type="text" id="c-wks-id" placeholder="E.g., WKS-003" value="${record ? record.id : generateNewId(storeName)}" readonly class="readonly-input" required>
             </div>
             <div class="form-group">
                 <label for="c-wks-name">Nama Workshop / Mitra Pengrajin</label>
@@ -3264,7 +3310,7 @@ async function showCRUDModal(storeName, key = null, type = 'ADD') {
         fields = `
             <div class="form-group">
                 <label for="c-city-id">ID Kabupaten/Kota</label>
-                <input type="text" id="c-city-id" placeholder="E.g., CIT-010" value="${record ? record.id : ''}" ${record ? 'readonly class="readonly-input"' : ''} required>
+                <input type="text" id="c-city-id" placeholder="E.g., CIT-010" value="${record ? record.id : generateNewId(storeName)}" readonly class="readonly-input" required>
             </div>
             <div class="form-group">
                 <label for="c-city-name">Kabupaten / Kota</label>
@@ -3285,7 +3331,7 @@ async function showCRUDModal(storeName, key = null, type = 'ADD') {
         fields = `
             <div class="form-group">
                 <label for="c-pay-id">ID Pembayaran</label>
-                <input type="text" id="c-pay-id" placeholder="E.g., PAY-005" value="${record ? record.id : ''}" ${record ? 'readonly class="readonly-input"' : ''} required>
+                <input type="text" id="c-pay-id" placeholder="E.g., PAY-005" value="${record ? record.id : generateNewId(storeName)}" readonly class="readonly-input" required>
             </div>
             <div class="form-group">
                 <label for="c-pay-name">Metode Pembayaran</label>
@@ -3298,7 +3344,7 @@ async function showCRUDModal(storeName, key = null, type = 'ADD') {
         fields = `
             <div class="form-group">
                 <label for="c-frm-id">ID Resep Formulasi</label>
-                <input type="text" id="c-frm-id" placeholder="E.g., FRM-001" value="${record ? record.id : ''}" ${record ? 'readonly class="readonly-input"' : ''} required>
+                <input type="text" id="c-frm-id" placeholder="E.g., FRM-001" value="${record ? record.id : generateNewId(storeName)}" readonly class="readonly-input" required>
             </div>
             <div class="form-group">
                 <label for="c-frm-met">ID Logam / Kadar Utama</label>
@@ -3319,7 +3365,7 @@ async function showCRUDModal(storeName, key = null, type = 'ADD') {
         fields = `
             <div class="form-group">
                 <label for="c-bnd-id">ID Aturan Bundling</label>
-                <input type="text" id="c-bnd-id" placeholder="E.g., BND-001" value="${record ? record.id : ''}" ${record ? 'readonly class="readonly-input"' : ''} required>
+                <input type="text" id="c-bnd-id" placeholder="E.g., BND-001" value="${record ? record.id : generateNewId(storeName)}" readonly class="readonly-input" required>
             </div>
             <div class="form-group">
                 <label for="c-bnd-type">Tipe Cincin (Single / Couple)</label>
@@ -3343,7 +3389,7 @@ async function showCRUDModal(storeName, key = null, type = 'ADD') {
         fields = `
             <div class="form-group">
                 <label for="c-pkg-id">ID Packaging</label>
-                <input type="text" id="c-pkg-id" placeholder="E.g., PKG-001" value="${record ? record.id : ''}" ${record ? 'readonly class="readonly-input"' : ''} required>
+                <input type="text" id="c-pkg-id" placeholder="E.g., PKG-001" value="${record ? record.id : generateNewId(storeName)}" readonly class="readonly-input" required>
             </div>
             <div class="form-group">
                 <label for="c-pkg-name">Nama Item Packaging</label>
@@ -3360,7 +3406,7 @@ async function showCRUDModal(storeName, key = null, type = 'ADD') {
         fields = `
             <div class="form-group">
                 <label for="c-raw-id">ID Bahan Mentah</label>
-                <input type="text" id="c-raw-id" placeholder="E.g., RAW-001" value="${record ? record.id : ''}" ${record ? 'readonly class="readonly-input"' : ''} required>
+                <input type="text" id="c-raw-id" placeholder="E.g., RAW-001" value="${record ? record.id : generateNewId(storeName)}" readonly class="readonly-input" required>
             </div>
             <div class="form-group">
                 <label for="c-raw-name">Nama Logam Murni / Alloy</label>
@@ -3370,11 +3416,50 @@ async function showCRUDModal(storeName, key = null, type = 'ADD') {
                 <label for="c-raw-stk">Stok Logam Tersedia (Gram)</label>
                 <input type="number" id="c-raw-stk" step="0.01" value="${record ? record.stock_gram : ''}" required>
             </div>
+            <div class="form-group">
+                <label for="c-raw-prc">Harga Pasar per Gram (Rp)</label>
+                <input type="number" id="c-raw-prc" step="1" value="${record ? record.price_per_gram : ''}" required>
+            </div>
         `;
     }
 
     document.getElementById('crud-modal-title').textContent = `${type === 'EDIT' ? 'Ubah' : 'Tambah'} Data Master`;
     crudForm.innerHTML = fields;
+
+    if (storeName === 'master_metals') {
+        const btnCalc = document.getElementById('btn-calc-metal-modal');
+        if (btnCalc) {
+            btnCalc.addEventListener('click', () => {
+                const metalId = document.getElementById('c-met-id').value.trim();
+                if (!metalId) {
+                    showToast('Harap isi ID Bahan terlebih dahulu!', 'error');
+                    return;
+                }
+                const formulas = State.masterData.formulas || [];
+                const rawMaterials = State.masterData.rawmaterials || [];
+                const recipes = formulas.filter(f => f.metal_id === metalId);
+                
+                if (recipes.length === 0) {
+                    showToast('Belum ada resep formulasi untuk ID Bahan ini. Tambahkan di tab Resep Formulasi terlebih dahulu.', 'warning');
+                    return;
+                }
+                
+                let totalModal = 0;
+                let calculationDetail = [];
+                recipes.forEach(recipe => {
+                    const raw = rawMaterials.find(r => r.id === recipe.raw_material_id);
+                    if (raw && recipe.percentage) {
+                        const cost = (raw.price_per_gram * (recipe.percentage / 100));
+                        totalModal += cost;
+                        calculationDetail.push(`${raw.name} (${recipe.percentage}%)`);
+                    }
+                });
+                
+                document.getElementById('c-met-modal').value = Math.round(totalModal);
+                showToast('Kalkulasi berhasil: ' + calculationDetail.join(' + '), 'success');
+            });
+        }
+    }
 
     // Attach details in modal element datasets
     const modal = document.getElementById('crud-modal');
@@ -3473,7 +3558,8 @@ async function executeCRUDSubmit() {
         payloadObj = {
             id: document.getElementById('c-raw-id').value.trim(),
             name: document.getElementById('c-raw-name').value.trim(),
-            stock_gram: parseFloat(document.getElementById('c-raw-stk').value) || 0
+            stock_gram: parseFloat(document.getElementById('c-raw-stk').value) || 0,
+            price_per_gram: parseFloat(document.getElementById('c-raw-prc').value) || 0
         };
     }
 
@@ -5157,3 +5243,390 @@ function insertMention(username) {
 
     closeMentionDropdown();
 }
+
+// ==========================================================================
+// 12. MELTING JOB (SPK PELEBURAN) CONTROLLER
+// ==========================================================================
+
+function showMeltingJobModal() {
+    const modal = document.getElementById('melting-job-modal');
+    const select = document.getElementById('melt-metal-id');
+    const display = document.getElementById('melt-formula-display');
+    const inputGroup = document.getElementById('melt-input-group');
+    const calcBreakdown = document.getElementById('melt-calc-breakdown');
+    
+    // Reset Form
+    select.innerHTML = '<option value="">Pilih Logam...</option>';
+    document.getElementById('melt-target-weight').value = '';
+    document.getElementById('melt-yield-weight').value = '';
+    display.classList.add('hidden');
+    inputGroup.classList.add('hidden');
+    calcBreakdown.classList.add('hidden');
+
+    // Populate Select based on available Formulas
+    if (!State.masterData.formulas || !State.masterData.metals) {
+        showToast('Data master belum siap. Pastikan Anda online.', 'warning');
+        return;
+    }
+    
+    // Get unique metal IDs from formulas
+    const metalIdsWithFormula = [...new Set(State.masterData.formulas.map(f => f.metal_id))];
+    
+    metalIdsWithFormula.forEach(mId => {
+        const metal = State.masterData.metals.find(m => m.id === mId);
+        if (metal) {
+            const option = document.createElement('option');
+            option.value = mId;
+            option.textContent = `${metal.name} (${mId})`;
+            select.appendChild(option);
+        }
+    });
+
+    modal.classList.remove('hidden');
+}
+
+document.getElementById('btn-modal-melting-close')?.addEventListener('click', () => {
+    document.getElementById('melting-job-modal').classList.add('hidden');
+});
+document.getElementById('btn-cancel-melting')?.addEventListener('click', () => {
+    document.getElementById('melting-job-modal').classList.add('hidden');
+});
+
+// Handle Metal Selection
+document.getElementById('melt-metal-id')?.addEventListener('change', (e) => {
+    const mId = e.target.value;
+    const display = document.getElementById('melt-formula-display');
+    const list = document.getElementById('melt-recipe-list');
+    const inputGroup = document.getElementById('melt-input-group');
+    const calcBreakdown = document.getElementById('melt-calc-breakdown');
+    
+    if (!mId) {
+        display.classList.add('hidden');
+        inputGroup.classList.add('hidden');
+        calcBreakdown.classList.add('hidden');
+        return;
+    }
+    
+    const recipes = State.masterData.formulas.filter(f => f.metal_id === mId);
+    list.innerHTML = '';
+    recipes.forEach(r => {
+        const raw = State.masterData.rawmaterials.find(rw => rw.id === r.raw_material_id);
+        const li = document.createElement('li');
+        li.textContent = `${raw ? raw.name : r.raw_material_id} - ${r.percentage}%`;
+        list.appendChild(li);
+    });
+    
+    display.classList.remove('hidden');
+    inputGroup.classList.remove('hidden');
+    
+    // Trigger calc if weight already filled
+    calculateMeltingCost();
+});
+
+// Handle Weight Input
+document.getElementById('melt-target-weight')?.addEventListener('input', calculateMeltingCost);
+document.getElementById('melt-yield-weight')?.addEventListener('input', calculateMeltingCost);
+
+function calculateMeltingCost() {
+    const mId = document.getElementById('melt-metal-id').value;
+    const targetWeight = parseFloat(document.getElementById('melt-target-weight').value) || 0;
+    const yieldWeight = parseFloat(document.getElementById('melt-yield-weight').value) || 0;
+    
+    const calcBreakdown = document.getElementById('melt-calc-breakdown');
+    const reqList = document.getElementById('melt-req-list');
+    
+    if (!mId || targetWeight <= 0) {
+        calcBreakdown.classList.add('hidden');
+        return;
+    }
+    
+    const recipes = State.masterData.formulas.filter(f => f.metal_id === mId);
+    let totalCost = 0;
+    let reqHtml = '';
+    
+    recipes.forEach(r => {
+        const raw = State.masterData.rawmaterials.find(rw => rw.id === r.raw_material_id);
+        if (raw) {
+            const neededGram = targetWeight * (r.percentage / 100);
+            const cost = neededGram * raw.price_per_gram;
+            totalCost += cost;
+            
+            const warn = neededGram > raw.stock_gram ? `<span style="color:red; font-size:11px;">(Stok Kurang!)</span>` : '';
+            reqHtml += `<div style="display:flex; justify-content:space-between; border-bottom:1px solid rgba(0,0,0,0.05); padding: 4px 0;">
+                <span>${raw.name} <strong style="color:var(--primary-color)">${neededGram.toFixed(2)} gr</strong> ${warn}</span>
+                <span>Rp ${Math.round(cost).toLocaleString('id-ID')}</span>
+            </div>`;
+        }
+    });
+    
+    reqList.innerHTML = reqHtml;
+    document.getElementById('melt-total-cost').textContent = `Rp ${Math.round(totalCost).toLocaleString('id-ID')}`;
+    
+    if (yieldWeight > 0) {
+        const shrinkage = targetWeight - yieldWeight;
+        const hpp = totalCost / yieldWeight;
+        
+        document.getElementById('melt-shrinkage').textContent = `${shrinkage.toFixed(2)} gr`;
+        document.getElementById('melt-final-hpp').textContent = `Rp ${Math.round(hpp).toLocaleString('id-ID')} / gr`;
+    } else {
+        document.getElementById('melt-shrinkage').textContent = '0 gr';
+        document.getElementById('melt-final-hpp').textContent = 'Rp 0 / gr';
+    }
+    
+    calcBreakdown.classList.remove('hidden');
+}
+
+// Handle Save Melting Job
+document.getElementById('btn-save-melting')?.addEventListener('click', async () => {
+    const mId = document.getElementById('melt-metal-id').value;
+    const targetWeight = parseFloat(document.getElementById('melt-target-weight').value) || 0;
+    const yieldWeight = parseFloat(document.getElementById('melt-yield-weight').value) || 0;
+    
+    if (!mId || targetWeight <= 0 || yieldWeight <= 0) {
+        showToast('Harap lengkapi semua data formulir peleburan!', 'warning');
+        return;
+    }
+    
+    if (yieldWeight > targetWeight) {
+        showToast('Hasil timbangan tidak mungkin lebih besar dari total bahan masuk!', 'error');
+        return;
+    }
+
+    const recipes = State.masterData.formulas.filter(f => f.metal_id === mId);
+    let totalCost = 0;
+    let inputRawJson = [];
+    let hasShortage = false;
+
+    recipes.forEach(r => {
+        const raw = State.masterData.rawmaterials.find(rw => rw.id === r.raw_material_id);
+        if (raw) {
+            const neededGram = targetWeight * (r.percentage / 100);
+            if (neededGram > raw.stock_gram) hasShortage = true;
+            
+            const cost = neededGram * raw.price_per_gram;
+            totalCost += cost;
+            inputRawJson.push({
+                raw_id: raw.id,
+                name: raw.name,
+                gram: neededGram,
+                cost: cost
+            });
+        }
+    });
+
+    if (hasShortage) {
+        showToast('Gagal! Stok salah satu bahan murni tidak mencukupi untuk SPK ini.', 'error');
+        return;
+    }
+
+    const jobId = 'MLT-' + new Date().getTime(); // Temporary ID, backend can overwrite or keep
+    const costPerGram = totalCost / yieldWeight;
+
+    const payload = {
+        id: jobId,
+        date: new Date().toISOString(),
+        metal_id: mId,
+        input_raw_json: JSON.stringify(inputRawJson),
+        total_input_cost: totalCost,
+        yield_gram: yieldWeight,
+        shrinkage_gram: targetWeight - yieldWeight,
+        cost_per_gram: costPerGram,
+        recorded_by: State.currentUser.username
+    };
+
+    // Push to Sync Queue
+    const syncItem = {
+        action: 'SAVE_MELTING_JOB',
+        payload: payload,
+        timestamp: new Date().getTime()
+    };
+    
+    await saveLocalData('sync_queue', syncItem);
+    document.getElementById('melting-job-modal').classList.add('hidden');
+    
+    showToast('SPK Peleburan berhasil dicatat! Menunggu sinkronisasi...', 'success');
+    runBackgroundSync();
+});
+
+// ==========================================================================
+// 13. PRODUCTION JOB (SPK TUKANG) CONTROLLER
+// ==========================================================================
+
+function showProductionJobModal() {
+    const modal = document.getElementById('production-job-modal');
+    const wsSelect = document.getElementById('prod-workshop-id');
+    const metalSelect = document.getElementById('prod-metal-id');
+    
+    // Reset Form
+    wsSelect.innerHTML = '<option value="">Pilih Workshop...</option>';
+    metalSelect.innerHTML = '<option value="">Pilih Logam...</option>';
+    document.getElementById('prod-initial-weight').value = '';
+    document.getElementById('prod-final-weight').value = '';
+    document.getElementById('prod-scrap-weight').value = '';
+    document.getElementById('prod-dust-weight').value = '';
+    document.getElementById('prod-loss-breakdown').classList.add('hidden');
+    document.getElementById('btn-save-prod').disabled = true;
+
+    if (!State.masterData.workshops || !State.masterData.metals) {
+        showToast('Data master belum siap. Pastikan Anda online.', 'warning');
+        return;
+    }
+    
+    // Populate Workshops
+    State.masterData.workshops.forEach(ws => {
+        const option = document.createElement('option');
+        option.value = ws.id;
+        option.textContent = ws.name;
+        wsSelect.appendChild(option);
+    });
+
+    // Populate Metals that have Solid/Lempeng stock
+    let validMetals = new Set();
+    if (State.masterData.processedmetals) {
+        State.masterData.processedmetals.forEach(pm => {
+            if (pm.type === 'Solid/Lempeng' && pm.stock_gram > 0) validMetals.add(pm.metal_id);
+        });
+    }
+
+    validMetals.forEach(mId => {
+        const metal = State.masterData.metals.find(m => m.id === mId);
+        if (metal) {
+            const option = document.createElement('option');
+            option.value = mId;
+            option.textContent = metal.name;
+            metalSelect.appendChild(option);
+        }
+    });
+
+    modal.classList.remove('hidden');
+}
+
+document.getElementById('btn-modal-prod-close')?.addEventListener('click', () => {
+    document.getElementById('production-job-modal').classList.add('hidden');
+});
+document.getElementById('btn-cancel-prod')?.addEventListener('click', () => {
+    document.getElementById('production-job-modal').classList.add('hidden');
+});
+
+// Real-time calculation listener
+const prodInputs = ['prod-initial-weight', 'prod-final-weight', 'prod-scrap-weight', 'prod-dust-weight'];
+prodInputs.forEach(id => {
+    document.getElementById(id)?.addEventListener('input', calculateProductionLoss);
+});
+
+function calculateProductionLoss() {
+    const initial = parseFloat(document.getElementById('prod-initial-weight').value) || 0;
+    const final = parseFloat(document.getElementById('prod-final-weight').value) || 0;
+    const scrap = parseFloat(document.getElementById('prod-scrap-weight').value) || 0;
+    const dust = parseFloat(document.getElementById('prod-dust-weight').value) || 0;
+    
+    const breakdown = document.getElementById('prod-loss-breakdown');
+    const btnSave = document.getElementById('btn-save-prod');
+    
+    if (initial <= 0 || (final === 0 && scrap === 0 && dust === 0)) {
+        breakdown.classList.add('hidden');
+        btnSave.disabled = true;
+        return;
+    }
+    
+    const totalReturned = final + scrap + dust;
+    const loss = initial - totalReturned;
+    const lossPercentage = (loss / initial) * 100;
+    
+    document.getElementById('prod-total-returned').textContent = `${totalReturned.toFixed(2)} gr`;
+    
+    const lossEl = document.getElementById('prod-loss-weight');
+    lossEl.textContent = `${loss.toFixed(2)} gr (${lossPercentage.toFixed(2)}%)`;
+    
+    const alertFraud = document.getElementById('prod-fraud-alert');
+    const alertSafe = document.getElementById('prod-safe-alert');
+    
+    if (loss < 0) {
+        lossEl.style.color = 'var(--red)';
+        lossEl.textContent = `Error: Hasil pengembalian lebih besar dari modal awal!`;
+        alertFraud.classList.add('hidden');
+        alertSafe.classList.add('hidden');
+        btnSave.disabled = true;
+    } else {
+        breakdown.classList.remove('hidden');
+        btnSave.disabled = false;
+        
+        // STANDARD TOLERANCE: 4%
+        if (lossPercentage > 4.0) {
+            lossEl.style.color = 'var(--red)';
+            alertFraud.classList.remove('hidden');
+            alertSafe.classList.add('hidden');
+            // Attach penalty info to button state if needed
+            btnSave.dataset.penalty = 'true';
+        } else {
+            lossEl.style.color = 'var(--green)';
+            alertFraud.classList.add('hidden');
+            alertSafe.classList.remove('hidden');
+            btnSave.dataset.penalty = 'false';
+        }
+    }
+}
+
+document.getElementById('btn-save-prod')?.addEventListener('click', async () => {
+    const wsId = document.getElementById('prod-workshop-id').value;
+    const mId = document.getElementById('prod-metal-id').value;
+    const initial = parseFloat(document.getElementById('prod-initial-weight').value) || 0;
+    const final = parseFloat(document.getElementById('prod-final-weight').value) || 0;
+    const scrap = parseFloat(document.getElementById('prod-scrap-weight').value) || 0;
+    const dust = parseFloat(document.getElementById('prod-dust-weight').value) || 0;
+    const penaltyApplied = document.getElementById('btn-save-prod').dataset.penalty === 'true';
+    
+    if (!wsId || !mId || initial <= 0) {
+        showToast('Mohon lengkapi Workshop, Logam, dan Berat Awal!', 'warning');
+        return;
+    }
+    
+    // Check if initial stock is sufficient
+    let currentStock = 0;
+    if (State.masterData.processedmetals) {
+        const pm = State.masterData.processedmetals.find(p => p.metal_id === mId && p.type === 'Solid/Lempeng');
+        if (pm) currentStock = pm.stock_gram;
+    }
+    
+    if (initial > currentStock) {
+        showToast(`Stok Lempeng tidak cukup! Tersedia: ${currentStock} gr`, 'error');
+        return;
+    }
+
+    const loss = initial - (final + scrap + dust);
+    const lossPct = (loss / initial) * 100;
+    const jobId = 'PRD-' + new Date().getTime();
+    
+    const payload = {
+        id: jobId,
+        date: new Date().toISOString(),
+        workshop_id: wsId,
+        metal_id: mId,
+        initial_gram: initial,
+        final_gram: final,
+        scrap_gram: scrap,
+        dust_gram: dust,
+        loss_gram: loss,
+        loss_percentage: lossPct,
+        status: penaltyApplied ? 'PENALTY' : 'CLEARED',
+        penalty_applied: penaltyApplied,
+        recorded_by: State.currentUser.username
+    };
+
+    const syncItem = {
+        action: 'SAVE_PRODUCTION_JOB',
+        payload: payload,
+        timestamp: new Date().getTime()
+    };
+    
+    await saveLocalData('sync_queue', syncItem);
+    document.getElementById('production-job-modal').classList.add('hidden');
+    
+    if (penaltyApplied) {
+        showToast('SPK Tersimpan dengan peringatan! Penalti pemotongan gaji dicatat.', 'warning');
+    } else {
+        showToast('Serah terima SPK Produksi berhasil.', 'success');
+    }
+    
+    runBackgroundSync();
+});

@@ -1285,16 +1285,30 @@
                             <!-- Sub-tab 2: Inventory -->
                             <div class="admin-tab-pane" id="tab-logistic-inventory">
                                 <div class="admin-pane-header">
-                                    <h3>Manajemen Inventory & Stok</h3>
-                                    <button class="premium-btn btn-sec font-compact">
-                                        <i class="fa-solid fa-plus"></i> Tambah Item Stok
-                                    </button>
+                                    <h3>Gudang Logam Olahan (Stok Setengah Jadi)</h3>
+                                    <div style="display: flex; gap: 8px;">
+                                        <button class="premium-btn btn-sec font-compact" onclick="showMeltingJobModal()">
+                                            <i class="fa-solid fa-fire-burner"></i> Catat SPK Peleburan
+                                        </button>
+                                        <button class="premium-btn font-compact" onclick="showProductionJobModal()">
+                                            <i class="fa-solid fa-hammer"></i> Catat SPK Produksi (Tukang)
+                                        </button>
+                                    </div>
                                 </div>
-                                <div class="premium-card">
-                                    <p style="color: var(--text-muted); font-size: 14px">
-                                        Panel inventaris stok bahan baku, packaging, dan perlengkapan sedang dalam
-                                        pengembangan (Under Construction).
-                                    </p>
+                                <div class="premium-card" style="padding: 0; overflow-x: auto">
+                                    <table class="premium-table font-compact" id="table-admin-processedmetals">
+                                        <thead>
+                                            <tr>
+                                                <th>ID Logam Olahan</th>
+                                                <th>Nama / Kadar Logam</th>
+                                                <th>Tipe Stok</th>
+                                                <th>Stok Tersedia (Gram)</th>
+                                                <th>HPP Rata-rata (Rp/gr)</th>
+                                                <th style="width: 130px; text-align: center">Aksi</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody></tbody>
+                                    </table>
                                 </div>
                             </div>
 
@@ -1333,6 +1347,7 @@
                                             <th>ID Bahan Mentah</th>
                                             <th>Nama Logam Murni / Alloy</th>
                                             <th>Stok Tersedia (Gram)</th>
+                                            <th>Harga Pasar (Rp/gr)</th>
                                             <th style="width: 130px; text-align: center">Aksi</th>
                                         </tr>
                                     </thead>
@@ -2448,6 +2463,149 @@
             <span class="lightbox-close" id="btn-close-lightbox">&times;</span>
             <img class="lightbox-content" id="lightbox-img" />
             <div class="lightbox-caption" id="lightbox-caption">Bukti Pembayaran</div>
+        </div>
+
+        <!-- 7. MELTING JOB (SPK PELEBURAN) MODAL -->
+        <div id="melting-job-modal" class="premium-modal hidden">
+            <div class="modal-content" style="max-width: 600px;">
+                <div class="modal-header">
+                    <h2 id="melting-modal-title"><i class="fa-solid fa-fire-burner"></i> Form SPK Peleburan Logam</h2>
+                    <span class="close" id="btn-modal-melting-close">&times;</span>
+                </div>
+                <div class="modal-body" id="melting-form-fields" style="max-height: 70vh; overflow-y: auto; padding-right: 10px;">
+                    <p style="font-size: 13px; color: var(--text-muted); margin-bottom: 15px;">
+                        Pilih Resep Formulasi (Bahan Setengah Jadi) yang akan dibuat. Sistem otomatis mengambil persentase bahan murni dan mengalkulasi harga modal (HPP) berdasarkan Harga Pasar murni saat ini.
+                    </p>
+                    <div class="form-group">
+                        <label for="melt-metal-id">Pilih Resep Logam Olahan</label>
+                        <select id="melt-metal-id" required>
+                            <option value="">Pilih Logam...</option>
+                        </select>
+                    </div>
+                    <div id="melt-formula-display" style="font-size: 13px; color: var(--primary-color); margin-bottom: 15px; background: rgba(197, 168, 92, 0.1); padding: 10px; border-radius: 6px;" class="hidden">
+                        <strong>Komposisi Resep:</strong>
+                        <ul id="melt-recipe-list" style="margin: 5px 0; padding-left: 20px;"></ul>
+                    </div>
+                    
+                    <div class="form-group" id="melt-input-group" class="hidden">
+                        <label for="melt-target-weight">Total Target Logam Masuk (Gram)</label>
+                        <input type="number" id="melt-target-weight" step="0.01" placeholder="Contoh: 100" required>
+                        <small style="color: var(--text-muted);">Sistem akan otomatis menghitung proporsi berat dan modal bahan murni yang dibutuhkan.</small>
+                    </div>
+                    
+                    <div id="melt-calc-breakdown" style="font-size: 12.5px; border-top: 1px dashed var(--border-color); padding-top: 15px; margin-top: 10px;" class="hidden">
+                        <strong>Rincian Kebutuhan Logam Murni & Estimasi Modal:</strong>
+                        <div id="melt-req-list" style="margin-top: 5px; margin-bottom: 15px;"></div>
+                        
+                        <div class="form-group">
+                            <label for="melt-yield-weight">Timbangan Aktual Logam Olahan (Gram)</label>
+                            <input type="number" id="melt-yield-weight" step="0.01" placeholder="Berat akhir setelah dilebur (mengurangi susut)" required>
+                        </div>
+                        
+                        <div style="background-color: var(--card-bg); padding: 15px; border-radius: 8px; border: 1px solid var(--border-color);">
+                            <div style="display: flex; justify-content: space-between; margin-bottom: 5px;">
+                                <span>Total Modal Logam:</span>
+                                <strong id="melt-total-cost">Rp 0</strong>
+                            </div>
+                            <div style="display: flex; justify-content: space-between; margin-bottom: 5px; color: var(--red);">
+                                <span>Susut Lebur / Penguapan:</span>
+                                <strong id="melt-shrinkage">0 gr</strong>
+                            </div>
+                            <div style="display: flex; justify-content: space-between; font-size: 16px; margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--border-color);">
+                                <span>HPP Logam Olahan Aktual:</span>
+                                <strong id="melt-final-hpp" style="color: var(--primary-color);">Rp 0 / gr</strong>
+                            </div>
+                        </div>
+                    </div>
+
+                </div>
+                <div class="modal-footer">
+                    <button class="premium-btn btn-sec" id="btn-cancel-melting">Batal</button>
+                    <button class="premium-btn" id="btn-save-melting">
+                        <i class="fa-solid fa-floppy-disk"></i> Proses Peleburan
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- 8. PRODUCTION JOB (SPK TUKANG) MODAL -->
+        <div id="production-job-modal" class="premium-modal hidden">
+            <div class="modal-content" style="max-width: 600px;">
+                <div class="modal-header">
+                    <h2 id="production-modal-title"><i class="fa-solid fa-hammer"></i> Serah Terima SPK Produksi</h2>
+                    <span class="close" id="btn-modal-prod-close">&times;</span>
+                </div>
+                <div class="modal-body" style="max-height: 70vh; overflow-y: auto; padding-right: 10px;">
+                    <p style="font-size: 13px; color: var(--text-muted); margin-bottom: 15px;">
+                        Input rincian timbangan logam setelah pengrajin selesai memproses pesanan. Sistem mendeteksi otomatis batas toleransi susut.
+                    </p>
+                    
+                    <div class="form-group" style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
+                        <div>
+                            <label>Pengrajin (Workshop)</label>
+                            <select id="prod-workshop-id" required>
+                                <option value="">Pilih Workshop...</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label>Logam Olahan (Bahan Keluar)</label>
+                            <select id="prod-metal-id" required>
+                                <option value="">Pilih Logam...</option>
+                            </select>
+                        </div>
+                    </div>
+                    
+                    <div style="background: rgba(0,0,0,0.02); padding: 15px; border-radius: 8px; margin-bottom: 15px;">
+                        <div class="form-group">
+                            <label>Berat Total Logam Awal Diserahkan (Gram)</label>
+                            <input type="number" id="prod-initial-weight" step="0.01" placeholder="Contoh: 50.00" required>
+                        </div>
+                    </div>
+                    
+                    <div style="background: rgba(197, 168, 92, 0.05); border: 1px dashed var(--primary-color); padding: 15px; border-radius: 8px; margin-bottom: 15px;">
+                        <h4 style="margin-top:0; margin-bottom:10px; color: var(--primary-color);">Timbangan Pengembalian</h4>
+                        
+                        <div class="form-group">
+                            <label>1. Timbangan Barang Jadi (Cincin)</label>
+                            <input type="number" id="prod-final-weight" step="0.01" placeholder="Total berat cincin utuh" required>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label>2. Timbangan Scrap Bersih (Potongan Utuh)</label>
+                            <input type="number" id="prod-scrap-weight" step="0.01" placeholder="Berat lempeng/potongan yang kembali" required>
+                        </div>
+                        
+                        <div class="form-group" style="margin-bottom:0;">
+                            <label>3. Timbangan Serbuk Kotor (Sweeping)</label>
+                            <input type="number" id="prod-dust-weight" step="0.01" placeholder="Berat debu kotor/gergajian" required>
+                        </div>
+                    </div>
+                    
+                    <div id="prod-loss-breakdown" class="hidden" style="background-color: var(--card-bg); padding: 15px; border-radius: 8px; border: 1px solid var(--border-color);">
+                        <div style="display: flex; justify-content: space-between; margin-bottom: 5px;">
+                            <span>Total Kembali (Jadi + Scrap + Serbuk):</span>
+                            <strong id="prod-total-returned">0 gr</strong>
+                        </div>
+                        <div style="display: flex; justify-content: space-between; font-size: 16px; margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--border-color);">
+                            <span>Susut Menguap (Loss):</span>
+                            <strong id="prod-loss-weight" style="color: var(--text-color);">0 gr (0%)</strong>
+                        </div>
+                        <div id="prod-fraud-alert" class="hidden" style="margin-top: 10px; padding: 10px; background-color: rgba(231,76,60,0.1); border-left: 3px solid var(--red); color: var(--red); font-size: 13px;">
+                            <i class="fa-solid fa-triangle-exclamation"></i> <strong>Peringatan!</strong> Toleransi susut logam melebihi batas 4%. Transaksi akan diberi penalti denda tukang otomatis.
+                        </div>
+                        <div id="prod-safe-alert" class="hidden" style="margin-top: 10px; padding: 10px; background-color: rgba(46,204,113,0.1); border-left: 3px solid var(--green); color: var(--green); font-size: 13px;">
+                            <i class="fa-solid fa-check"></i> Susut normal dan dapat diterima.
+                        </div>
+                    </div>
+
+                </div>
+                <div class="modal-footer">
+                    <button class="premium-btn btn-sec" id="btn-cancel-prod">Batal</button>
+                    <button class="premium-btn" id="btn-save-prod" disabled>
+                        <i class="fa-solid fa-floppy-disk"></i> Validasi & Simpan
+                    </button>
+                </div>
+            </div>
         </div>
 
         <!-- Core App Logic Script -->
