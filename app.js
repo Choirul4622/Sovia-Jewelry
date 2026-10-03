@@ -443,7 +443,7 @@ function getSingleLocalData(storeName, key) {
 async function pullDataFromServer() {
     if (!navigator.onLine || !CONFIG.GAS_API_URL) return;
     try {
-        const response = await fetch(CONFIG.GAS_API_URL);
+        const response = await fetch(CONFIG.GAS_API_URL + '?t=' + Date.now());
         const result = await response.json();
         if (result && result.status === 'success') {
             const data = result.data;
