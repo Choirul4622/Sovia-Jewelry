@@ -17,14 +17,21 @@ const State = {
         repairs: [],
         workshops: [],
         cities: [],
-        payments: []
+        payments: [],
+        formulas: [],
+        bundlingrules: [],
+        packaginginventory: [],
+        rawmaterials: [],
+        processedmetals: [],
+        meltingjobs: [],
+        productionjobs: []
     }
 };
 
 // --- CONFIGURATIONS ---
 const CONFIG = {
     DB_NAME: 'SoviaRepairDB',
-    DB_VERSION: 2,
+    DB_VERSION: 3,
     // Google Apps Script Deploy URL
     GAS_API_URL:
         'https://script.google.com/macros/s/AKfycbwaJsUPiuxnwVt2Rn_ALJrkUK8aaWwu7E5Z2F7cKkc8s5kuDCyiuif-PKs3dkUY1GJEvw/exec'
@@ -3072,15 +3079,19 @@ async function loadAdminTable(panelSuffix, storeName, keys) {
 
         // Target ID for key operations
         const idVal = item[keys[0]]; // usually the primary key is first key
-
-        cellsHtml += `
-            <td>
-                <div class="action-buttons-flex">
-                    <button class="action-btn-circle btn-admin-edit" data-store="${storeName}" data-id="${idVal}" title="Edit"><i class="fa-solid fa-pen-to-square"></i></button>
-                    <button class="action-btn-circle trash btn-admin-delete" data-store="${storeName}" data-id="${idVal}" title="Hapus"><i class="fa-regular fa-trash-can"></i></button>
-                </div>
-            </td>
-        `;
+        
+        if (!['master_processedmetals', 'master_meltingjobs', 'master_productionjobs'].includes(storeName)) {
+            cellsHtml += `
+                <td>
+                    <div class="action-buttons-flex">
+                        <button class="action-btn-circle btn-admin-edit" data-store="${storeName}" data-id="${idVal}" title="Edit"><i class="fa-solid fa-pen-to-square"></i></button>
+                        <button class="action-btn-circle trash btn-admin-delete" data-store="${storeName}" data-id="${idVal}" title="Hapus"><i class="fa-regular fa-trash-can"></i></button>
+                    </div>
+                </td>
+            `;
+        } else {
+            cellsHtml += `<td style="text-align:center; color:var(--text-muted); font-size: 11px;"><i>Otomatis</i></td>`;
+        }
         tr.innerHTML = cellsHtml;
         tbody.appendChild(tr);
     });
