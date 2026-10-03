@@ -2940,8 +2940,10 @@ async function pushDataToGAS(action, payload) {
                 }
             }
             return true;
+        } else {
+            console.error('Google Apps Script Backend Error: ', result ? result.message : 'Unknown error');
+            return false;
         }
-        return false;
     } catch (e) {
         console.error('GAS Push Fail: ', e);
         return false;
