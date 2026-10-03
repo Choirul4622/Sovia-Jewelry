@@ -1467,11 +1467,11 @@
                                     <div style="display: flex; gap: 15px; flex-wrap: wrap;">
                                         <div id="sd-render-cowok-container" style="text-align: center; display: none;">
                                             <div style="font-size: 11px; font-weight: 600; margin-bottom: 4px; color: var(--text-muted);">Render Cowok</div>
-                                            <img id="sd-render-cowok-img" src="" class="img-thumbnail-link" alt="Render Cowok" style="width: 60px; height: 60px; border-radius: var(--border-radius-sm); border: 1px solid var(--border-color); object-fit: cover; cursor: pointer;">
+                                            <img id="sd-render-cowok-img" class="img-thumbnail-link" alt="Render Cowok" style="width: 60px; height: 60px; border-radius: var(--border-radius-sm); border: 1px solid var(--border-color); object-fit: cover; cursor: pointer;">
                                         </div>
                                         <div id="sd-render-cewek-container" style="text-align: center; display: none;">
                                             <div style="font-size: 11px; font-weight: 600; margin-bottom: 4px; color: var(--text-muted);">Render Cewek</div>
-                                            <img id="sd-render-cewek-img" src="" class="img-thumbnail-link" alt="Render Cewek" style="width: 60px; height: 60px; border-radius: var(--border-radius-sm); border: 1px solid var(--border-color); object-fit: cover; cursor: pointer;">
+                                            <img id="sd-render-cewek-img" class="img-thumbnail-link" alt="Render Cewek" style="width: 60px; height: 60px; border-radius: var(--border-radius-sm); border: 1px solid var(--border-color); object-fit: cover; cursor: pointer;">
                                         </div>
                                     </div>
                                     
@@ -1499,7 +1499,7 @@
                             <div id="sd-realpict-block" class="hidden" style="background: var(--card-bg-dark); padding: 10px; border-radius: var(--border-radius-sm); border: 1px solid var(--border-color);">
                                 <strong>Preview Fisik Realpict Cincin:</strong>
                                 <div style="display: flex; gap: 10px; align-items: center; margin-top: 8px;">
-                                    <img id="sd-realpict-img" src="" class="img-thumbnail-link" alt="Fisik Cincin" style="width: 60px; height: 60px;">
+                                    <img id="sd-realpict-img" class="img-thumbnail-link" alt="Fisik Cincin" style="width: 60px; height: 60px;">
                                     <div style="flex: 1;">
                                         <div style="margin-bottom: 6px;">Status: <span id="sd-realpict-approval-badge">-</span></div>
                                         <div id="sd-realpict-actions" class="hidden" style="display: flex; gap: 5px;">
@@ -1557,7 +1557,7 @@
                         </div>
                         <div style="text-align: right;">
                             <strong>Bukti Refund:</strong><br>
-                            <img id="sd-refund-receipt-img" src="" class="img-thumbnail-link" alt="Bukti Refund" style="width: 50px; height: 50px; margin-top: 5px;">
+                            <img id="sd-refund-receipt-img" class="img-thumbnail-link" alt="Bukti Refund" style="width: 50px; height: 50px; margin-top: 5px;">
                         </div>
                     </div>
 
@@ -1629,28 +1629,11 @@
     <!-- 6. IMAGE LIGHTBOX OVERLAY MODAL -->
     <div id="image-lightbox-modal" class="lightbox-modal">
         <span class="lightbox-close" id="btn-close-lightbox">&times;</span>
-        <img class="lightbox-content" id="lightbox-img" src="">
+        <img class="lightbox-content" id="lightbox-img">
         <div class="lightbox-caption" id="lightbox-caption">Bukti Pembayaran</div>
     </div>
 
-    <!-- 7. PRINT INDIVIDUAL LOGISTIC MODAL -->
-    <div id="print-modal" class="modal-overlay hidden" style="z-index:9999;">
-        <div class="modal-card" style="max-width:680px; width:95%;">
-            <div class="modal-header">
-                <h2><i class="fa-solid fa-file-invoice"></i> Preview Surat Jalan & Label</h2>
-                <button class="modal-close-btn" onclick="document.getElementById('print-modal').classList.add('hidden')">&times;</button>
-            </div>
-            <div class="modal-body" style="max-height:70vh;overflow-y:auto;">
-                <div id="print-receipt-body" style="background:#fff;color:#000;padding:16px;border-radius:var(--border-radius-sm);">
-                    <!-- Print content injected by printIndividualLogistic() -->
-                </div>
-            </div>
-            <div class="modal-footer">
-                <button class="premium-btn btn-sec" onclick="document.getElementById('print-modal').classList.add('hidden')">Tutup</button>
-                <button class="premium-btn" onclick="printReceiptContent()"><i class="fa-solid fa-print"></i> Cetak Sekarang</button>
-            </div>
-        </div>
-    </div>
+
 
     <!-- Core App Logic Script -->
     <script src="app.js" defer></script>
