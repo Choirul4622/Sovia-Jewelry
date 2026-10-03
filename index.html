@@ -1301,30 +1301,43 @@
                             <!-- Sub-tab 3: Warehouse -->
                             <div class="admin-tab-pane" id="tab-logistic-warehouse">
                                 <div class="admin-pane-header">
-                                    <h3>Gudang Logistik (Warehouse)</h3>
+                                    <h3>Gudang Logistik & Stok Packaging</h3>
+                                    <button class="premium-btn btn-sec font-compact btn-admin-add" data-type="packaging">
+                                        <i class="fa-solid fa-plus"></i> Tambah Item Packaging
+                                    </button>
                                 </div>
-                                <div class="premium-card">
-                                    <p style="color: var(--text-muted); font-size: 14px">
-                                        Pemantauan penyimpanan produk, denah brankas, dan status gudang (Under
-                                        Construction).
-                                    </p>
-                                </div>
+                                <table class="premium-table font-compact" id="table-admin-packaging">
+                                    <thead>
+                                        <tr>
+                                            <th>ID Item</th>
+                                            <th>Nama Item Packaging / Kelengkapan</th>
+                                            <th>Stok Tersedia (Pcs)</th>
+                                            <th style="width: 130px; text-align: center">Aksi</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody></tbody>
+                                </table>
                             </div>
 
                             <!-- Sub-tab 4: Procurement -->
                             <div class="admin-tab-pane" id="tab-logistic-procurement">
                                 <div class="admin-pane-header">
-                                    <h3>Pengadaan Barang (Procurement)</h3>
-                                    <button class="premium-btn btn-sec font-compact">
-                                        <i class="fa-solid fa-plus"></i> Request Pembelian
+                                    <h3>Pengadaan Barang & Logam Murni (Procurement)</h3>
+                                    <button class="premium-btn btn-sec font-compact btn-admin-add" data-type="rawmaterial">
+                                        <i class="fa-solid fa-plus"></i> Request / Tambah Bahan
                                     </button>
                                 </div>
-                                <div class="premium-card">
-                                    <p style="color: var(--text-muted); font-size: 14px">
-                                        Daftar pengajuan pengadaan barang (Purchase Order) dan pembelian kebutuhan
-                                        operasional (Under Construction).
-                                    </p>
-                                </div>
+                                <table class="premium-table font-compact" id="table-admin-rawmaterials">
+                                    <thead>
+                                        <tr>
+                                            <th>ID Bahan Mentah</th>
+                                            <th>Nama Logam Murni / Alloy</th>
+                                            <th>Stok Tersedia (Gram)</th>
+                                            <th style="width: 130px; text-align: center">Aksi</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody></tbody>
+                                </table>
                             </div>
                         </div>
                     </div>
@@ -1453,6 +1466,8 @@
                             <button class="admin-tab-btn" data-tab="tab-workshops">Pengrajin & Workshop</button>
                             <button class="admin-tab-btn" data-tab="tab-cities">Kab/Kota Pengiriman</button>
                             <button class="admin-tab-btn" data-tab="tab-payments">Sistem Pembayaran</button>
+                            <button class="admin-tab-btn" data-tab="tab-formulas">Resep Formulasi</button>
+                            <button class="admin-tab-btn" data-tab="tab-bundles">Aturan Bundling</button>
                         </div>
 
                         <!-- Admin Sub-Panel Containers -->
@@ -1468,8 +1483,7 @@
                                 <table class="premium-table font-compact" id="table-admin-users">
                                     <thead>
                                         <tr>
-                                            <th>ID</th>
-                                            <th>Username</th>
+                                            <th>Username (ID)</th>
                                             <th>Role Akses</th>
                                             <th>Kode Store</th>
                                             <th style="width: 130px; text-align: center">Aksi</th>
@@ -1627,6 +1641,50 @@
                                         <tr>
                                             <th>ID</th>
                                             <th>Metode Pembayaran</th>
+                                            <th style="width: 130px; text-align: center">Aksi</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody></tbody>
+                                </table>
+                            </div>
+
+                            <!-- Sub-tab 9: Formulas -->
+                            <div class="admin-tab-pane" id="tab-formulas">
+                                <div class="admin-pane-header">
+                                    <h3>Resep & Formulasi Komposisi Logam</h3>
+                                    <button class="premium-btn btn-sec font-compact btn-admin-add" data-type="formula">
+                                        <i class="fa-solid fa-plus"></i> Tambah Resep
+                                    </button>
+                                </div>
+                                <table class="premium-table font-compact" id="table-admin-formulas">
+                                    <thead>
+                                        <tr>
+                                            <th>ID Resep</th>
+                                            <th>ID Logam (Kadar)</th>
+                                            <th>ID Bahan Mentah</th>
+                                            <th>Persentase Rasio (%)</th>
+                                            <th style="width: 130px; text-align: center">Aksi</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody></tbody>
+                                </table>
+                            </div>
+
+                            <!-- Sub-tab 10: Bundles -->
+                            <div class="admin-tab-pane" id="tab-bundles">
+                                <div class="admin-pane-header">
+                                    <h3>Aturan Bundling Packaging Produk</h3>
+                                    <button class="premium-btn btn-sec font-compact btn-admin-add" data-type="bundle">
+                                        <i class="fa-solid fa-plus"></i> Tambah Aturan
+                                    </button>
+                                </div>
+                                <table class="premium-table font-compact" id="table-admin-bundles">
+                                    <thead>
+                                        <tr>
+                                            <th>ID Aturan</th>
+                                            <th>Tipe Cincin</th>
+                                            <th>ID Packaging (Katalog)</th>
+                                            <th>Kuantitas (Pcs)</th>
                                             <th style="width: 130px; text-align: center">Aksi</th>
                                         </tr>
                                     </thead>

@@ -85,7 +85,11 @@ function initDatabase() {
                 { name: 'master_repairs', key: 'id' },
                 { name: 'master_workshops', key: 'id' },
                 { name: 'master_cities', key: 'id' },
-                { name: 'master_payments', key: 'id' }
+                { name: 'master_payments', key: 'id' },
+                { name: 'master_formulas', key: 'id' },
+                { name: 'master_bundlingrules', key: 'id' },
+                { name: 'master_packaginginventory', key: 'id' },
+                { name: 'master_rawmaterials', key: 'id' }
             ];
 
             masterStores.forEach((store) => {
@@ -443,7 +447,11 @@ async function pullDataFromServer() {
                 master_repairs: data.repairs,
                 master_workshops: data.workshops,
                 master_cities: data.cities,
-                master_payments: data.payments
+                master_payments: data.payments,
+                master_formulas: data.formulas,
+                master_bundlingrules: data.bundlingrules,
+                master_packaginginventory: data.packaginginventory,
+                master_rawmaterials: data.rawmaterials
             };
 
             for (const storeName in masterStores) {
@@ -497,6 +505,10 @@ async function loadAllMasterDataToCache() {
         State.masterData.workshops = await getLocalData('master_workshops');
         State.masterData.cities = await getLocalData('master_cities');
         State.masterData.payments = await getLocalData('master_payments');
+        State.masterData.formulas = await getLocalData('master_formulas');
+        State.masterData.bundlingrules = await getLocalData('master_bundlingrules');
+        State.masterData.packaginginventory = await getLocalData('master_packaginginventory');
+        State.masterData.rawmaterials = await getLocalData('master_rawmaterials');
     } catch (e) {
         console.error('Gagal membaca master cache: ', e);
     }
@@ -3006,12 +3018,25 @@ async function renderAdminPanels() {
     // Dynamic loading of admin lists
     await loadAdminTable('users', 'master_users', ['username', 'role', 'store_code']);
     await loadAdminTable('stores', 'master_stores', ['code', 'name', 'address', 'phone']);
-    await loadAdminTable('catalog', 'master_catalog', ['id', 'name', 'category', 'price']);
-    await loadAdminTable('metals', 'master_metals', ['id', 'name', 'price_per_gram', 'custom_fee']);
+    await loadAdminTable('catalog', 'master_catalog', ['id', 'name', 'category', 'price', 'modal_price']);
+    await loadAdminTable('metals', 'master_metals', ['id', 'name', 'price_per_gram', 'custom_fee', 'modal_per_gram']);
     await loadAdminTable('repairs', 'master_repairs', ['id', 'name', 'repair_fee']);
-    await loadAdminTable('workshops', 'master_workshops', ['id', 'name', 'phone', 'address']);
+    await loadAdminTable('workshops', 'master_workshops', [
+        'id',
+        'name',
+        'phone',
+        'address',
+        'modal_repair_cowok',
+        'modal_repair_cewek'
+    ]);
     await loadAdminTable('cities', 'master_cities', ['id', 'city', 'province', 'shipping_fee']);
     await loadAdminTable('payments', 'master_payments', ['id', 'name']);
+    
+    // New ERP Expansion tables
+    await loadAdminTable('formulas', 'master_formulas', ['id', 'metal_id', 'raw_material_id', 'percentage']);
+    await loadAdminTable('bundles', 'master_bundlingrules', ['id', 'ring_type', 'packaging_id', 'qty']);
+    await loadAdminTable('packaging', 'master_packaginginventory', ['id', 'name', 'stock_qty']);
+    await loadAdminTable('rawmaterials', 'master_rawmaterials', ['id', 'name', 'stock_gram']);
 }
 
 async function loadAdminTable(panelSuffix, storeName, keys) {
@@ -3157,6 +3182,10 @@ async function showCRUDModal(storeName, key = null, type = 'ADD') {
                 <label for="c-cat-price">Harga Layanan (Rp)</label>
                 <input type="number" id="c-cat-price" value="${record ? record.price : ''}" required>
             </div>
+            <div class="form-group">
+                <label for="c-cat-modal">Harga Modal HPP (Rp)</label>
+                <input type="number" id="c-cat-modal" value="${record ? record.modal_price : ''}" required>
+            </div>
         `;
     }
     // 4. Metals CRUD fields
@@ -3177,6 +3206,10 @@ async function showCRUDModal(storeName, key = null, type = 'ADD') {
             <div class="form-group">
                 <label for="c-met-fee">Biaya Pembuatan Jasa Custom (Rp)</label>
                 <input type="number" id="c-met-fee" value="${record ? record.custom_fee : ''}" required>
+            </div>
+            <div class="form-group">
+                <label for="c-met-modal">Harga Modal per Gram (Rp)</label>
+                <input type="number" id="c-met-modal" value="${record ? record.modal_per_gram : ''}" required>
             </div>
         `;
     }
@@ -3216,6 +3249,14 @@ async function showCRUDModal(storeName, key = null, type = 'ADD') {
                 <label for="c-wks-addr">Alamat Workshop</label>
                 <textarea id="c-wks-addr" required>${record ? record.address : ''}</textarea>
             </div>
+            <div class="form-group">
+                <label for="c-wks-modal-cwk">Modal Repair Cowok (Rp)</label>
+                <input type="number" id="c-wks-modal-cwk" value="${record ? record.modal_repair_cowok : ''}" required>
+            </div>
+            <div class="form-group">
+                <label for="c-wks-modal-cw">Modal Repair Cewek (Rp)</label>
+                <input type="number" id="c-wks-modal-cw" value="${record ? record.modal_repair_cewek : ''}" required>
+            </div>
         `;
     }
     // 7. Cities CRUD fields
@@ -3249,6 +3290,85 @@ async function showCRUDModal(storeName, key = null, type = 'ADD') {
             <div class="form-group">
                 <label for="c-pay-name">Metode Pembayaran</label>
                 <input type="text" id="c-pay-name" placeholder="E.g., BRI Transfer SOVIA" value="${record ? record.name : ''}" required>
+            </div>
+        `;
+    }
+    // 9. Formulas CRUD fields
+    else if (storeName === 'master_formulas') {
+        fields = `
+            <div class="form-group">
+                <label for="c-frm-id">ID Resep Formulasi</label>
+                <input type="text" id="c-frm-id" placeholder="E.g., FRM-001" value="${record ? record.id : ''}" ${record ? 'readonly class="readonly-input"' : ''} required>
+            </div>
+            <div class="form-group">
+                <label for="c-frm-met">ID Logam / Kadar Utama</label>
+                <input type="text" id="c-frm-met" placeholder="E.g., MET-001" value="${record ? record.metal_id : ''}" required>
+            </div>
+            <div class="form-group">
+                <label for="c-frm-raw">ID Bahan Mentah (Raw)</label>
+                <input type="text" id="c-frm-raw" placeholder="E.g., RAW-001" value="${record ? record.raw_material_id : ''}" required>
+            </div>
+            <div class="form-group">
+                <label for="c-frm-pct">Persentase (%)</label>
+                <input type="number" id="c-frm-pct" value="${record ? record.percentage : ''}" required>
+            </div>
+        `;
+    }
+    // 10. Bundling Rules CRUD fields
+    else if (storeName === 'master_bundlingrules') {
+        fields = `
+            <div class="form-group">
+                <label for="c-bnd-id">ID Aturan Bundling</label>
+                <input type="text" id="c-bnd-id" placeholder="E.g., BND-001" value="${record ? record.id : ''}" ${record ? 'readonly class="readonly-input"' : ''} required>
+            </div>
+            <div class="form-group">
+                <label for="c-bnd-type">Tipe Cincin (Single / Couple)</label>
+                <select id="c-bnd-type" required>
+                    <option value="Single" ${record && record.ring_type === 'Single' ? 'selected' : ''}>Single</option>
+                    <option value="Couple" ${record && record.ring_type === 'Couple' ? 'selected' : ''}>Couple</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label for="c-bnd-pkg">ID Packaging</label>
+                <input type="text" id="c-bnd-pkg" placeholder="E.g., PKG-001" value="${record ? record.packaging_id : ''}" required>
+            </div>
+            <div class="form-group">
+                <label for="c-bnd-qty">Kuantitas per Transaksi</label>
+                <input type="number" id="c-bnd-qty" value="${record ? record.qty : ''}" required>
+            </div>
+        `;
+    }
+    // 11. Packaging Inventory CRUD fields
+    else if (storeName === 'master_packaginginventory') {
+        fields = `
+            <div class="form-group">
+                <label for="c-pkg-id">ID Packaging</label>
+                <input type="text" id="c-pkg-id" placeholder="E.g., PKG-001" value="${record ? record.id : ''}" ${record ? 'readonly class="readonly-input"' : ''} required>
+            </div>
+            <div class="form-group">
+                <label for="c-pkg-name">Nama Item Packaging</label>
+                <input type="text" id="c-pkg-name" value="${record ? record.name : ''}" required>
+            </div>
+            <div class="form-group">
+                <label for="c-pkg-qty">Stok Kuantitas FIsik (Pcs)</label>
+                <input type="number" id="c-pkg-qty" value="${record ? record.stock_qty : ''}" required>
+            </div>
+        `;
+    }
+    // 12. Raw Materials CRUD fields
+    else if (storeName === 'master_rawmaterials') {
+        fields = `
+            <div class="form-group">
+                <label for="c-raw-id">ID Bahan Mentah</label>
+                <input type="text" id="c-raw-id" placeholder="E.g., RAW-001" value="${record ? record.id : ''}" ${record ? 'readonly class="readonly-input"' : ''} required>
+            </div>
+            <div class="form-group">
+                <label for="c-raw-name">Nama Logam Murni / Alloy</label>
+                <input type="text" id="c-raw-name" value="${record ? record.name : ''}" required>
+            </div>
+            <div class="form-group">
+                <label for="c-raw-stk">Stok Logam Tersedia (Gram)</label>
+                <input type="number" id="c-raw-stk" step="0.01" value="${record ? record.stock_gram : ''}" required>
             </div>
         `;
     }
@@ -3291,14 +3411,16 @@ async function executeCRUDSubmit() {
             id: document.getElementById('c-cat-id').value.trim(),
             name: document.getElementById('c-cat-name').value.trim(),
             category: document.getElementById('c-cat-cat').value,
-            price: parseFloat(document.getElementById('c-cat-price').value) || 0
+            price: parseFloat(document.getElementById('c-cat-price').value) || 0,
+            modal_price: parseFloat(document.getElementById('c-cat-modal').value) || 0
         };
     } else if (storeName === 'master_metals') {
         payloadObj = {
             id: document.getElementById('c-met-id').value.trim(),
             name: document.getElementById('c-met-name').value.trim(),
             price_per_gram: parseFloat(document.getElementById('c-met-price').value) || 0,
-            custom_fee: parseFloat(document.getElementById('c-met-fee').value) || 0
+            custom_fee: parseFloat(document.getElementById('c-met-fee').value) || 0,
+            modal_per_gram: parseFloat(document.getElementById('c-met-modal').value) || 0
         };
     } else if (storeName === 'master_repairs') {
         payloadObj = {
@@ -3311,7 +3433,9 @@ async function executeCRUDSubmit() {
             id: document.getElementById('c-wks-id').value.trim(),
             name: document.getElementById('c-wks-name').value.trim(),
             phone: document.getElementById('c-wks-phone').value.trim(),
-            address: document.getElementById('c-wks-addr').value.trim()
+            address: document.getElementById('c-wks-addr').value.trim(),
+            modal_repair_cowok: parseFloat(document.getElementById('c-wks-modal-cwk').value) || 0,
+            modal_repair_cewek: parseFloat(document.getElementById('c-wks-modal-cw').value) || 0
         };
     } else if (storeName === 'master_cities') {
         payloadObj = {
@@ -3324,6 +3448,32 @@ async function executeCRUDSubmit() {
         payloadObj = {
             id: document.getElementById('c-pay-id').value.trim(),
             name: document.getElementById('c-pay-name').value.trim()
+        };
+    } else if (storeName === 'master_formulas') {
+        payloadObj = {
+            id: document.getElementById('c-frm-id').value.trim(),
+            metal_id: document.getElementById('c-frm-met').value.trim(),
+            raw_material_id: document.getElementById('c-frm-raw').value.trim(),
+            percentage: parseFloat(document.getElementById('c-frm-pct').value) || 0
+        };
+    } else if (storeName === 'master_bundlingrules') {
+        payloadObj = {
+            id: document.getElementById('c-bnd-id').value.trim(),
+            ring_type: document.getElementById('c-bnd-type').value,
+            packaging_id: document.getElementById('c-bnd-pkg').value.trim(),
+            qty: parseFloat(document.getElementById('c-bnd-qty').value) || 0
+        };
+    } else if (storeName === 'master_packaginginventory') {
+        payloadObj = {
+            id: document.getElementById('c-pkg-id').value.trim(),
+            name: document.getElementById('c-pkg-name').value.trim(),
+            stock_qty: parseFloat(document.getElementById('c-pkg-qty').value) || 0
+        };
+    } else if (storeName === 'master_rawmaterials') {
+        payloadObj = {
+            id: document.getElementById('c-raw-id').value.trim(),
+            name: document.getElementById('c-raw-name').value.trim(),
+            stock_gram: parseFloat(document.getElementById('c-raw-stk').value) || 0
         };
     }
 
@@ -3777,6 +3927,10 @@ document.addEventListener('DOMContentLoaded', async () => {
             else if (type === 'workshop') store = 'master_workshops';
             else if (type === 'city') store = 'master_cities';
             else if (type === 'payment') store = 'master_payments';
+            else if (type === 'formula') store = 'master_formulas';
+            else if (type === 'bundle') store = 'master_bundlingrules';
+            else if (type === 'packaging') store = 'master_packaginginventory';
+            else if (type === 'rawmaterial') store = 'master_rawmaterials';
 
             showCRUDModal(store, null, 'ADD');
         });
