@@ -1131,8 +1131,17 @@
                             </p>
                         </div>
 
-                        <!-- V2: Sub-Table for Designer Rendering Assignments -->
-                        <div class="premium-card">
+                        <!-- Inner Navigation Sub-Tabs -->
+                        <div class="admin-tab-bar">
+                            <button class="admin-tab-btn active" data-tab="tab-prod-design">Desain & Render</button>
+                            <button class="admin-tab-btn" data-tab="tab-prod-workshop">Workshop (Pengrajin)</button>
+                            <button class="admin-tab-btn" data-tab="tab-prod-qa">Pemeriksaan (QA & QC)</button>
+                        </div>
+
+                        <div class="admin-tab-content">
+                            <!-- Sub-tab 1: Design -->
+                            <div class="admin-tab-pane active" id="tab-prod-design">
+                                <div class="premium-card">
                             <h3>Penugasan & Proses Desain Render</h3>
                             <p>
                                 Kelola alokasi desainer 3D dan proses upload render model 3D (untuk remake/produksi
@@ -1160,7 +1169,10 @@
                                 </table>
                             </div>
                         </div>
-
+                    </div>
+                    
+                    <!-- Sub-tab 2: Workshop -->
+                    <div class="admin-tab-pane" id="tab-prod-workshop">
                         <div class="premium-card">
                             <h3>Penugasan Pengrajin Cincin</h3>
                             <p>Kelola perbaikan cincin dan tentukan status pengerjaan fisik di bengkel/workshop.</p>
@@ -1187,7 +1199,10 @@
                                 </table>
                             </div>
                         </div>
-
+                    </div>
+                    
+                    <!-- Sub-tab 3: QA & QC -->
+                    <div class="admin-tab-pane" id="tab-prod-qa">
                         <!-- QA - Quality Assurance Panel -->
                         <div class="premium-card">
                             <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 8px">
@@ -1281,8 +1296,10 @@
                             </div>
                         </div>
                     </div>
+                </div>
+            </div>
 
-                    <!-- 5. LOGISTIC VIEW -->
+            <!-- 5. LOGISTIC VIEW -->
                     <div id="logistic-panel" class="app-panel">
                         <div class="panel-header-section">
                             <h1>Panel Pengiriman & Logistik</h1>
@@ -2504,14 +2521,22 @@
                     <h2><i class="fa-solid fa-scale-balanced"></i> Input Timbangan Akhir Produksi</h2>
                     <button class="modal-close-btn" id="btn-close-prod-complete-modal">&times;</button>
                 </div>
-                <div class="modal-body" style="max-height: 70vh; overflow-y: auto;">
+                <div class="modal-body" style="max-height: 70vh; overflow-y: auto">
                     <p style="font-size: 13px; color: var(--text-muted); margin-bottom: 15px">
                         Input timbangan pengembalian logam untuk menghitung susut (loss) otomatis dan harga final.
                     </p>
                     <input type="hidden" id="prod-complete-id" />
 
-                    <div style="background: rgba(197, 168, 92, 0.05); border: 1px solid var(--primary-color); padding: 15px; border-radius: 8px; margin-bottom: 15px;">
-                        <h4 style="margin-top:0; margin-bottom:10px;">1. Barang Jadi (Cincin)</h4>
+                    <div
+                        style="
+                            background: rgba(197, 168, 92, 0.05);
+                            border: 1px solid var(--primary-color);
+                            padding: 15px;
+                            border-radius: 8px;
+                            margin-bottom: 15px;
+                        "
+                    >
+                        <h4 style="margin-top: 0; margin-bottom: 10px">1. Barang Jadi (Cincin)</h4>
                         <div id="prod-complete-cowok-group" class="form-group hidden" style="margin-bottom: 10px">
                             <label for="prod-complete-cowok-weight">Berat Final Cincin Cowok (gram)</label>
                             <input
@@ -2532,8 +2557,10 @@
                         </div>
                     </div>
 
-                    <div style="background: rgba(0,0,0, 0.02); padding: 15px; border-radius: 8px; margin-bottom: 15px;">
-                        <h4 style="margin-top:0; margin-bottom:10px;">2. Sisa Potongan & Leburan</h4>
+                    <div
+                        style="background: rgba(0, 0, 0, 0.02); padding: 15px; border-radius: 8px; margin-bottom: 15px"
+                    >
+                        <h4 style="margin-top: 0; margin-bottom: 10px">2. Sisa Potongan & Leburan</h4>
                         <div class="form-group">
                             <label>Scrap Bersih (Potongan Utuh)</label>
                             <input
@@ -2544,7 +2571,7 @@
                                 value="0"
                             />
                         </div>
-                        <div class="form-group" style="margin-bottom:0">
+                        <div class="form-group" style="margin-bottom: 0">
                             <label>Serbuk Kotor (Sweeping)</label>
                             <input
                                 type="number"
@@ -2556,21 +2583,50 @@
                         </div>
                     </div>
 
-                    <div id="prod-complete-loss-breakdown" class="hidden" style="background:var(--bg-light); border:1px solid rgba(0,0,0,0.1); padding:10px; border-radius:8px;">
-                        <div style="display:flex; justify-content:space-between; margin-bottom:5px;">
+                    <div
+                        id="prod-complete-loss-breakdown"
+                        class="hidden"
+                        style="
+                            background: var(--bg-light);
+                            border: 1px solid rgba(0, 0, 0, 0.1);
+                            padding: 10px;
+                            border-radius: 8px;
+                        "
+                    >
+                        <div style="display: flex; justify-content: space-between; margin-bottom: 5px">
                             <span>Total Modal Awal:</span>
                             <strong id="prod-complete-initial-total">0.00 gr</strong>
                         </div>
-                        <div style="display:flex; justify-content:space-between; margin-bottom:5px;">
+                        <div style="display: flex; justify-content: space-between; margin-bottom: 5px">
                             <span>Total Pengembalian:</span>
                             <strong id="prod-complete-returned-total">0.00 gr</strong>
                         </div>
-                        <div style="display:flex; justify-content:space-between; font-weight:bold; border-top:1px solid #ddd; padding-top:5px;">
+                        <div
+                            style="
+                                display: flex;
+                                justify-content: space-between;
+                                font-weight: bold;
+                                border-top: 1px solid #ddd;
+                                padding-top: 5px;
+                            "
+                        >
                             <span>Susut (Loss):</span>
-                            <span id="prod-complete-loss-weight" style="color:var(--primary-color);">0.00 gr (0%)</span>
+                            <span id="prod-complete-loss-weight" style="color: var(--primary-color)">0.00 gr (0%)</span>
                         </div>
-                        <div id="prod-complete-fraud-alert" class="hidden" style="color:var(--red); font-size:12px; margin-top:10px;"><i class="fa-solid fa-triangle-exclamation"></i> Susut di atas toleransi 4% (Penalti).</div>
-                        <div id="prod-complete-safe-alert" class="hidden" style="color:var(--green); font-size:12px; margin-top:10px;"><i class="fa-solid fa-check-circle"></i> Susut normal (Aman).</div>
+                        <div
+                            id="prod-complete-fraud-alert"
+                            class="hidden"
+                            style="color: var(--red); font-size: 12px; margin-top: 10px"
+                        >
+                            <i class="fa-solid fa-triangle-exclamation"></i> Susut di atas toleransi 4% (Penalti).
+                        </div>
+                        <div
+                            id="prod-complete-safe-alert"
+                            class="hidden"
+                            style="color: var(--green); font-size: 12px; margin-top: 10px"
+                        >
+                            <i class="fa-solid fa-check-circle"></i> Susut normal (Aman).
+                        </div>
                     </div>
                 </div>
                 <div class="modal-footer">
