@@ -800,6 +800,7 @@ function calculateRingPricing(type) {
     if (active) {
         const materialId = document.getElementById(`${type}-material`).value;
         const weight = parseFloat(document.getElementById(`${type}-weight`).value) || 0;
+        const oldWeight = parseFloat(document.getElementById(`${type}-old-weight`).value) || 0;
         const repairId = document.getElementById(`${type}-repair-type`).value;
 
         const metal = State.masterData.metals.find((m) => m.id === materialId);
@@ -811,11 +812,12 @@ function calculateRingPricing(type) {
 
         if (metal) {
             if (isReproduct) {
-                // Produksi ulang: kenakan biaya logam + jasa
-                metalPrice = metal.price_per_gram * weight;
+                // Produksi ulang: kenakan biaya logam (untuk selisih kekurangan berat + 10% susut peleburan) + jasa full
+                const neededWeight = Math.max(0, weight - oldWeight + (oldWeight * 0.10));
+                metalPrice = metal.price_per_gram * neededWeight;
                 customFee = metal.custom_fee;
                 document.getElementById(`${type}-material-price-preview`).textContent =
-                    `[Produksi Ulang] Logam: ${formatRupiah(metal.price_per_gram)}/gr | Jasa: ${formatRupiah(metal.custom_fee)}`;
+                    `[Produksi Ulang] Logam Aktual: ${neededWeight.toFixed(2)} gr x ${formatRupiah(metal.price_per_gram)} | Jasa: ${formatRupiah(metal.custom_fee)}`;
             } else {
                 // Repair biasa: TIDAK dikenakan biaya logam
                 metalPrice = 0;
@@ -827,11 +829,12 @@ function calculateRingPricing(type) {
             document.getElementById(`${type}-material-price-preview`).textContent = `Harga: Rp 0/gr | Jasa: Rp 0`;
         }
 
-        if (repair) {
+        if (repair && !isReproduct) { // Jika reproduksi, biaya repair ditiadakan
             repairFee = repair.repair_fee;
             document.getElementById(`${type}-repair-fee-preview`).textContent =
                 `Biaya repair: ${formatRupiah(repair.repair_fee)}`;
         } else {
+            repairFee = 0;
             document.getElementById(`${type}-repair-fee-preview`).textContent = `Biaya repair: Rp 0`;
         }
 
@@ -3849,16 +3852,43 @@ document.addEventListener('DOMContentLoaded', async () => {
         'cowok-material',
         'cowok-weight',
         'cowok-repair-type',
+        'cowok-is-reproduct',
+        'cowok-old-weight',
         'cewek-material',
         'cewek-weight',
         'cewek-repair-type',
+        'cewek-is-reproduct',
+        'cewek-old-weight',
         'cust-city',
         'dp1-amount',
         'dp2-amount'
     ];
     calcSelectors.forEach((id) => {
-        document.getElementById(id).addEventListener('input', () => calculateFormPricing());
-        document.getElementById(id).addEventListener('change', () => calculateFormPricing());
+        const el = document.getElementById(id);
+        if(el) {
+            el.addEventListener('input', () => calculateFormPricing());
+            el.addEventListener('change', () => calculateFormPricing());
+        }
+    });
+
+    ['cowok', 'cewek'].forEach((type) => {
+        const cb = document.getElementById(`${type}-is-reproduct`);
+        if(cb) {
+            cb.addEventListener('change', (e) => {
+                const isRepro = e.target.checked;
+                const oldWeightGrp = document.getElementById(`${type}-old-weight-group`);
+                const repairTypeSelect = document.getElementById(`${type}-repair-type`);
+                
+                if(isRepro) {
+                    oldWeightGrp.classList.remove('hidden');
+                    repairTypeSelect.disabled = true;
+                    repairTypeSelect.value = '';
+                } else {
+                    oldWeightGrp.classList.add('hidden');
+                    repairTypeSelect.disabled = false;
+                }
+            });
+        }
     });
 
     document.getElementById('btn-add-item-row').addEventListener('click', () => {
