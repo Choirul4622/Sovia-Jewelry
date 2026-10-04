@@ -3747,10 +3747,7 @@ async function executeProductionAssignSubmit() {
                         recorded_by: State.currentUser.username
                     };
 
-                    await queueSyncTask('SAVE_MASTER_RECORD', {
-                        store_name: 'master_productionjobs',
-                        payload: payload
-                    });
+                    await queueSyncTask('SAVE_PRODUCTION_JOB', payload);
                     await saveLocalData('master_productionjobs', payload);
                 }
             }
@@ -6018,10 +6015,7 @@ async function executeProductionCompleteSubmit(repNum, cowokW, cewekW, scrap, du
             j.penalty_applied = penaltyApplied;
 
             await saveLocalData('master_productionjobs', j);
-            await queueSyncTask('SAVE_MASTER_RECORD', {
-                store_name: 'master_productionjobs',
-                payload: j
-            });
+            await queueSyncTask('UPDATE_PRODUCTION_JOB', j);
         }
     }
 
