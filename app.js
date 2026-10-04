@@ -1091,7 +1091,7 @@ async function populateFormForEdit(tx) {
             document.getElementById(`${type}-engraving`).value = tx[`${type}_engraving`];
             document.getElementById(`${type}-notes`).value = tx[`${type}_notes`];
 
-            const isRepro = tx[`${type}_is_reproduct`] === 'TRUE';
+            const isRepro = String(tx[`${type}_is_reproduct`]).toUpperCase() === 'TRUE';
             const cb = document.getElementById(`${type}-is-reproduct`);
             if (cb) {
                 cb.checked = isRepro;
@@ -1113,8 +1113,8 @@ async function populateFormForEdit(tx) {
         }
     };
 
-    populateRingEdit('cowok', tx.cowok_active === 'TRUE');
-    populateRingEdit('cewek', tx.cewek_active === 'TRUE');
+    populateRingEdit('cowok', String(tx.cowok_active).toUpperCase() === 'TRUE');
+    populateRingEdit('cewek', String(tx.cewek_active).toUpperCase() === 'TRUE');
 
     // Additional items
     document.getElementById('tbody-additional-items').innerHTML = '';
@@ -1689,7 +1689,7 @@ async function renderProductionBoard() {
         const cewekRep = State.masterData.repairs.find((r) => r.id === tx.cewek_repair_type);
 
         const cowokDesc =
-            tx.cowok_active === 'TRUE'
+            String(tx.cowok_active).toUpperCase() === 'TRUE'
                 ? `
             <div>${cowokMetal?.name || ''} (Sz: ${tx.cowok_size}) - ${cowokRep?.name || ''}</div>
             <div style="display:flex; gap:6px; margin-top:4px; flex-wrap:wrap;">
@@ -1701,7 +1701,7 @@ async function renderProductionBoard() {
                 : '<em>Nonaktif</em>';
 
         let cewekDesc =
-            tx.cewek_active === 'TRUE'
+            String(tx.cewek_active).toUpperCase() === 'TRUE'
                 ? `
             <div>${cewekMetal?.name || ''} (Sz: ${tx.cewek_size}) - ${cewekRep?.name || ''}</div>
             <div style="display:flex; gap:6px; margin-top:4px; flex-wrap:wrap;">
@@ -2240,8 +2240,8 @@ async function printIndividualLogistic(repairNum) {
             <table style="width:100%;border-collapse:collapse;border:1px solid #ddd;">
                 <thead><tr style="background:#f5f5f5;"><th style="border:1px solid #ddd;padding:6px;">No</th><th style="border:1px solid #ddd;padding:6px;">Deskripsi</th><th style="border:1px solid #ddd;padding:6px;">Berat Awal</th><th style="border:1px solid #ddd;padding:6px;">Berat Akhir</th></tr></thead>
                 <tbody>
-                    ${tx.cowok_active === 'TRUE' ? `<tr><td style="border:1px solid #ddd;padding:6px;text-align:center;">1</td><td style="border:1px solid #ddd;padding:6px;">Cincin Pria (${tx.cowok_size})</td><td style="border:1px solid #ddd;padding:6px;text-align:center;">${tx.cowok_weight}g</td><td style="border:1px solid #ddd;padding:6px;text-align:center;">${tx.cowok_weight_final || '-'}g</td></tr>` : ''}
-                    ${tx.cewek_active === 'TRUE' ? `<tr><td style="border:1px solid #ddd;padding:6px;text-align:center;">${tx.cowok_active === 'TRUE' ? '2' : '1'}</td><td style="border:1px solid #ddd;padding:6px;">Cincin Wanita (${tx.cewek_size})</td><td style="border:1px solid #ddd;padding:6px;text-align:center;">${tx.cewek_weight}g</td><td style="border:1px solid #ddd;padding:6px;text-align:center;">${tx.cewek_weight_final || '-'}g</td></tr>` : ''}
+                    ${String(tx.cowok_active).toUpperCase() === 'TRUE' ? `<tr><td style="border:1px solid #ddd;padding:6px;text-align:center;">1</td><td style="border:1px solid #ddd;padding:6px;">Cincin Pria (${tx.cowok_size})</td><td style="border:1px solid #ddd;padding:6px;text-align:center;">${tx.cowok_weight}g</td><td style="border:1px solid #ddd;padding:6px;text-align:center;">${tx.cowok_weight_final || '-'}g</td></tr>` : ''}
+                    ${String(tx.cewek_active).toUpperCase() === 'TRUE' ? `<tr><td style="border:1px solid #ddd;padding:6px;text-align:center;">${String(tx.cowok_active).toUpperCase() === 'TRUE' ? '2' : '1'}</td><td style="border:1px solid #ddd;padding:6px;">Cincin Wanita (${tx.cewek_size})</td><td style="border:1px solid #ddd;padding:6px;text-align:center;">${tx.cewek_weight}g</td><td style="border:1px solid #ddd;padding:6px;text-align:center;">${tx.cewek_weight_final || '-'}g</td></tr>` : ''}
                 </tbody>
             </table>
             <div style="margin-top:24px;border:1px solid #000;padding:12px;display:inline-block;min-width:220px;">
@@ -2283,7 +2283,7 @@ async function showProductionAssignModal(repairNum) {
     if (!tx) return;
 
     let cowokReproFields = '';
-    if (tx.cowok_is_reproduct === 'TRUE') {
+    if (String(tx.cowok_is_reproduct).toUpperCase() === 'TRUE') {
         cowokReproFields = `
             <div style="background:var(--bg-light); padding:10px; border-radius:8px; margin-bottom:10px; border:1px solid rgba(197, 168, 92, 0.3);">
                 <strong><i class="fa-solid fa-mars"></i> SPK Cincin Pria (${tx.cowok_material || '-'})</strong><br/>
@@ -2298,7 +2298,7 @@ async function showProductionAssignModal(repairNum) {
     }
 
     let cewekReproFields = '';
-    if (tx.cewek_is_reproduct === 'TRUE') {
+    if (String(tx.cewek_is_reproduct).toUpperCase() === 'TRUE') {
         cewekReproFields = `
             <div style="background:var(--bg-light); padding:10px; border-radius:8px; margin-bottom:10px; border:1px solid rgba(197, 168, 92, 0.3);">
                 <strong><i class="fa-solid fa-venus"></i> SPK Cincin Wanita (${tx.cewek_material || '-'})</strong><br/>
@@ -2322,7 +2322,7 @@ async function showProductionAssignModal(repairNum) {
         </div>
         ${cowokReproFields}
         ${cewekReproFields}
-        ${tx.cowok_is_reproduct !== 'TRUE' && tx.cewek_is_reproduct !== 'TRUE' ? '<small style="color:var(--text-muted);"><i class="fa-solid fa-info-circle"></i> Repair biasa (bukan reproduksi), tidak membutuhkan input modal logam awal.</small>' : ''}
+        ${String(tx.cowok_is_reproduct).toUpperCase() !== 'TRUE' && String(tx.cewek_is_reproduct).toUpperCase() !== 'TRUE' ? '<small style="color:var(--text-muted);"><i class="fa-solid fa-info-circle"></i> Repair biasa (bukan reproduksi), tidak membutuhkan input modal logam awal.</small>' : ''}
     `;
 
     document.getElementById('crud-modal-title').textContent = `Delegasi Pengrajin & SPK (${repairNum})`;
@@ -2370,10 +2370,10 @@ async function renderLogisticBoard() {
                     <button class="action-btn-circle" style="background:linear-gradient(135deg,#c5a85c,#e0c97a);color:#1a1a1a;" onclick="printIndividualLogistic('${tx.repair_number}')" title="Cetak Surat Jalan Individual"><i class="fa-solid fa-file-invoice"></i></button>
                 </div>
             </td>
-            <td>${tx.cowok_active === 'TRUE' ? `${tx.cowok_weight}g` : ''}</td>
+            <td>${String(tx.cowok_active).toUpperCase() === 'TRUE' ? `${tx.cowok_weight}g` : ''}</td>
             <td>${tx.cowok_weight_final ? `${tx.cowok_weight_final}g` : ''}</td>
             <td>${tx.cowok_weight && tx.cowok_weight_final ? (tx.cowok_weight - tx.cowok_weight_final - 0.2).toFixed(2) + 'g' : ''}</td>
-            <td>${tx.cewek_active === 'TRUE' ? `${tx.cewek_weight}g` : ''}</td>
+            <td>${String(tx.cewek_active).toUpperCase() === 'TRUE' ? `${tx.cewek_weight}g` : ''}</td>
             <td>${tx.cewek_weight_final ? `${tx.cewek_weight_final}g` : ''}</td>
             <td>${tx.cewek_weight && tx.cewek_weight_final ? (tx.cewek_weight - tx.cewek_weight_final - 0.2).toFixed(2) + 'g' : ''}</td>
         `;
@@ -2435,7 +2435,11 @@ async function renderLogisticBoard() {
                 '<thead><tr><th>No</th><th>Repair #</th><th>Customer</th><th>Alamat</th><th>Berat Awal</th><th>Berat Akhir</th><th>Residu</th></tr></thead><tbody>';
             orders.forEach((tx, idx) => {
                 const beratAwal =
-                    tx.cowok_active === 'TRUE' ? tx.cowok_weight : tx.cewek_active === 'TRUE' ? tx.cewek_weight : '-';
+                    String(tx.cowok_active).toUpperCase() === 'TRUE'
+                        ? tx.cowok_weight
+                        : String(tx.cewek_active).toUpperCase() === 'TRUE'
+                          ? tx.cewek_weight
+                          : '-';
                 const beratAkhir = tx.cowok_weight_final || tx.cewek_weight_final || '-';
                 const residu =
                     tx.cowok_weight && tx.cowok_weight_final
@@ -2503,8 +2507,8 @@ async function showReceiptPrintModal(repairNum, type = 'RECEIPT', mockTx = null)
     const cewekMetal = State.masterData.metals.find((m) => m.id === tx.cewek_material);
     const cewekRep = State.masterData.repairs.find((r) => r.id === tx.cewek_repair_type);
 
-    const isCowok = tx.cowok_active === 'TRUE';
-    const isCewek = tx.cewek_active === 'TRUE';
+    const isCowok = String(tx.cowok_active).toUpperCase() === 'TRUE';
+    const isCewek = String(tx.cewek_active).toUpperCase() === 'TRUE';
 
     // Build extra items rows html
     const addItems = JSON.parse(tx.additional_items_json || '[]');
@@ -2757,14 +2761,14 @@ async function triggerWhatsAppNotification(repairNum) {
     msg += `*Target Selesai:* ${formatSimpleDate(tx.deadline)}\n`;
     msg += `*Sales Terkait:* ${tx.store_sales_name.split(' (')[0]}\n\n`;
 
-    if (tx.cowok_active === 'TRUE') {
+    if (String(tx.cowok_active).toUpperCase() === 'TRUE') {
         const metal = State.masterData.metals.find((m) => m.id === tx.cowok_material);
         const rep = State.masterData.repairs.find((r) => r.id === tx.cowok_repair_type);
         msg += `*Cincin Cowok:* ${metal?.name || ''} (Sz: ${tx.cowok_size})\n`;
         msg += `- Layanan: ${rep?.name || ''}\n`;
         if (tx.cowok_engraving) msg += `- Ukir Nama: "${tx.cowok_engraving}"\n`;
     }
-    if (tx.cewek_active === 'TRUE') {
+    if (String(tx.cewek_active).toUpperCase() === 'TRUE') {
         const metal = State.masterData.metals.find((m) => m.id === tx.cewek_material);
         const rep = State.masterData.repairs.find((r) => r.id === tx.cewek_repair_type);
         msg += `*Cincin Cewek:* ${metal?.name || ''} (Sz: ${tx.cewek_size})\n`;
@@ -3708,7 +3712,7 @@ async function executeProductionAssignSubmit() {
         // SPK PRODUKSI TERINTEGRASI (BUAT RECORD BARU JIKA REPRO)
         // ----------------------------------------------------
         const processSPK = async (type) => {
-            if (match[`${type}_is_reproduct`] === 'TRUE') {
+            if (String(match[`${type}_is_reproduct`]).toUpperCase() === 'TRUE') {
                 const addGramInput = document.getElementById(`crud-p-${type}-add`);
                 if (addGramInput) {
                     const addGram = parseFloat(addGramInput.value) || 0;
@@ -4493,7 +4497,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
 function calculateTransactionHPP(tx) {
     let cowokHpp = 0;
-    if (tx.cowok_active === 'TRUE') {
+    if (String(tx.cowok_active).toUpperCase() === 'TRUE') {
         const metal = State.masterData.metals.find((m) => m.id === tx.cowok_material);
         if (metal) {
             cowokHpp =
@@ -4503,7 +4507,7 @@ function calculateTransactionHPP(tx) {
     }
 
     let cewekHpp = 0;
-    if (tx.cewek_active === 'TRUE') {
+    if (String(tx.cewek_active).toUpperCase() === 'TRUE') {
         const metal = State.masterData.metals.find((m) => m.id === tx.cewek_material);
         if (metal) {
             cewekHpp =
@@ -4513,7 +4517,7 @@ function calculateTransactionHPP(tx) {
     }
 
     let cowokRepHpp = 0;
-    if (tx.cowok_active === 'TRUE') {
+    if (String(tx.cowok_active).toUpperCase() === 'TRUE') {
         const rep = State.masterData.repairs.find((r) => r.id === tx.cowok_repair_type);
         if (rep) {
             cowokRepHpp = (parseFloat(rep.repair_fee) || 0) * 0.4;
@@ -4521,7 +4525,7 @@ function calculateTransactionHPP(tx) {
     }
 
     let cewekRepHpp = 0;
-    if (tx.cewek_active === 'TRUE') {
+    if (String(tx.cewek_active).toUpperCase() === 'TRUE') {
         const rep = State.masterData.repairs.find((r) => r.id === tx.cewek_repair_type);
         if (rep) {
             cewekRepHpp = (parseFloat(rep.repair_fee) || 0) * 0.4;
@@ -4577,7 +4581,7 @@ async function showSalesDetailModal(repairNumber) {
 
     // Bind ring cowok details
     const cowokBlock = document.getElementById('sd-cowok-block');
-    if (tx.cowok_active === 'TRUE') {
+    if (String(tx.cowok_active).toUpperCase() === 'TRUE') {
         cowokBlock.classList.remove('hidden');
         const metal = State.masterData.metals.find((m) => m.id === tx.cowok_material);
         const rep = State.masterData.repairs.find((r) => r.id === tx.cowok_repair_type);
@@ -4593,7 +4597,7 @@ async function showSalesDetailModal(repairNumber) {
 
     // Bind ring cewek details
     const cewekBlock = document.getElementById('sd-cewek-block');
-    if (tx.cewek_active === 'TRUE') {
+    if (String(tx.cewek_active).toUpperCase() === 'TRUE') {
         cewekBlock.classList.remove('hidden');
         const metal = State.masterData.metals.find((m) => m.id === tx.cewek_material);
         const rep = State.masterData.repairs.find((r) => r.id === tx.cewek_repair_type);
@@ -5822,11 +5826,11 @@ async function showProductionCompleteModal(repairNum) {
     // We need to fetch the SPKs created for this repair (if it was repro)
     let totalInitial = 0;
     let hasRepro = false;
-    
+
     if (State.masterData.productionjobs) {
-        const jobs = State.masterData.productionjobs.filter(j => j.repair_number === repairNum);
-        jobs.forEach(j => {
-            totalInitial += (parseFloat(j.initial_gram) || 0);
+        const jobs = State.masterData.productionjobs.filter((j) => j.repair_number === repairNum);
+        jobs.forEach((j) => {
+            totalInitial += parseFloat(j.initial_gram) || 0;
             hasRepro = true;
         });
     }
@@ -5844,32 +5848,37 @@ async function showProductionCompleteModal(repairNum) {
 
     const cowokGroup = document.getElementById('prod-complete-cowok-group');
     const cewekGroup = document.getElementById('prod-complete-cewek-group');
-    
+
     document.getElementById('prod-complete-cowok-weight').value = '';
     document.getElementById('prod-complete-cewek-weight').value = '';
     document.getElementById('prod-complete-scrap').value = '0';
     document.getElementById('prod-complete-dust').value = '0';
-    
-    if (tx.cowok_is_reproduct === 'TRUE') {
+
+    if (String(tx.cowok_is_reproduct).toUpperCase() === 'TRUE') {
         cowokGroup.classList.remove('hidden');
     } else {
         cowokGroup.classList.add('hidden');
     }
-    
-    if (tx.cewek_is_reproduct === 'TRUE') {
+
+    if (String(tx.cewek_is_reproduct).toUpperCase() === 'TRUE') {
         cewekGroup.classList.remove('hidden');
     } else {
         cewekGroup.classList.add('hidden');
     }
-    
+
     document.getElementById('prod-complete-loss-breakdown').classList.add('hidden');
     document.getElementById('btn-save-prod-complete').disabled = true;
 
     document.getElementById('production-complete-modal').classList.remove('hidden');
 }
 
-const completeInputs = ['prod-complete-cowok-weight', 'prod-complete-cewek-weight', 'prod-complete-scrap', 'prod-complete-dust'];
-completeInputs.forEach(id => {
+const completeInputs = [
+    'prod-complete-cowok-weight',
+    'prod-complete-cewek-weight',
+    'prod-complete-scrap',
+    'prod-complete-dust'
+];
+completeInputs.forEach((id) => {
     document.getElementById(id)?.addEventListener('input', calculateCompleteLoss);
 });
 
@@ -5894,7 +5903,7 @@ function calculateCompleteLoss() {
     const lossPercentage = initialTotal > 0 ? (loss / initialTotal) * 100 : 0;
 
     document.getElementById('prod-complete-returned-total').textContent = totalReturned.toFixed(2) + ' gr';
-    
+
     const lossEl = document.getElementById('prod-complete-loss-weight');
     lossEl.textContent = `${loss.toFixed(2)} gr (${lossPercentage.toFixed(2)}%)`;
 
@@ -5938,11 +5947,11 @@ document.getElementById('btn-save-prod-complete')?.addEventListener('click', asy
     const cewekW = parseFloat(document.getElementById('prod-complete-cewek-weight').value) || 0;
     const scrap = parseFloat(document.getElementById('prod-complete-scrap').value) || 0;
     const dust = parseFloat(document.getElementById('prod-complete-dust').value) || 0;
-    
+
     // Check if required inputs are filled based on visibility
     const cowokVisible = !document.getElementById('prod-complete-cowok-group').classList.contains('hidden');
     const cewekVisible = !document.getElementById('prod-complete-cewek-group').classList.contains('hidden');
-    
+
     if (cowokVisible && cowokW <= 0) {
         showToast('Berat final cincin cowok harus diisi', 'warning');
         return;
@@ -5968,7 +5977,7 @@ async function executeProductionCompleteSubmit(repNum, cowokW, cewekW, scrap, du
     match.status = 'Pending Sync';
     if (cowokW > 0) match.cowok_weight_final = cowokW;
     if (cewekW > 0) match.cewek_weight_final = cewekW;
-    
+
     await saveLocalData('repair_transactions', match);
 
     // Update Repair Status
@@ -5983,22 +5992,22 @@ async function executeProductionCompleteSubmit(repNum, cowokW, cewekW, scrap, du
     // We must also update the specific ProductionJobs related to this repair to calculate their actual loss individually
     // This is a simplification: We distribute scrap and dust proportionally to the SPK's initial weights if there are two SPKs
     if (State.masterData.productionjobs) {
-        const jobs = State.masterData.productionjobs.filter(j => j.repair_number === repNum && j.status === 'WIP');
+        const jobs = State.masterData.productionjobs.filter((j) => j.repair_number === repNum && j.status === 'WIP');
         let totalInitial = jobs.reduce((sum, j) => sum + (parseFloat(j.initial_gram) || 0), 0);
-        
+
         for (let j of jobs) {
             const isCowokJob = j.id.endsWith('COWOK');
             const finalW = isCowokJob ? cowokW : cewekW;
             const initG = parseFloat(j.initial_gram) || 0;
-            const portion = totalInitial > 0 ? (initG / totalInitial) : 0;
-            
+            const portion = totalInitial > 0 ? initG / totalInitial : 0;
+
             const jScrap = scrap * portion;
             const jDust = dust * portion;
-            
+
             const totalRet = finalW + jScrap + jDust;
             const jLoss = initG - totalRet;
             const jLossPct = initG > 0 ? (jLoss / initG) * 100 : 0;
-            
+
             j.final_gram = finalW;
             j.scrap_gram = jScrap;
             j.dust_gram = jDust;
@@ -6006,7 +6015,7 @@ async function executeProductionCompleteSubmit(repNum, cowokW, cewekW, scrap, du
             j.loss_percentage = jLossPct;
             j.status = penaltyApplied ? 'PENALTY' : 'CLEARED';
             j.penalty_applied = penaltyApplied;
-            
+
             await saveLocalData('master_productionjobs', j);
             await queueSyncTask('SAVE_MASTER_RECORD', {
                 store_name: 'master_productionjobs',
@@ -6020,7 +6029,6 @@ async function executeProductionCompleteSubmit(repNum, cowokW, cewekW, scrap, du
     } else {
         showToast(`SPK Produksi ${repNum} selesai aman! Diteruskan ke QA.`, 'success');
     }
-    
+
     await refreshAllData();
 }
-
