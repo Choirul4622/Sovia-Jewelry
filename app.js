@@ -24,14 +24,15 @@ const State = {
         rawmaterials: [],
         processedmetals: [],
         meltingjobs: [],
-        productionjobs: []
+        productionjobs: [],
+        procurementtransactions: []
     }
 };
 
 // --- CONFIGURATIONS ---
 const CONFIG = {
     DB_NAME: 'SoviaRepairDB',
-    DB_VERSION: 3,
+    DB_VERSION: 4,
     // Google Apps Script Deploy URL
     GAS_API_URL:
         'https://script.google.com/macros/s/AKfycbwaJsUPiuxnwVt2Rn_ALJrkUK8aaWwu7E5Z2F7cKkc8s5kuDCyiuif-PKs3dkUY1GJEvw/exec'
@@ -99,7 +100,8 @@ function initDatabase() {
                 { name: 'master_rawmaterials', key: 'id' },
                 { name: 'master_processedmetals', key: 'id' },
                 { name: 'master_meltingjobs', key: 'id' },
-                { name: 'master_productionjobs', key: 'id' }
+                { name: 'master_productionjobs', key: 'id' },
+                { name: 'master_procurementtransactions', key: 'id' }
             ];
 
             masterStores.forEach((store) => {
@@ -525,6 +527,7 @@ async function loadAllMasterDataToCache() {
         State.masterData.processedmetals = await getLocalData('master_processedmetals');
         State.masterData.meltingjobs = await getLocalData('master_meltingjobs');
         State.masterData.productionjobs = await getLocalData('master_productionjobs');
+        State.masterData.procurementtransactions = await getLocalData('master_procurementtransactions');
     } catch (e) {
         console.error('Gagal membaca master cache: ', e);
     }
@@ -6298,14 +6301,18 @@ async function printCollectiveSuratJalan(type) {
 // 11. PROCUREMENT / RESTOCK LOGIC
 // ==========================================================================
 function showProcurementModal() {
-    checkAdminAuthority(async () => {
-        document.getElementById('proc-qty').value = '';
-        document.getElementById('proc-unit-cost').value = '';
-        document.getElementById('proc-supplier').value = '';
-        document.getElementById('proc-notes').value = '';
-        document.getElementById('proc-category').value = 'rawmaterial';
-        
-        await populateProcurementItems();
+    if (!State.currentUser || !['Admin', 'Logistic'].includes(State.currentUser.role)) {
+        showToast('Akses ditolak. Fitur ini hanya untuk Admin / Logistic.', 'error');
+        return;
+    }
+    
+    document.getElementById('proc-qty').value = '';
+    document.getElementById('proc-unit-cost').value = '';
+    document.getElementById('proc-supplier').value = '';
+    document.getElementById('proc-notes').value = '';
+    document.getElementById('proc-category').value = 'rawmaterial';
+    
+    populateProcurementItems().then(() => {
         document.getElementById('procurement-modal').classList.remove('hidden');
     });
 }
