@@ -3134,6 +3134,21 @@ async function renderAdminPanels() {
         'stock_gram',
         'average_cost_per_gram'
     ]);
+    
+    // WIP Production Jobs
+    await loadAdminTable('productionjobs', 'master_productionjobs', [
+        'id',
+        'repair_number',
+        'date',
+        'workshop',
+        'metal_id',
+        'initial_gram',
+        'final_gram',
+        'scrap_dust_gram',
+        'loss_gram',
+        'loss_percentage',
+        'status'
+    ]);
 }
 
 async function loadAdminTable(panelSuffix, storeName, keys) {
