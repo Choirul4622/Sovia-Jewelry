@@ -1784,29 +1784,7 @@ async function renderProductionBoard() {
         btn.addEventListener('click', () => showProductionAssignModal(btn.dataset.id));
     });
     document.querySelectorAll('.btn-prod-complete').forEach((btn) => {
-        btn.addEventListener('click', async () => {
-            const repairNum = btn.dataset.id;
-            if (confirm(`Tandai pengerjaan cincin pada transaksi ${repairNum} selesai di workshop?`)) {
-                const txs = await getLocalData('repair_transactions');
-                const match = txs.find((t) => t.repair_number === repairNum);
-                if (match) {
-                    match.production_status = 'Completed';
-                    match.qa_status = 'Pending';
-                    match.status = 'Pending Sync';
-                    await saveLocalData('repair_transactions', match);
-                    await queueSyncTask('UPDATE_REPAIR_STATUS', {
-                        repair_number: repairNum,
-                        production_status: 'Completed',
-                        qa_status: 'Pending'
-                    });
-                    showToast(
-                        `Repair ${repairNum} selesai produksi! Diteruskan ke QA untuk pemeriksaan kualitas.`,
-                        'success'
-                    );
-                    await refreshAllData();
-                }
-            }
-        });
+        btn.addEventListener('click', () => showProductionCompleteModal(btn.dataset.id));
     });
 
     // Render Model File Upload Listener
@@ -5830,3 +5808,219 @@ document.getElementById('btn-save-prod')?.addEventListener('click', async () => 
 
     runBackgroundSync();
 });
+
+// ==========================================================================
+// 14. PRODUCTION COMPLETE CONTROLLER
+// ==========================================================================
+async function showProductionCompleteModal(repairNum) {
+    const txs = await getLocalData('repair_transactions');
+    const tx = txs.find((t) => t.repair_number === repairNum);
+    if (!tx) return;
+
+    document.getElementById('prod-complete-id').value = repairNum;
+
+    // We need to fetch the SPKs created for this repair (if it was repro)
+    let totalInitial = 0;
+    let hasRepro = false;
+    
+    if (State.masterData.productionjobs) {
+        const jobs = State.masterData.productionjobs.filter(j => j.repair_number === repairNum);
+        jobs.forEach(j => {
+            totalInitial += (parseFloat(j.initial_gram) || 0);
+            hasRepro = true;
+        });
+    }
+
+    if (!hasRepro) {
+        // If no SPK exists, it means it's just a normal repair, just complete it directly
+        if (confirm(`Repair biasa (tanpa peleburan ulang). Tandai selesai produksi untuk ${repairNum}?`)) {
+            executeProductionCompleteSubmit(repairNum, 0, 0, 0, 0, 0, 0);
+        }
+        return;
+    }
+
+    document.getElementById('prod-complete-initial-total').textContent = totalInitial.toFixed(2) + ' gr';
+    document.getElementById('prod-complete-initial-total').dataset.initial = totalInitial;
+
+    const cowokGroup = document.getElementById('prod-complete-cowok-group');
+    const cewekGroup = document.getElementById('prod-complete-cewek-group');
+    
+    document.getElementById('prod-complete-cowok-weight').value = '';
+    document.getElementById('prod-complete-cewek-weight').value = '';
+    document.getElementById('prod-complete-scrap').value = '0';
+    document.getElementById('prod-complete-dust').value = '0';
+    
+    if (tx.cowok_is_reproduct === 'TRUE') {
+        cowokGroup.classList.remove('hidden');
+    } else {
+        cowokGroup.classList.add('hidden');
+    }
+    
+    if (tx.cewek_is_reproduct === 'TRUE') {
+        cewekGroup.classList.remove('hidden');
+    } else {
+        cewekGroup.classList.add('hidden');
+    }
+    
+    document.getElementById('prod-complete-loss-breakdown').classList.add('hidden');
+    document.getElementById('btn-save-prod-complete').disabled = true;
+
+    document.getElementById('production-complete-modal').classList.remove('hidden');
+}
+
+const completeInputs = ['prod-complete-cowok-weight', 'prod-complete-cewek-weight', 'prod-complete-scrap', 'prod-complete-dust'];
+completeInputs.forEach(id => {
+    document.getElementById(id)?.addEventListener('input', calculateCompleteLoss);
+});
+
+function calculateCompleteLoss() {
+    const cowokW = parseFloat(document.getElementById('prod-complete-cowok-weight').value) || 0;
+    const cewekW = parseFloat(document.getElementById('prod-complete-cewek-weight').value) || 0;
+    const scrap = parseFloat(document.getElementById('prod-complete-scrap').value) || 0;
+    const dust = parseFloat(document.getElementById('prod-complete-dust').value) || 0;
+
+    const initialTotal = parseFloat(document.getElementById('prod-complete-initial-total').dataset.initial) || 0;
+    const totalReturned = cowokW + cewekW + scrap + dust;
+    const breakdown = document.getElementById('prod-complete-loss-breakdown');
+    const btnSave = document.getElementById('btn-save-prod-complete');
+
+    if (totalReturned <= 0) {
+        breakdown.classList.add('hidden');
+        btnSave.disabled = true;
+        return;
+    }
+
+    const loss = initialTotal - totalReturned;
+    const lossPercentage = initialTotal > 0 ? (loss / initialTotal) * 100 : 0;
+
+    document.getElementById('prod-complete-returned-total').textContent = totalReturned.toFixed(2) + ' gr';
+    
+    const lossEl = document.getElementById('prod-complete-loss-weight');
+    lossEl.textContent = `${loss.toFixed(2)} gr (${lossPercentage.toFixed(2)}%)`;
+
+    const alertFraud = document.getElementById('prod-complete-fraud-alert');
+    const alertSafe = document.getElementById('prod-complete-safe-alert');
+
+    breakdown.classList.remove('hidden');
+
+    if (loss < 0) {
+        lossEl.style.color = 'var(--red)';
+        lossEl.textContent = `Error: Pengembalian melebihi modal!`;
+        alertFraud.classList.add('hidden');
+        alertSafe.classList.add('hidden');
+        btnSave.disabled = true;
+    } else {
+        btnSave.disabled = false;
+        if (lossPercentage > 4.0) {
+            lossEl.style.color = 'var(--red)';
+            alertFraud.classList.remove('hidden');
+            alertSafe.classList.add('hidden');
+            btnSave.dataset.penalty = 'true';
+        } else {
+            lossEl.style.color = 'var(--green)';
+            alertFraud.classList.add('hidden');
+            alertSafe.classList.remove('hidden');
+            btnSave.dataset.penalty = 'false';
+        }
+    }
+}
+
+document.getElementById('btn-close-prod-complete-modal')?.addEventListener('click', () => {
+    document.getElementById('production-complete-modal').classList.add('hidden');
+});
+document.getElementById('btn-cancel-prod-complete')?.addEventListener('click', () => {
+    document.getElementById('production-complete-modal').classList.add('hidden');
+});
+
+document.getElementById('btn-save-prod-complete')?.addEventListener('click', async () => {
+    const repNum = document.getElementById('prod-complete-id').value;
+    const cowokW = parseFloat(document.getElementById('prod-complete-cowok-weight').value) || 0;
+    const cewekW = parseFloat(document.getElementById('prod-complete-cewek-weight').value) || 0;
+    const scrap = parseFloat(document.getElementById('prod-complete-scrap').value) || 0;
+    const dust = parseFloat(document.getElementById('prod-complete-dust').value) || 0;
+    
+    // Check if required inputs are filled based on visibility
+    const cowokVisible = !document.getElementById('prod-complete-cowok-group').classList.contains('hidden');
+    const cewekVisible = !document.getElementById('prod-complete-cewek-group').classList.contains('hidden');
+    
+    if (cowokVisible && cowokW <= 0) {
+        showToast('Berat final cincin cowok harus diisi', 'warning');
+        return;
+    }
+    if (cewekVisible && cewekW <= 0) {
+        showToast('Berat final cincin cewek harus diisi', 'warning');
+        return;
+    }
+
+    const penaltyApplied = document.getElementById('btn-save-prod-complete').dataset.penalty === 'true';
+
+    await executeProductionCompleteSubmit(repNum, cowokW, cewekW, scrap, dust, penaltyApplied);
+    document.getElementById('production-complete-modal').classList.add('hidden');
+});
+
+async function executeProductionCompleteSubmit(repNum, cowokW, cewekW, scrap, dust, penaltyApplied) {
+    const txs = await getLocalData('repair_transactions');
+    const match = txs.find((t) => t.repair_number === repNum);
+    if (!match) return;
+
+    match.production_status = 'Completed';
+    match.qa_status = 'Pending';
+    match.status = 'Pending Sync';
+    if (cowokW > 0) match.cowok_weight_final = cowokW;
+    if (cewekW > 0) match.cewek_weight_final = cewekW;
+    
+    await saveLocalData('repair_transactions', match);
+
+    // Update Repair Status
+    await queueSyncTask('UPDATE_REPAIR_STATUS', {
+        repair_number: repNum,
+        production_status: 'Completed',
+        qa_status: 'Pending',
+        cowok_weight_final: cowokW > 0 ? cowokW : '',
+        cewek_weight_final: cewekW > 0 ? cewekW : ''
+    });
+
+    // We must also update the specific ProductionJobs related to this repair to calculate their actual loss individually
+    // This is a simplification: We distribute scrap and dust proportionally to the SPK's initial weights if there are two SPKs
+    if (State.masterData.productionjobs) {
+        const jobs = State.masterData.productionjobs.filter(j => j.repair_number === repNum && j.status === 'WIP');
+        let totalInitial = jobs.reduce((sum, j) => sum + (parseFloat(j.initial_gram) || 0), 0);
+        
+        for (let j of jobs) {
+            const isCowokJob = j.id.endsWith('COWOK');
+            const finalW = isCowokJob ? cowokW : cewekW;
+            const initG = parseFloat(j.initial_gram) || 0;
+            const portion = totalInitial > 0 ? (initG / totalInitial) : 0;
+            
+            const jScrap = scrap * portion;
+            const jDust = dust * portion;
+            
+            const totalRet = finalW + jScrap + jDust;
+            const jLoss = initG - totalRet;
+            const jLossPct = initG > 0 ? (jLoss / initG) * 100 : 0;
+            
+            j.final_gram = finalW;
+            j.scrap_gram = jScrap;
+            j.dust_gram = jDust;
+            j.loss_gram = jLoss;
+            j.loss_percentage = jLossPct;
+            j.status = penaltyApplied ? 'PENALTY' : 'CLEARED';
+            j.penalty_applied = penaltyApplied;
+            
+            await saveLocalData('master_productionjobs', j);
+            await queueSyncTask('SAVE_MASTER_RECORD', {
+                store_name: 'master_productionjobs',
+                payload: j
+            });
+        }
+    }
+
+    if (penaltyApplied) {
+        showToast(`SPK Produksi ${repNum} selesai dengan Penalti Susut! Diteruskan ke QA.`, 'warning');
+    } else {
+        showToast(`SPK Produksi ${repNum} selesai aman! Diteruskan ke QA.`, 'success');
+    }
+    
+    await refreshAllData();
+}
+
