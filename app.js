@@ -388,6 +388,23 @@ function getLocalData(storeName) {
     });
 }
 
+function getLocalDataById(storeName, id) {
+    return new Promise((resolve, reject) => {
+        if (!State.db) return resolve(null);
+        const tx = State.db.transaction(storeName, 'readonly');
+        const store = tx.objectStore(storeName);
+        const req = store.get(id);
+        req.onsuccess = () => {
+            let res = req.result || null;
+            if (storeName === 'repair_transactions' && res) {
+                res = normalizeTransaction(res);
+            }
+            resolve(res);
+        };
+        req.onerror = () => reject(req.error);
+    });
+}
+
 function saveLocalData(storeName, dataObject) {
     return new Promise((resolve, reject) => {
         if (!State.db) return reject('Database not initialized');
