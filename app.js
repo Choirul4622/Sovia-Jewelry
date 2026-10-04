@@ -799,8 +799,9 @@ function calculateRingPricing(type) {
 
     if (active) {
         const materialId = document.getElementById(`${type}-material`).value;
-        const weight = parseFloat(document.getElementById(`${type}-weight`).value) || 0;
-        const oldWeight = parseFloat(document.getElementById(`${type}-old-weight`).value) || 0;
+        const weight = parseFloat(document.getElementById(`${type}-weight`).value) || 0; // Ini sekarang adalah berat cincin lama/aktual
+        const targetWeightNode = document.getElementById(`${type}-target-weight`);
+        const targetWeight = targetWeightNode ? (parseFloat(targetWeightNode.value) || 0) : 0;
         const repairId = document.getElementById(`${type}-repair-type`).value;
 
         const metal = State.masterData.metals.find((m) => m.id === materialId);
@@ -812,18 +813,18 @@ function calculateRingPricing(type) {
 
         if (metal) {
             if (isReproduct) {
-                // Produksi ulang: kenakan biaya logam (untuk selisih kekurangan berat + 10% susut peleburan) + jasa full
-                const neededWeight = Math.max(0, weight - oldWeight + (oldWeight * 0.10));
+                // Produksi ulang: kenakan biaya logam (selisih target - berat lama + 10% susut dari berat lama) + jasa full
+                const neededWeight = Math.max(0, targetWeight - weight + (weight * 0.10));
                 metalPrice = metal.price_per_gram * neededWeight;
                 customFee = metal.custom_fee;
                 document.getElementById(`${type}-material-price-preview`).textContent =
-                    `[Produksi Ulang] Logam Aktual: ${neededWeight.toFixed(2)} gr x ${formatRupiah(metal.price_per_gram)} | Jasa: ${formatRupiah(metal.custom_fee)}`;
+                    `[Produksi Ulang] Kekurangan Logam + Susut: ${neededWeight.toFixed(2)} gr x ${formatRupiah(metal.price_per_gram)} | Jasa: ${formatRupiah(metal.custom_fee)}`;
             } else {
                 // Repair biasa: TIDAK dikenakan biaya logam
                 metalPrice = 0;
                 customFee = 0;
                 document.getElementById(`${type}-material-price-preview`).textContent =
-                    `[Repair Biasa] Harga logam tidak dikenakan | Jasa: ${formatRupiah(metal.custom_fee)}/gr (info saja)`;
+                    `[Repair Biasa] Harga logam tidak dikenakan | Jasa: ${formatRupiah(metal.custom_fee)} (TIDAK DITAGIHKAN)`;
             }
         } else {
             document.getElementById(`${type}-material-price-preview`).textContent = `Harga: Rp 0/gr | Jasa: Rp 0`;
@@ -1087,6 +1088,23 @@ async function populateFormForEdit(tx) {
             document.getElementById(`${type}-repair-type`).value = tx[`${type}_repair_type`];
             document.getElementById(`${type}-engraving`).value = tx[`${type}_engraving`];
             document.getElementById(`${type}-notes`).value = tx[`${type}_notes`];
+            
+            const isRepro = tx[`${type}_is_reproduct`] === 'TRUE';
+            const cb = document.getElementById(`${type}-is-reproduct`);
+            if (cb) {
+                cb.checked = isRepro;
+                const oldWeightGrp = document.getElementById(`${type}-old-weight-group`);
+                const repairTypeSelect = document.getElementById(`${type}-repair-type`);
+                if(isRepro) {
+                    oldWeightGrp.classList.remove('hidden');
+                    repairTypeSelect.disabled = true;
+                    document.getElementById(`${type}-target-weight`).value = tx[`${type}_target_weight`] || '';
+                } else {
+                    oldWeightGrp.classList.add('hidden');
+                    repairTypeSelect.disabled = false;
+                }
+            }
+
             setUploadPreview(`${type}-image-preview`, tx[`${type}_image_url`], `cincin ${type}`);
         } else {
             resetRingCardFields(type);
@@ -1178,6 +1196,14 @@ function resetRingCardFields(prefix) {
     document.getElementById(`${prefix}-engraving`).value = '';
     document.getElementById(`${prefix}-notes`).value = '';
     document.getElementById(`${prefix}-image`).value = '';
+    
+    const cb = document.getElementById(`${prefix}-is-reproduct`);
+    if(cb) {
+        cb.checked = false;
+        document.getElementById(`${prefix}-old-weight-group`).classList.add('hidden');
+        document.getElementById(`${prefix}-target-weight`).value = '';
+        document.getElementById(`${prefix}-repair-type`).disabled = false;
+    }
     setUploadPreview(`${prefix}-image-preview`, '', `cincin ${prefix}`);
 }
 
@@ -2475,9 +2501,12 @@ function showLogisticShipModal(repairNum) {
 // ==========================================================================
 
 // Prepares and shows thermal / letterhead print layouts
-async function showReceiptPrintModal(repairNum, type = 'RECEIPT') {
-    const txs = await getLocalData('repair_transactions');
-    const tx = txs.find((t) => t.repair_number === repairNum);
+async function showReceiptPrintModal(repairNum, type = 'RECEIPT', mockTx = null) {
+    let tx = mockTx;
+    if (!tx) {
+        const txs = await getLocalData('repair_transactions');
+        tx = txs.find((t) => t.repair_number === repairNum);
+    }
     if (!tx) return;
 
     const modalBody = document.getElementById('print-receipt-body');
@@ -3951,18 +3980,17 @@ document.addEventListener('DOMContentLoaded', async () => {
         calculateFormPricing();
     });
 
-    // Live calculations inputs listeners
     const calcSelectors = [
         'cowok-material',
         'cowok-weight',
         'cowok-repair-type',
         'cowok-is-reproduct',
-        'cowok-old-weight',
+        'cowok-target-weight',
         'cewek-material',
         'cewek-weight',
         'cewek-repair-type',
         'cewek-is-reproduct',
-        'cewek-old-weight',
+        'cewek-target-weight',
         'cust-city',
         'dp1-amount',
         'dp2-amount'
@@ -4032,7 +4060,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         const modalBody = document.getElementById('preview-modal-body');
 
         // Generate html preview layout (reuses print slip engine structurally)
-        await showReceiptPrintModal(tx.repair_number, 'RECEIPT');
+        await showReceiptPrintModal(tx.repair_number, 'RECEIPT', tx);
 
         // Move the HTML content inside the preview modal specifically
         modalBody.innerHTML = document.getElementById('print-receipt-body').innerHTML;
