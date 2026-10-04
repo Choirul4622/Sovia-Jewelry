@@ -2287,11 +2287,11 @@ async function showProductionAssignModal(repairNum) {
         cowokReproFields = `
             <div style="background:var(--bg-light); padding:10px; border-radius:8px; margin-bottom:10px; border:1px solid rgba(197, 168, 92, 0.3);">
                 <strong><i class="fa-solid fa-mars"></i> SPK Cincin Pria (${tx.cowok_material || '-'})</strong><br/>
-                <small>Berat Bekas: <span id="spk-c-old">${tx.cowok_weight || 0}</span> gr | Target Baru: ${tx.cowok_target_weight || 0} gr</small>
+                <small>Berat Bekas (Disimpan Gudang): <span id="spk-c-old">${tx.cowok_weight || 0}</span> gr | Target Baru: ${tx.cowok_target_weight || 0} gr</small>
                 <div class="form-group" style="margin-top:10px;">
-                    <label>Tambahan Emas Murni/Alloy (Gram) dari Gudang</label>
-                    <input type="number" id="crud-p-cowok-add" step="0.01" value="0" oninput="document.getElementById('spk-c-total').textContent = (parseFloat(this.value||0) + parseFloat(document.getElementById('spk-c-old').textContent)).toFixed(2)">
-                    <small>Total Modal Berat Awal: <strong id="spk-c-total" style="color:var(--gold);">${tx.cowok_weight || 0}</strong> gr</small>
+                    <label>Bahan Emas Murni/Alloy (Gram) dari Gudang</label>
+                    <input type="number" id="crud-p-cowok-add" step="0.01" value="0" oninput="document.getElementById('spk-c-total').textContent = parseFloat(this.value||0).toFixed(2)">
+                    <small>Total Modal Berat Awal Tukang: <strong id="spk-c-total" style="color:var(--gold);">0.00</strong> gr</small>
                 </div>
             </div>
         `;
@@ -2302,11 +2302,11 @@ async function showProductionAssignModal(repairNum) {
         cewekReproFields = `
             <div style="background:var(--bg-light); padding:10px; border-radius:8px; margin-bottom:10px; border:1px solid rgba(197, 168, 92, 0.3);">
                 <strong><i class="fa-solid fa-venus"></i> SPK Cincin Wanita (${tx.cewek_material || '-'})</strong><br/>
-                <small>Berat Bekas: <span id="spk-cw-old">${tx.cewek_weight || 0}</span> gr | Target Baru: ${tx.cewek_target_weight || 0} gr</small>
+                <small>Berat Bekas (Disimpan Gudang): <span id="spk-cw-old">${tx.cewek_weight || 0}</span> gr | Target Baru: ${tx.cewek_target_weight || 0} gr</small>
                 <div class="form-group" style="margin-top:10px;">
-                    <label>Tambahan Emas Murni/Alloy (Gram) dari Gudang</label>
-                    <input type="number" id="crud-p-cewek-add" step="0.01" value="0" oninput="document.getElementById('spk-cw-total').textContent = (parseFloat(this.value||0) + parseFloat(document.getElementById('spk-cw-old').textContent)).toFixed(2)">
-                    <small>Total Modal Berat Awal: <strong id="spk-cw-total" style="color:var(--gold);">${tx.cewek_weight || 0}</strong> gr</small>
+                    <label>Bahan Emas Murni/Alloy (Gram) dari Gudang</label>
+                    <input type="number" id="crud-p-cewek-add" step="0.01" value="0" oninput="document.getElementById('spk-cw-total').textContent = parseFloat(this.value||0).toFixed(2)">
+                    <small>Total Modal Berat Awal Tukang: <strong id="spk-cw-total" style="color:var(--gold);">0.00</strong> gr</small>
                 </div>
             </div>
         `;
@@ -3727,7 +3727,8 @@ async function executeProductionAssignSubmit() {
                     }
 
                     const jobId = 'PROD-' + new Date().getTime() + '-' + type.toUpperCase();
-                    const initialTotal = oldWeight + addGram;
+                    // NEW MECHANISM: Initial weight is strictly the new materials. Old ring is kept in warehouse.
+                    const initialTotal = addGram;
 
                     const payload = {
                         id: jobId,
