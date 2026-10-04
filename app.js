@@ -801,7 +801,7 @@ function calculateRingPricing(type) {
         const materialId = document.getElementById(`${type}-material`).value;
         const weight = parseFloat(document.getElementById(`${type}-weight`).value) || 0; // Ini sekarang adalah berat cincin lama/aktual
         const targetWeightNode = document.getElementById(`${type}-target-weight`);
-        const targetWeight = targetWeightNode ? (parseFloat(targetWeightNode.value) || 0) : 0;
+        const targetWeight = targetWeightNode ? parseFloat(targetWeightNode.value) || 0 : 0;
         const repairId = document.getElementById(`${type}-repair-type`).value;
 
         const metal = State.masterData.metals.find((m) => m.id === materialId);
@@ -814,7 +814,7 @@ function calculateRingPricing(type) {
         if (metal) {
             if (isReproduct) {
                 // Produksi ulang: kenakan biaya logam (selisih target - berat lama + 10% susut dari berat lama) + jasa full
-                const neededWeight = Math.max(0, targetWeight - weight + (weight * 0.10));
+                const neededWeight = Math.max(0, targetWeight - weight + weight * 0.1);
                 metalPrice = metal.price_per_gram * neededWeight;
                 customFee = metal.custom_fee;
                 document.getElementById(`${type}-material-price-preview`).textContent =
@@ -830,7 +830,8 @@ function calculateRingPricing(type) {
             document.getElementById(`${type}-material-price-preview`).textContent = `Harga: Rp 0/gr | Jasa: Rp 0`;
         }
 
-        if (repair && !isReproduct) { // Jika reproduksi, biaya repair ditiadakan
+        if (repair && !isReproduct) {
+            // Jika reproduksi, biaya repair ditiadakan
             repairFee = repair.repair_fee;
             document.getElementById(`${type}-repair-fee-preview`).textContent =
                 `Biaya repair: ${formatRupiah(repair.repair_fee)}`;
@@ -952,7 +953,8 @@ async function getTransactionFromForm() {
             [`${type}_material`]: active ? document.getElementById(`${type}-material`).value : '',
             [`${type}_weight`]: active ? parseFloat(document.getElementById(`${type}-weight`).value) || 0 : 0,
             [`${type}_is_reproduct`]: active && isRepro ? 'TRUE' : 'FALSE',
-            [`${type}_target_weight`]: active && isRepro ? parseFloat(document.getElementById(`${type}-target-weight`).value) || 0 : 0,
+            [`${type}_target_weight`]:
+                active && isRepro ? parseFloat(document.getElementById(`${type}-target-weight`).value) || 0 : 0,
             [`${type}_size`]: active ? document.getElementById(`${type}-size`).value : '',
             [`${type}_repair_type`]: active ? document.getElementById(`${type}-repair-type`).value : '',
             [`${type}_engraving`]: active ? document.getElementById(`${type}-engraving`).value : '',
@@ -1088,14 +1090,14 @@ async function populateFormForEdit(tx) {
             document.getElementById(`${type}-repair-type`).value = tx[`${type}_repair_type`];
             document.getElementById(`${type}-engraving`).value = tx[`${type}_engraving`];
             document.getElementById(`${type}-notes`).value = tx[`${type}_notes`];
-            
+
             const isRepro = tx[`${type}_is_reproduct`] === 'TRUE';
             const cb = document.getElementById(`${type}-is-reproduct`);
             if (cb) {
                 cb.checked = isRepro;
                 const oldWeightGrp = document.getElementById(`${type}-old-weight-group`);
                 const repairTypeSelect = document.getElementById(`${type}-repair-type`);
-                if(isRepro) {
+                if (isRepro) {
                     oldWeightGrp.classList.remove('hidden');
                     repairTypeSelect.disabled = true;
                     document.getElementById(`${type}-target-weight`).value = tx[`${type}_target_weight`] || '';
@@ -1196,9 +1198,9 @@ function resetRingCardFields(prefix) {
     document.getElementById(`${prefix}-engraving`).value = '';
     document.getElementById(`${prefix}-notes`).value = '';
     document.getElementById(`${prefix}-image`).value = '';
-    
+
     const cb = document.getElementById(`${prefix}-is-reproduct`);
-    if(cb) {
+    if (cb) {
         cb.checked = false;
         document.getElementById(`${prefix}-old-weight-group`).classList.add('hidden');
         document.getElementById(`${prefix}-target-weight`).value = '';
@@ -1250,7 +1252,10 @@ function validateRepairForm() {
         const targetWeight = parseFloat(document.getElementById('cowok-target-weight').value) || 0;
 
         if (!material || weight <= 0 || !size || (!isReproduct && !repType) || (isReproduct && targetWeight <= 0)) {
-            showToast('Informasi cincin cowok belum diisi lengkap (Bahan, Berat, Ukuran, Repair/Target Baru)!', 'warning');
+            showToast(
+                'Informasi cincin cowok belum diisi lengkap (Bahan, Berat, Ukuran, Repair/Target Baru)!',
+                'warning'
+            );
             return false;
         }
     }
@@ -1264,7 +1269,10 @@ function validateRepairForm() {
         const targetWeight = parseFloat(document.getElementById('cewek-target-weight').value) || 0;
 
         if (!material || weight <= 0 || !size || (!isReproduct && !repType) || (isReproduct && targetWeight <= 0)) {
-            showToast('Informasi cincin cewek belum diisi lengkap (Bahan, Berat, Ukuran, Repair/Target Baru)!', 'warning');
+            showToast(
+                'Informasi cincin cewek belum diisi lengkap (Bahan, Berat, Ukuran, Repair/Target Baru)!',
+                'warning'
+            );
             return false;
         }
     }
@@ -2294,7 +2302,7 @@ async function showProductionAssignModal(repairNum) {
 
     const txs = await getLocalData('repair_transactions');
     const tx = txs.find((t) => t.repair_number === repairNum);
-    if(!tx) return;
+    if (!tx) return;
 
     let cowokReproFields = '';
     if (tx.cowok_is_reproduct === 'TRUE') {
@@ -2336,7 +2344,7 @@ async function showProductionAssignModal(repairNum) {
         </div>
         ${cowokReproFields}
         ${cewekReproFields}
-        ${(tx.cowok_is_reproduct !== 'TRUE' && tx.cewek_is_reproduct !== 'TRUE') ? '<small style="color:var(--text-muted);"><i class="fa-solid fa-info-circle"></i> Repair biasa (bukan reproduksi), tidak membutuhkan input modal logam awal.</small>' : ''}
+        ${tx.cowok_is_reproduct !== 'TRUE' && tx.cewek_is_reproduct !== 'TRUE' ? '<small style="color:var(--text-muted);"><i class="fa-solid fa-info-circle"></i> Repair biasa (bukan reproduksi), tidak membutuhkan input modal logam awal.</small>' : ''}
     `;
 
     document.getElementById('crud-modal-title').textContent = `Delegasi Pengrajin & SPK (${repairNum})`;
@@ -3009,8 +3017,8 @@ async function pushDataToGAS(action, payload) {
                     if (payload.logistic_status !== undefined) match.logistic_status = payload.logistic_status;
                     if (payload.logistic_receipt_no !== undefined)
                         match.logistic_receipt_no = payload.logistic_receipt_no;
-                    if (payload.pelunasan_amount !== undefined) match.dp2_amount = payload.pelunasan_amount;
-                    if (payload.pelunasan_method !== undefined) match.dp2_method = payload.pelunasan_method;
+                    if (payload.dp2_amount !== undefined) match.dp2_amount = payload.dp2_amount;
+                    if (payload.dp2_method !== undefined) match.dp2_method = payload.dp2_method;
 
                     await saveLocalData('repair_transactions', match);
                 }
@@ -3020,7 +3028,7 @@ async function pushDataToGAS(action, payload) {
             console.error('Google Apps Script Backend Error: ', result ? result.message : 'Unknown error');
             if (result && result.message && result.message.includes('not found')) {
                 // Drop from queue to prevent infinite loops for dummy/deleted data
-                return true; 
+                return true;
             }
             return false;
         }
@@ -3129,15 +3137,21 @@ async function renderAdminPanels() {
     ]);
     await loadAdminTable('cities', 'master_cities', ['id', 'city', 'province', 'shipping_fee']);
     await loadAdminTable('payments', 'master_payments', ['id', 'name']);
-    
+
     // New ERP Expansion tables
     await loadAdminTable('formulas', 'master_formulas', ['id', 'metal_id', 'raw_material_id', 'percentage']);
     await loadAdminTable('bundles', 'master_bundlingrules', ['id', 'ring_type', 'packaging_id', 'qty']);
     await loadAdminTable('packaging', 'master_packaginginventory', ['id', 'name', 'stock_qty']);
     await loadAdminTable('rawmaterials', 'master_rawmaterials', ['id', 'name', 'stock_gram', 'price_per_gram']);
-    
+
     // Processed Metals (Half-finished) Inventory
-    await loadAdminTable('processedmetals', 'master_processedmetals', ['id', 'metal_id', 'type', 'stock_gram', 'average_cost_per_gram']);
+    await loadAdminTable('processedmetals', 'master_processedmetals', [
+        'id',
+        'metal_id',
+        'type',
+        'stock_gram',
+        'average_cost_per_gram'
+    ]);
 }
 
 async function loadAdminTable(panelSuffix, storeName, keys) {
@@ -3161,7 +3175,7 @@ async function loadAdminTable(panelSuffix, storeName, keys) {
 
         // Target ID for key operations
         const idVal = item[keys[0]]; // usually the primary key is first key
-        
+
         if (!['master_processedmetals', 'master_meltingjobs', 'master_productionjobs'].includes(storeName)) {
             cellsHtml += `
                 <td>
@@ -3207,7 +3221,7 @@ function generateNewId(storeName) {
     let rawStoreName = storeName.replace('master_', '');
     if (!State.masterData[rawStoreName]) return '';
     const records = State.masterData[rawStoreName];
-    
+
     let prefix = '';
     if (storeName === 'master_catalog') prefix = 'CAT-';
     else if (storeName === 'master_metals') prefix = 'MET-';
@@ -3222,15 +3236,15 @@ function generateNewId(storeName) {
     else return '';
 
     if (!records || records.length === 0) return prefix + '001';
-    
+
     let maxNum = 0;
-    records.forEach(r => {
+    records.forEach((r) => {
         if (r.id && r.id.startsWith(prefix)) {
             const numPart = parseInt(r.id.replace(prefix, ''), 10);
             if (!isNaN(numPart) && numPart > maxNum) maxNum = numPart;
         }
     });
-    
+
     return prefix + String(maxNum + 1).padStart(3, '0');
 }
 
@@ -3274,7 +3288,7 @@ async function showCRUDModal(storeName, key = null, type = 'ADD') {
                 <select id="c-user-store" required>
                     <option value="" disabled selected>Pilih Store...</option>
                     <option value="ALL" ${record && record.store_code === 'ALL' ? 'selected' : ''}>ALL (Semua Store)</option>
-                    ${State.masterData.stores.map(s => `<option value="${s.code}" ${record && record.store_code === s.code ? 'selected' : ''}>${s.code} - ${s.name}</option>`).join('')}
+                    ${State.masterData.stores.map((s) => `<option value="${s.code}" ${record && record.store_code === s.code ? 'selected' : ''}>${s.code} - ${s.name}</option>`).join('')}
                 </select>
             </div>
         `;
@@ -3447,14 +3461,14 @@ async function showCRUDModal(storeName, key = null, type = 'ADD') {
                 <label for="c-frm-met">Pilih Logam / Kadar Utama</label>
                 <select id="c-frm-met" required>
                     <option value="" disabled selected>Pilih Logam...</option>
-                    ${State.masterData.metals.map(m => `<option value="${m.id}" ${record && record.metal_id === m.id ? 'selected' : ''}>${m.id} - ${m.name}</option>`).join('')}
+                    ${State.masterData.metals.map((m) => `<option value="${m.id}" ${record && record.metal_id === m.id ? 'selected' : ''}>${m.id} - ${m.name}</option>`).join('')}
                 </select>
             </div>
             <div class="form-group">
                 <label for="c-frm-raw">Pilih Bahan Mentah (Raw)</label>
                 <select id="c-frm-raw" required>
                     <option value="" disabled selected>Pilih Bahan Mentah...</option>
-                    ${State.masterData.rawmaterials.map(r => `<option value="${r.id}" ${record && record.raw_material_id === r.id ? 'selected' : ''}>${r.id} - ${r.name}</option>`).join('')}
+                    ${State.masterData.rawmaterials.map((r) => `<option value="${r.id}" ${record && record.raw_material_id === r.id ? 'selected' : ''}>${r.id} - ${r.name}</option>`).join('')}
                 </select>
             </div>
             <div class="form-group">
@@ -3481,7 +3495,7 @@ async function showCRUDModal(storeName, key = null, type = 'ADD') {
                 <label for="c-bnd-pkg">Pilih Packaging</label>
                 <select id="c-bnd-pkg" required>
                     <option value="" disabled selected>Pilih Packaging...</option>
-                    ${State.masterData.packaginginventory.map(p => `<option value="${p.id}" ${record && record.packaging_id === p.id ? 'selected' : ''}>${p.id} - ${p.name}</option>`).join('')}
+                    ${State.masterData.packaginginventory.map((p) => `<option value="${p.id}" ${record && record.packaging_id === p.id ? 'selected' : ''}>${p.id} - ${p.name}</option>`).join('')}
                 </select>
             </div>
             <div class="form-group">
@@ -3543,24 +3557,27 @@ async function showCRUDModal(storeName, key = null, type = 'ADD') {
                 }
                 const formulas = State.masterData.formulas || [];
                 const rawMaterials = State.masterData.rawmaterials || [];
-                const recipes = formulas.filter(f => f.metal_id === metalId);
-                
+                const recipes = formulas.filter((f) => f.metal_id === metalId);
+
                 if (recipes.length === 0) {
-                    showToast('Belum ada resep formulasi untuk ID Bahan ini. Tambahkan di tab Resep Formulasi terlebih dahulu.', 'warning');
+                    showToast(
+                        'Belum ada resep formulasi untuk ID Bahan ini. Tambahkan di tab Resep Formulasi terlebih dahulu.',
+                        'warning'
+                    );
                     return;
                 }
-                
+
                 let totalModal = 0;
                 let calculationDetail = [];
-                recipes.forEach(recipe => {
-                    const raw = rawMaterials.find(r => r.id === recipe.raw_material_id);
+                recipes.forEach((recipe) => {
+                    const raw = rawMaterials.find((r) => r.id === recipe.raw_material_id);
                     if (raw && recipe.percentage) {
-                        const cost = (raw.price_per_gram * (recipe.percentage / 100));
+                        const cost = raw.price_per_gram * (recipe.percentage / 100);
                         totalModal += cost;
                         calculationDetail.push(`${raw.name} (${recipe.percentage}%)`);
                     }
                 });
-                
+
                 document.getElementById('c-met-modal').value = Math.round(totalModal);
                 showToast('Kalkulasi berhasil: ' + calculationDetail.join(' + '), 'success');
             });
@@ -3719,17 +3736,17 @@ async function executeProductionAssignSubmit() {
                     const addGram = parseFloat(addGramInput.value) || 0;
                     const oldWeight = parseFloat(match[`${type}_weight`]) || 0;
                     const targetWeight = parseFloat(match[`${type}_target_weight`]) || 0;
-                    
+
                     const mName = match[`${type}_material`];
                     let metalId = '';
                     if (State.masterData.metals) {
-                        const metalObj = State.masterData.metals.find(m => m.name === mName);
+                        const metalObj = State.masterData.metals.find((m) => m.name === mName);
                         if (metalObj) metalId = metalObj.id;
                     }
 
                     const jobId = 'PROD-' + new Date().getTime() + '-' + type.toUpperCase();
                     const initialTotal = oldWeight + addGram;
-                    
+
                     const payload = {
                         id: jobId,
                         repair_number: repNum,
@@ -3746,8 +3763,11 @@ async function executeProductionAssignSubmit() {
                         penalty_applied: 'FALSE',
                         recorded_by: State.currentUser.username
                     };
-                    
-                    await queueSyncTask('SAVE_MASTER_RECORD', { store_name: 'master_productionjobs', payload: payload });
+
+                    await queueSyncTask('SAVE_MASTER_RECORD', {
+                        store_name: 'master_productionjobs',
+                        payload: payload
+                    });
                     await saveLocalData('master_productionjobs', payload);
                 }
             }
@@ -4001,7 +4021,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     ];
     calcSelectors.forEach((id) => {
         const el = document.getElementById(id);
-        if(el) {
+        if (el) {
             el.addEventListener('input', () => calculateFormPricing());
             el.addEventListener('change', () => calculateFormPricing());
         }
@@ -4009,13 +4029,13 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     ['cowok', 'cewek'].forEach((type) => {
         const cb = document.getElementById(`${type}-is-reproduct`);
-        if(cb) {
+        if (cb) {
             cb.addEventListener('change', (e) => {
                 const isRepro = e.target.checked;
                 const oldWeightGrp = document.getElementById(`${type}-old-weight-group`);
                 const repairTypeSelect = document.getElementById(`${type}-repair-type`);
-                
-                if(isRepro) {
+
+                if (isRepro) {
                     oldWeightGrp.classList.remove('hidden');
                     repairTypeSelect.disabled = true;
                     repairTypeSelect.value = '';
@@ -4411,9 +4431,9 @@ document.addEventListener('DOMContentLoaded', async () => {
 
             await queueSyncTask('UPDATE_REPAIR_STATUS', {
                 repair_number: repairNumber,
-                pelunasan_method: method,
-                pelunasan_amount: amount,
-                pelunasan_receipt_url: base64Data,
+                dp2_method: method,
+                dp2_amount: amount,
+                dp2_receipt_url: base64Data,
                 pelunasan_approval: 'Pending'
             });
             runBackgroundSync();
@@ -5433,7 +5453,7 @@ function showMeltingJobModal() {
     const display = document.getElementById('melt-formula-display');
     const inputGroup = document.getElementById('melt-input-group');
     const calcBreakdown = document.getElementById('melt-calc-breakdown');
-    
+
     // Reset Form
     select.innerHTML = '<option value="">Pilih Logam...</option>';
     document.getElementById('melt-target-weight').value = '';
@@ -5447,12 +5467,12 @@ function showMeltingJobModal() {
         showToast('Data master belum siap. Pastikan Anda online.', 'warning');
         return;
     }
-    
+
     // Get unique metal IDs from formulas
-    const metalIdsWithFormula = [...new Set(State.masterData.formulas.map(f => f.metal_id))];
-    
-    metalIdsWithFormula.forEach(mId => {
-        const metal = State.masterData.metals.find(m => m.id === mId);
+    const metalIdsWithFormula = [...new Set(State.masterData.formulas.map((f) => f.metal_id))];
+
+    metalIdsWithFormula.forEach((mId) => {
+        const metal = State.masterData.metals.find((m) => m.id === mId);
         if (metal) {
             const option = document.createElement('option');
             option.value = mId;
@@ -5478,26 +5498,26 @@ document.getElementById('melt-metal-id')?.addEventListener('change', (e) => {
     const list = document.getElementById('melt-recipe-list');
     const inputGroup = document.getElementById('melt-input-group');
     const calcBreakdown = document.getElementById('melt-calc-breakdown');
-    
+
     if (!mId) {
         display.classList.add('hidden');
         inputGroup.classList.add('hidden');
         calcBreakdown.classList.add('hidden');
         return;
     }
-    
-    const recipes = State.masterData.formulas.filter(f => f.metal_id === mId);
+
+    const recipes = State.masterData.formulas.filter((f) => f.metal_id === mId);
     list.innerHTML = '';
-    recipes.forEach(r => {
-        const raw = State.masterData.rawmaterials.find(rw => rw.id === r.raw_material_id);
+    recipes.forEach((r) => {
+        const raw = State.masterData.rawmaterials.find((rw) => rw.id === r.raw_material_id);
         const li = document.createElement('li');
         li.textContent = `${raw ? raw.name : r.raw_material_id} - ${r.percentage}%`;
         list.appendChild(li);
     });
-    
+
     display.classList.remove('hidden');
     inputGroup.classList.remove('hidden');
-    
+
     // Trigger calc if weight already filled
     calculateMeltingCost();
 });
@@ -5510,48 +5530,49 @@ function calculateMeltingCost() {
     const mId = document.getElementById('melt-metal-id').value;
     const targetWeight = parseFloat(document.getElementById('melt-target-weight').value) || 0;
     const yieldWeight = parseFloat(document.getElementById('melt-yield-weight').value) || 0;
-    
+
     const calcBreakdown = document.getElementById('melt-calc-breakdown');
     const reqList = document.getElementById('melt-req-list');
-    
+
     if (!mId || targetWeight <= 0) {
         calcBreakdown.classList.add('hidden');
         return;
     }
-    
-    const recipes = State.masterData.formulas.filter(f => f.metal_id === mId);
+
+    const recipes = State.masterData.formulas.filter((f) => f.metal_id === mId);
     let totalCost = 0;
     let reqHtml = '';
-    
-    recipes.forEach(r => {
-        const raw = State.masterData.rawmaterials.find(rw => rw.id === r.raw_material_id);
+
+    recipes.forEach((r) => {
+        const raw = State.masterData.rawmaterials.find((rw) => rw.id === r.raw_material_id);
         if (raw) {
             const neededGram = targetWeight * (r.percentage / 100);
             const cost = neededGram * raw.price_per_gram;
             totalCost += cost;
-            
-            const warn = neededGram > raw.stock_gram ? `<span style="color:red; font-size:11px;">(Stok Kurang!)</span>` : '';
+
+            const warn =
+                neededGram > raw.stock_gram ? `<span style="color:red; font-size:11px;">(Stok Kurang!)</span>` : '';
             reqHtml += `<div style="display:flex; justify-content:space-between; border-bottom:1px solid rgba(0,0,0,0.05); padding: 4px 0;">
                 <span>${raw.name} <strong style="color:var(--primary-color)">${neededGram.toFixed(2)} gr</strong> ${warn}</span>
                 <span>Rp ${Math.round(cost).toLocaleString('id-ID')}</span>
             </div>`;
         }
     });
-    
+
     reqList.innerHTML = reqHtml;
     document.getElementById('melt-total-cost').textContent = `Rp ${Math.round(totalCost).toLocaleString('id-ID')}`;
-    
+
     if (yieldWeight > 0) {
         const shrinkage = targetWeight - yieldWeight;
         const hpp = totalCost / yieldWeight;
-        
+
         document.getElementById('melt-shrinkage').textContent = `${shrinkage.toFixed(2)} gr`;
         document.getElementById('melt-final-hpp').textContent = `Rp ${Math.round(hpp).toLocaleString('id-ID')} / gr`;
     } else {
         document.getElementById('melt-shrinkage').textContent = '0 gr';
         document.getElementById('melt-final-hpp').textContent = 'Rp 0 / gr';
     }
-    
+
     calcBreakdown.classList.remove('hidden');
 }
 
@@ -5560,28 +5581,28 @@ document.getElementById('btn-save-melting')?.addEventListener('click', async () 
     const mId = document.getElementById('melt-metal-id').value;
     const targetWeight = parseFloat(document.getElementById('melt-target-weight').value) || 0;
     const yieldWeight = parseFloat(document.getElementById('melt-yield-weight').value) || 0;
-    
+
     if (!mId || targetWeight <= 0 || yieldWeight <= 0) {
         showToast('Harap lengkapi semua data formulir peleburan!', 'warning');
         return;
     }
-    
+
     if (yieldWeight > targetWeight) {
         showToast('Hasil timbangan tidak mungkin lebih besar dari total bahan masuk!', 'error');
         return;
     }
 
-    const recipes = State.masterData.formulas.filter(f => f.metal_id === mId);
+    const recipes = State.masterData.formulas.filter((f) => f.metal_id === mId);
     let totalCost = 0;
     let inputRawJson = [];
     let hasShortage = false;
 
-    recipes.forEach(r => {
-        const raw = State.masterData.rawmaterials.find(rw => rw.id === r.raw_material_id);
+    recipes.forEach((r) => {
+        const raw = State.masterData.rawmaterials.find((rw) => rw.id === r.raw_material_id);
         if (raw) {
             const neededGram = targetWeight * (r.percentage / 100);
             if (neededGram > raw.stock_gram) hasShortage = true;
-            
+
             const cost = neededGram * raw.price_per_gram;
             totalCost += cost;
             inputRawJson.push({
@@ -5619,10 +5640,10 @@ document.getElementById('btn-save-melting')?.addEventListener('click', async () 
         payload: payload,
         timestamp: new Date().getTime()
     };
-    
+
     await saveLocalData('sync_queue', syncItem);
     document.getElementById('melting-job-modal').classList.add('hidden');
-    
+
     showToast('SPK Peleburan berhasil dicatat! Menunggu sinkronisasi...', 'success');
     runBackgroundSync();
 });
@@ -5635,7 +5656,7 @@ function showProductionJobModal() {
     const modal = document.getElementById('production-job-modal');
     const wsSelect = document.getElementById('prod-workshop-id');
     const metalSelect = document.getElementById('prod-metal-id');
-    
+
     // Reset Form
     wsSelect.innerHTML = '<option value="">Pilih Workshop...</option>';
     metalSelect.innerHTML = '<option value="">Pilih Logam...</option>';
@@ -5650,9 +5671,9 @@ function showProductionJobModal() {
         showToast('Data master belum siap. Pastikan Anda online.', 'warning');
         return;
     }
-    
+
     // Populate Workshops
-    State.masterData.workshops.forEach(ws => {
+    State.masterData.workshops.forEach((ws) => {
         const option = document.createElement('option');
         option.value = ws.id;
         option.textContent = ws.name;
@@ -5662,13 +5683,13 @@ function showProductionJobModal() {
     // Populate Metals that have Solid/Lempeng stock
     let validMetals = new Set();
     if (State.masterData.processedmetals) {
-        State.masterData.processedmetals.forEach(pm => {
+        State.masterData.processedmetals.forEach((pm) => {
             if (pm.type === 'Solid/Lempeng' && pm.stock_gram > 0) validMetals.add(pm.metal_id);
         });
     }
 
-    validMetals.forEach(mId => {
-        const metal = State.masterData.metals.find(m => m.id === mId);
+    validMetals.forEach((mId) => {
+        const metal = State.masterData.metals.find((m) => m.id === mId);
         if (metal) {
             const option = document.createElement('option');
             option.value = mId;
@@ -5689,7 +5710,7 @@ document.getElementById('btn-cancel-prod')?.addEventListener('click', () => {
 
 // Real-time calculation listener
 const prodInputs = ['prod-initial-weight', 'prod-final-weight', 'prod-scrap-weight', 'prod-dust-weight'];
-prodInputs.forEach(id => {
+prodInputs.forEach((id) => {
     document.getElementById(id)?.addEventListener('input', calculateProductionLoss);
 });
 
@@ -5698,28 +5719,28 @@ function calculateProductionLoss() {
     const final = parseFloat(document.getElementById('prod-final-weight').value) || 0;
     const scrap = parseFloat(document.getElementById('prod-scrap-weight').value) || 0;
     const dust = parseFloat(document.getElementById('prod-dust-weight').value) || 0;
-    
+
     const breakdown = document.getElementById('prod-loss-breakdown');
     const btnSave = document.getElementById('btn-save-prod');
-    
+
     if (initial <= 0 || (final === 0 && scrap === 0 && dust === 0)) {
         breakdown.classList.add('hidden');
         btnSave.disabled = true;
         return;
     }
-    
+
     const totalReturned = final + scrap + dust;
     const loss = initial - totalReturned;
     const lossPercentage = (loss / initial) * 100;
-    
+
     document.getElementById('prod-total-returned').textContent = `${totalReturned.toFixed(2)} gr`;
-    
+
     const lossEl = document.getElementById('prod-loss-weight');
     lossEl.textContent = `${loss.toFixed(2)} gr (${lossPercentage.toFixed(2)}%)`;
-    
+
     const alertFraud = document.getElementById('prod-fraud-alert');
     const alertSafe = document.getElementById('prod-safe-alert');
-    
+
     if (loss < 0) {
         lossEl.style.color = 'var(--red)';
         lossEl.textContent = `Error: Hasil pengembalian lebih besar dari modal awal!`;
@@ -5729,7 +5750,7 @@ function calculateProductionLoss() {
     } else {
         breakdown.classList.remove('hidden');
         btnSave.disabled = false;
-        
+
         // STANDARD TOLERANCE: 4%
         if (lossPercentage > 4.0) {
             lossEl.style.color = 'var(--red)';
@@ -5754,19 +5775,19 @@ document.getElementById('btn-save-prod')?.addEventListener('click', async () => 
     const scrap = parseFloat(document.getElementById('prod-scrap-weight').value) || 0;
     const dust = parseFloat(document.getElementById('prod-dust-weight').value) || 0;
     const penaltyApplied = document.getElementById('btn-save-prod').dataset.penalty === 'true';
-    
+
     if (!wsId || !mId || initial <= 0) {
         showToast('Mohon lengkapi Workshop, Logam, dan Berat Awal!', 'warning');
         return;
     }
-    
+
     // Check if initial stock is sufficient
     let currentStock = 0;
     if (State.masterData.processedmetals) {
-        const pm = State.masterData.processedmetals.find(p => p.metal_id === mId && p.type === 'Solid/Lempeng');
+        const pm = State.masterData.processedmetals.find((p) => p.metal_id === mId && p.type === 'Solid/Lempeng');
         if (pm) currentStock = pm.stock_gram;
     }
-    
+
     if (initial > currentStock) {
         showToast(`Stok Lempeng tidak cukup! Tersedia: ${currentStock} gr`, 'error');
         return;
@@ -5775,7 +5796,7 @@ document.getElementById('btn-save-prod')?.addEventListener('click', async () => 
     const loss = initial - (final + scrap + dust);
     const lossPct = (loss / initial) * 100;
     const jobId = 'PRD-' + new Date().getTime();
-    
+
     const payload = {
         id: jobId,
         date: new Date().toISOString(),
@@ -5797,15 +5818,15 @@ document.getElementById('btn-save-prod')?.addEventListener('click', async () => 
         payload: payload,
         timestamp: new Date().getTime()
     };
-    
+
     await saveLocalData('sync_queue', syncItem);
     document.getElementById('production-job-modal').classList.add('hidden');
-    
+
     if (penaltyApplied) {
         showToast('SPK Tersimpan dengan peringatan! Penalti pemotongan gaji dicatat.', 'warning');
     } else {
         showToast('Serah terima SPK Produksi berhasil.', 'success');
     }
-    
+
     runBackgroundSync();
 });
