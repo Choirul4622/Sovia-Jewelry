@@ -945,10 +945,13 @@ async function getTransactionFromForm() {
 
     const extractRingData = async (type, imgVar) => {
         const active = document.getElementById(`ring-${type}-active`).checked;
+        const isRepro = document.getElementById(`${type}-is-reproduct`)?.checked;
         return {
             [`${type}_active`]: active ? 'TRUE' : 'FALSE',
             [`${type}_material`]: active ? document.getElementById(`${type}-material`).value : '',
             [`${type}_weight`]: active ? parseFloat(document.getElementById(`${type}-weight`).value) || 0 : 0,
+            [`${type}_is_reproduct`]: active && isRepro ? 'TRUE' : 'FALSE',
+            [`${type}_target_weight`]: active && isRepro ? parseFloat(document.getElementById(`${type}-target-weight`).value) || 0 : 0,
             [`${type}_size`]: active ? document.getElementById(`${type}-size`).value : '',
             [`${type}_repair_type`]: active ? document.getElementById(`${type}-repair-type`).value : '',
             [`${type}_engraving`]: active ? document.getElementById(`${type}-engraving`).value : '',
@@ -2253,11 +2256,45 @@ async function printIndividualLogistic(repairNum) {
     if (printModal) printModal.classList.remove('hidden');
 }
 
-function showProductionAssignModal(repairNum) {
+async function showProductionAssignModal(repairNum) {
     let wksOptions = '<option value="" disabled selected>Pilih Pengrajin</option>';
     State.masterData.workshops.forEach((w) => {
         wksOptions += `<option value="${w.name}">${w.name}</option>`;
     });
+
+    const txs = await getLocalData('repair_transactions');
+    const tx = txs.find((t) => t.repair_number === repairNum);
+    if(!tx) return;
+
+    let cowokReproFields = '';
+    if (tx.cowok_is_reproduct === 'TRUE') {
+        cowokReproFields = `
+            <div style="background:var(--bg-light); padding:10px; border-radius:8px; margin-bottom:10px; border:1px solid rgba(197, 168, 92, 0.3);">
+                <strong><i class="fa-solid fa-mars"></i> SPK Cincin Pria (${tx.cowok_material || '-'})</strong><br/>
+                <small>Berat Bekas: <span id="spk-c-old">${tx.cowok_weight || 0}</span> gr | Target Baru: ${tx.cowok_target_weight || 0} gr</small>
+                <div class="form-group" style="margin-top:10px;">
+                    <label>Tambahan Emas Murni/Alloy (Gram) dari Gudang</label>
+                    <input type="number" id="crud-p-cowok-add" step="0.01" value="0" oninput="document.getElementById('spk-c-total').textContent = (parseFloat(this.value||0) + parseFloat(document.getElementById('spk-c-old').textContent)).toFixed(2)">
+                    <small>Total Modal Berat Awal: <strong id="spk-c-total" style="color:var(--gold);">${tx.cowok_weight || 0}</strong> gr</small>
+                </div>
+            </div>
+        `;
+    }
+
+    let cewekReproFields = '';
+    if (tx.cewek_is_reproduct === 'TRUE') {
+        cewekReproFields = `
+            <div style="background:var(--bg-light); padding:10px; border-radius:8px; margin-bottom:10px; border:1px solid rgba(197, 168, 92, 0.3);">
+                <strong><i class="fa-solid fa-venus"></i> SPK Cincin Wanita (${tx.cewek_material || '-'})</strong><br/>
+                <small>Berat Bekas: <span id="spk-cw-old">${tx.cewek_weight || 0}</span> gr | Target Baru: ${tx.cewek_target_weight || 0} gr</small>
+                <div class="form-group" style="margin-top:10px;">
+                    <label>Tambahan Emas Murni/Alloy (Gram) dari Gudang</label>
+                    <input type="number" id="crud-p-cewek-add" step="0.01" value="0" oninput="document.getElementById('spk-cw-total').textContent = (parseFloat(this.value||0) + parseFloat(document.getElementById('spk-cw-old').textContent)).toFixed(2)">
+                    <small>Total Modal Berat Awal: <strong id="spk-cw-total" style="color:var(--gold);">${tx.cewek_weight || 0}</strong> gr</small>
+                </div>
+            </div>
+        `;
+    }
 
     const fields = `
         <input type="hidden" id="crud-p-repnum" value="${repairNum}">
@@ -2267,9 +2304,12 @@ function showProductionAssignModal(repairNum) {
                 ${wksOptions}
             </select>
         </div>
+        ${cowokReproFields}
+        ${cewekReproFields}
+        ${(tx.cowok_is_reproduct !== 'TRUE' && tx.cewek_is_reproduct !== 'TRUE') ? '<small style="color:var(--text-muted);"><i class="fa-solid fa-info-circle"></i> Repair biasa (bukan reproduksi), tidak membutuhkan input modal logam awal.</small>' : ''}
     `;
 
-    document.getElementById('crud-modal-title').textContent = `Delegasi Pengrajin (${repairNum})`;
+    document.getElementById('crud-modal-title').textContent = `Delegasi Pengrajin & SPK (${repairNum})`;
     document.getElementById('crud-form-fields').innerHTML = fields;
 
     const crudModal = document.getElementById('crud-modal');
@@ -3194,7 +3234,11 @@ async function showCRUDModal(storeName, key = null, type = 'ADD') {
             </div>
             <div class="form-group">
                 <label for="c-user-store">Kode Store Relasi</label>
-                <input type="text" id="c-user-store" placeholder="E.g., BEK or ALL" value="${record ? record.store_code : ''}" required>
+                <select id="c-user-store" required>
+                    <option value="" disabled selected>Pilih Store...</option>
+                    <option value="ALL" ${record && record.store_code === 'ALL' ? 'selected' : ''}>ALL (Semua Store)</option>
+                    ${State.masterData.stores.map(s => `<option value="${s.code}" ${record && record.store_code === s.code ? 'selected' : ''}>${s.code} - ${s.name}</option>`).join('')}
+                </select>
             </div>
         `;
     }
@@ -3363,12 +3407,18 @@ async function showCRUDModal(storeName, key = null, type = 'ADD') {
                 <input type="text" id="c-frm-id" placeholder="E.g., FRM-001" value="${record ? record.id : generateNewId(storeName)}" readonly class="readonly-input" required>
             </div>
             <div class="form-group">
-                <label for="c-frm-met">ID Logam / Kadar Utama</label>
-                <input type="text" id="c-frm-met" placeholder="E.g., MET-001" value="${record ? record.metal_id : ''}" required>
+                <label for="c-frm-met">Pilih Logam / Kadar Utama</label>
+                <select id="c-frm-met" required>
+                    <option value="" disabled selected>Pilih Logam...</option>
+                    ${State.masterData.metals.map(m => `<option value="${m.id}" ${record && record.metal_id === m.id ? 'selected' : ''}>${m.id} - ${m.name}</option>`).join('')}
+                </select>
             </div>
             <div class="form-group">
-                <label for="c-frm-raw">ID Bahan Mentah (Raw)</label>
-                <input type="text" id="c-frm-raw" placeholder="E.g., RAW-001" value="${record ? record.raw_material_id : ''}" required>
+                <label for="c-frm-raw">Pilih Bahan Mentah (Raw)</label>
+                <select id="c-frm-raw" required>
+                    <option value="" disabled selected>Pilih Bahan Mentah...</option>
+                    ${State.masterData.rawmaterials.map(r => `<option value="${r.id}" ${record && record.raw_material_id === r.id ? 'selected' : ''}>${r.id} - ${r.name}</option>`).join('')}
+                </select>
             </div>
             <div class="form-group">
                 <label for="c-frm-pct">Persentase (%)</label>
@@ -3391,8 +3441,11 @@ async function showCRUDModal(storeName, key = null, type = 'ADD') {
                 </select>
             </div>
             <div class="form-group">
-                <label for="c-bnd-pkg">ID Packaging</label>
-                <input type="text" id="c-bnd-pkg" placeholder="E.g., PKG-001" value="${record ? record.packaging_id : ''}" required>
+                <label for="c-bnd-pkg">Pilih Packaging</label>
+                <select id="c-bnd-pkg" required>
+                    <option value="" disabled selected>Pilih Packaging...</option>
+                    ${State.masterData.packaginginventory.map(p => `<option value="${p.id}" ${record && record.packaging_id === p.id ? 'selected' : ''}>${p.id} - ${p.name}</option>`).join('')}
+                </select>
             </div>
             <div class="form-group">
                 <label for="c-bnd-qty">Kuantitas per Transaksi</label>
@@ -3619,7 +3672,54 @@ async function executeProductionAssignSubmit() {
             production_status: 'Active'
         });
 
-        showToast(`Cincin ${repNum} didelegasikan ke ${assignedWks}!`, 'success');
+        // ----------------------------------------------------
+        // SPK PRODUKSI TERINTEGRASI (BUAT RECORD BARU JIKA REPRO)
+        // ----------------------------------------------------
+        const processSPK = async (type) => {
+            if (match[`${type}_is_reproduct`] === 'TRUE') {
+                const addGramInput = document.getElementById(`crud-p-${type}-add`);
+                if (addGramInput) {
+                    const addGram = parseFloat(addGramInput.value) || 0;
+                    const oldWeight = parseFloat(match[`${type}_weight`]) || 0;
+                    const targetWeight = parseFloat(match[`${type}_target_weight`]) || 0;
+                    
+                    const mName = match[`${type}_material`];
+                    let metalId = '';
+                    if (State.masterData.metals) {
+                        const metalObj = State.masterData.metals.find(m => m.name === mName);
+                        if (metalObj) metalId = metalObj.id;
+                    }
+
+                    const jobId = 'PROD-' + new Date().getTime() + '-' + type.toUpperCase();
+                    const initialTotal = oldWeight + addGram;
+                    
+                    const payload = {
+                        id: jobId,
+                        repair_number: repNum,
+                        date: new Date().toISOString(),
+                        workshop_id: assignedWks,
+                        metal_id: metalId,
+                        initial_gram: initialTotal,
+                        final_gram: 0,
+                        scrap_gram: 0,
+                        dust_gram: 0,
+                        loss_gram: 0,
+                        loss_percentage: 0,
+                        status: 'WIP',
+                        penalty_applied: 'FALSE',
+                        recorded_by: State.currentUser.username
+                    };
+                    
+                    await queueSyncTask('SAVE_MASTER_RECORD', { store_name: 'master_productionjobs', payload: payload });
+                    await saveLocalData('master_productionjobs', payload);
+                }
+            }
+        };
+
+        await processSPK('cowok');
+        await processSPK('cewek');
+
+        showToast(`Cincin ${repNum} didelegasikan ke ${assignedWks}! SPK diproses.`, 'success');
         document.getElementById('crud-modal').classList.add('hidden');
         await refreshAllData();
     }
