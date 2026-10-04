@@ -3149,6 +3149,18 @@ async function renderAdminPanels() {
         'loss_percentage',
         'status'
     ]);
+
+    // Procurement History
+    await loadAdminTable('procurementtransactions', 'master_procurementtransactions', [
+        'id',
+        'date',
+        'item_category',
+        'item_id',
+        'qty_added',
+        'unit_cost',
+        'supplier',
+        'recorded_by'
+    ]);
 }
 
 async function loadAdminTable(panelSuffix, storeName, keys) {
@@ -3759,7 +3771,13 @@ async function executeProductionAssignSubmit() {
 
                     await queueSyncTask('SAVE_PRODUCTION_JOB', payload);
                     await saveLocalData('master_productionjobs', payload);
+                    
+                    // Trigger Print SPK Tukang
+                    printSPKTukang(match, type, assignedWks, initialTotal, targetWeight);
                 }
+            } else {
+                // If not reproduct, we still might need to print a normal repair form
+                printSPKTukang(match, type, assignedWks, match[`${type}_weight`] || 0, match[`${type}_weight`] || 0);
             }
         };
 
@@ -3770,6 +3788,110 @@ async function executeProductionAssignSubmit() {
         document.getElementById('crud-modal').classList.add('hidden');
         await refreshAllData();
         runBackgroundSync();
+    }
+}
+
+// Helper: Cetak SPK Tukang Per Cincin (Tanpa Harga & Identitas Lengkap)
+function printSPKTukang(tx, type, wks, initialWeight, targetWeight) {
+    const isReproduct = String(tx[`${type}_is_reproduct`]).toUpperCase() === 'TRUE';
+    const renderImg = tx[`${type}_render_img`] || '';
+    const custName = tx.customer_name ? tx.customer_name.split(' ')[0] : 'NN';
+    const repNum = tx.repair_number;
+    
+    // Only show render if it's reproduct and image exists
+    const showRender = isReproduct && renderImg;
+
+    const htmlContent = `
+    <html>
+    <head>
+        <title>SPK Pengrajin - ${repNum} (${type.toUpperCase()})</title>
+        <style>
+            body { font-family: 'Arial', sans-serif; padding: 20px; color: #333; }
+            .header { text-align: center; border-bottom: 2px solid #000; padding-bottom: 10px; margin-bottom: 20px; }
+            .header h1 { margin: 0; font-size: 24px; text-transform: uppercase; }
+            .header p { margin: 5px 0 0 0; font-size: 14px; }
+            .content-table { width: 100%; border-collapse: collapse; margin-bottom: 20px; }
+            .content-table th, .content-table td { border: 1px solid #000; padding: 10px; text-align: left; }
+            .content-table th { background-color: #f5f5f5; width: 35%; }
+            .render-box { width: 100%; height: 400px; border: 2px dashed #999; display: flex; align-items: center; justify-content: center; margin-bottom: 20px; }
+            .render-box img { max-width: 100%; max-height: 100%; object-fit: contain; }
+            .footer { margin-top: 40px; display: flex; justify-content: space-between; text-align: center; }
+            .sign-box { width: 200px; }
+            .sign-box p { margin-bottom: 70px; font-weight: bold; }
+        </style>
+    </head>
+    <body onload="window.print(); setTimeout(() => window.close(), 1000);">
+        <div class="header">
+            <h1>SURAT PERINTAH KERJA (SPK) - WORKSHOP</h1>
+            <p><strong>No. Repair:</strong> ${repNum} | <strong>Tipe Cincin:</strong> ${type.toUpperCase()}</p>
+        </div>
+        
+        <table class="content-table">
+            <tr>
+                <th>Nama Pemesan</th>
+                <td>${custName} <em>(Identitas dienkripsi)</em></td>
+            </tr>
+            <tr>
+                <th>Workshop / Pengrajin</th>
+                <td><strong>${wks}</strong></td>
+            </tr>
+            <tr>
+                <th>Status Pekerjaan</th>
+                <td>${isReproduct ? 'PRODUKSI ULANG (REMAKE)' : 'REPAIR REGULER'}</td>
+            </tr>
+            <tr>
+                <th>Berat Logam Awal (Diserahkan)</th>
+                <td><strong>${initialWeight} Gram</strong></td>
+            </tr>
+            ${isReproduct ? `<tr>
+                <th>Target Berat Jadi (Estimasi)</th>
+                <td>${targetWeight || '-'} Gram</td>
+            </tr>` : ''}
+            <tr>
+                <th>Instruksi Tambahan (Ukir Nama)</th>
+                <td>${tx[`${type}_engraving`] || '-'}</td>
+            </tr>
+            <tr>
+                <th>Keterangan Ring Size dsb</th>
+                <td>${tx[`${type}_notes`] || '-'}</td>
+            </tr>
+        </table>
+
+        ${showRender ? `
+        <h3>Gambar Render / Referensi Model:</h3>
+        <div class="render-box">
+            <img src="${renderImg}" alt="Render Cincin ${type}">
+        </div>
+        ` : `
+        ${isReproduct ? `
+        <h3>Gambar Render / Referensi Model:</h3>
+        <div class="render-box">
+            <span style="color: #666;">(Tidak ada foto render yang diunggah)</span>
+        </div>
+        ` : ''}
+        `}
+
+        <div class="footer">
+            <div class="sign-box">
+                <p>Diserahkan Oleh,</p>
+                <hr>
+                <span>Bagian Produksi (Admin)</span>
+            </div>
+            <div class="sign-box">
+                <p>Diterima Oleh,</p>
+                <hr>
+                <span>${wks}</span>
+            </div>
+        </div>
+    </body>
+    </html>
+    `;
+
+    const printWin = window.open('', '_blank');
+    if (printWin) {
+        printWin.document.open();
+        printWin.document.write(htmlContent);
+        printWin.document.close();
     }
 }
 
@@ -6037,4 +6159,225 @@ async function executeProductionCompleteSubmit(repNum, cowokW, cewekW, scrap, du
     }
 
     await refreshAllData();
+}
+
+// ==========================================================================
+// 10. CETAK SURAT JALAN KOLEKTIF
+// ==========================================================================
+async function printCollectiveSuratJalan(type) {
+    const txs = await getLocalData('repair_transactions');
+    let title = '';
+    let filteredTxs = [];
+    
+    if (type === 'logistic') {
+        title = 'SURAT JALAN KOLEKTIF - PENGIRIMAN LOGISTIK';
+        filteredTxs = txs.filter(t => String(t.logistic_ready).toUpperCase() === 'TRUE' && String(t.logistic_shipped).toUpperCase() !== 'TRUE');
+    } else if (type === 'workshop') {
+        title = 'SURAT JALAN KOLEKTIF - DELEGASI WORKSHOP';
+        // Find those assigned but not yet completed
+        filteredTxs = txs.filter(t => (t.cowok_wks && String(t.production_status) !== 'Completed') || (t.cewek_wks && String(t.production_status) !== 'Completed'));
+    } else if (type === 'melting') {
+        title = 'SURAT PERINTAH KERJA (SPK) - PELEBURAN LOGAM';
+    }
+    
+    if (type !== 'melting' && filteredTxs.length === 0) {
+        showToast('Tidak ada data aktif untuk dicetak', 'warning');
+        return;
+    }
+
+    const todayStr = new Date().toLocaleDateString('id-ID');
+    
+    let tableRows = '';
+    if (type === 'melting') {
+        tableRows = `
+            <tr>
+                <td>1</td>
+                <td></td>
+                <td></td>
+                <td></td>
+                <td></td>
+                <td></td>
+            </tr>
+            <tr>
+                <td>2</td>
+                <td></td>
+                <td></td>
+                <td></td>
+                <td></td>
+                <td></td>
+            </tr>
+            <tr>
+                <td>3</td>
+                <td></td>
+                <td></td>
+                <td></td>
+                <td></td>
+                <td></td>
+            </tr>
+        `;
+    } else {
+        filteredTxs.forEach((tx, idx) => {
+            const custName = tx.customer_name ? tx.customer_name.split(' ')[0] : 'NN';
+            tableRows += `
+                <tr>
+                    <td>${idx + 1}</td>
+                    <td><strong>${tx.repair_number}</strong></td>
+                    <td>${custName} (Dienkripsi)</td>
+                    <td>${type === 'logistic' ? (tx.logistic_courier || '-') : ((tx.cowok_wks || '') + ' ' + (tx.cewek_wks || ''))}</td>
+                    <td>${type === 'logistic' ? (tx.logistic_address || '-') : 'Tunggu Produksi'}</td>
+                    <td></td>
+                </tr>
+            `;
+        });
+    }
+
+    const htmlContent = `
+    <html>
+    <head>
+        <title>${title}</title>
+        <style>
+            body { font-family: 'Arial', sans-serif; padding: 20px; color: #333; }
+            .header { text-align: center; border-bottom: 2px solid #000; padding-bottom: 10px; margin-bottom: 20px; }
+            .header h1 { margin: 0; font-size: 22px; text-transform: uppercase; }
+            .header p { margin: 5px 0 0 0; font-size: 14px; }
+            .content-table { width: 100%; border-collapse: collapse; margin-bottom: 20px; font-size: 13px; }
+            .content-table th, .content-table td { border: 1px solid #000; padding: 8px; text-align: left; }
+            .content-table th { background-color: #f5f5f5; }
+            .footer { margin-top: 40px; display: flex; justify-content: space-between; text-align: center; }
+            .sign-box { width: 200px; }
+            .sign-box p { margin-bottom: 70px; font-weight: bold; }
+        </style>
+    </head>
+    <body onload="window.print(); setTimeout(() => window.close(), 1000);">
+        <div class="header">
+            <h1>${title}</h1>
+            <p><strong>Tanggal:</strong> ${todayStr} | <strong>Dicetak Oleh:</strong> ${State.currentUser ? State.currentUser.username : 'Admin'}</p>
+        </div>
+        
+        <table class="content-table">
+            <thead>
+                <tr>
+                    <th style="width: 5%">No</th>
+                    <th style="width: 15%">No. Referensi</th>
+                    <th style="width: 20%">Nama Pelanggan</th>
+                    <th style="width: 20%">${type === 'logistic' ? 'Kurir / Ekspedisi' : (type === 'workshop' ? 'Tujuan Workshop' : 'Jenis Logam')}</th>
+                    <th style="width: 25%">${type === 'logistic' ? 'Alamat Tujuan' : (type === 'workshop' ? 'Keterangan' : 'Berat (Gram)')}</th>
+                    <th style="width: 15%">Ceklis Fisik</th>
+                </tr>
+            </thead>
+            <tbody>
+                ${tableRows}
+            </tbody>
+        </table>
+
+        <div class="footer">
+            <div class="sign-box">
+                <p>Diserahkan Oleh,</p>
+                <hr>
+                <span>Bagian Administrasi</span>
+            </div>
+            <div class="sign-box">
+                <p>Diterima Oleh,</p>
+                <hr>
+                <span>( ............................ )</span>
+            </div>
+        </div>
+    </body>
+    </html>
+    `;
+
+    const printWin = window.open('', '_blank');
+    if (printWin) {
+        printWin.document.open();
+        printWin.document.write(htmlContent);
+        printWin.document.close();
+    }
+}
+
+// ==========================================================================
+// 11. PROCUREMENT / RESTOCK LOGIC
+// ==========================================================================
+function showProcurementModal() {
+    checkAdminAuthority(async () => {
+        document.getElementById('proc-qty').value = '';
+        document.getElementById('proc-unit-cost').value = '';
+        document.getElementById('proc-supplier').value = '';
+        document.getElementById('proc-notes').value = '';
+        document.getElementById('proc-category').value = 'rawmaterial';
+        
+        await populateProcurementItems();
+        document.getElementById('procurement-modal').classList.remove('hidden');
+    });
+}
+
+async function populateProcurementItems() {
+    const category = document.getElementById('proc-category').value;
+    const select = document.getElementById('proc-item-id');
+    select.innerHTML = '<option value="">-- Pilih Item --</option>';
+    
+    let storeName = category === 'rawmaterial' ? 'master_rawmaterials' : 'master_packaginginventory';
+    const items = await getLocalData(storeName);
+    
+    items.forEach(i => {
+        const option = document.createElement('option');
+        option.value = i.id;
+        option.textContent = `[${i.id}] ${i.name}`;
+        select.appendChild(option);
+    });
+}
+
+async function executeProcurementSubmit() {
+    const category = document.getElementById('proc-category').value;
+    const itemId = document.getElementById('proc-item-id').value;
+    const qty = parseFloat(document.getElementById('proc-qty').value);
+    const unitCost = parseFloat(document.getElementById('proc-unit-cost').value);
+    const supplier = document.getElementById('proc-supplier').value;
+    const notes = document.getElementById('proc-notes').value;
+
+    if (!itemId || isNaN(qty) || qty <= 0 || isNaN(unitCost) || unitCost < 0) {
+        showToast('Mohon lengkapi item, kuantitas (minimal > 0), dan harga satuan yang valid!', 'error');
+        return;
+    }
+
+    const txId = 'PO-' + new Date().getTime();
+    
+    const payload = {
+        id: txId,
+        date: new Date().toISOString(),
+        item_category: category,
+        item_id: itemId,
+        qty_added: qty,
+        unit_cost: unitCost,
+        total_cost: qty * unitCost,
+        supplier: supplier,
+        notes: notes,
+        recorded_by: State.currentUser.username
+    };
+
+    // Save history
+    await queueSyncTask('SAVE_PROCUREMENT', payload);
+    await saveLocalData('master_procurementtransactions', payload);
+    
+    // Update local stock directly so UI reflects immediately
+    const storeName = category === 'rawmaterial' ? 'master_rawmaterials' : 'master_packaginginventory';
+    const item = await getLocalDataById(storeName, itemId);
+    if (item) {
+        const stockKey = category === 'rawmaterial' ? 'stock_gram' : 'stock_qty';
+        const oldStock = parseFloat(item[stockKey]) || 0;
+        item[stockKey] = oldStock + qty;
+        
+        if (category === 'rawmaterial') {
+            const oldCost = parseFloat(item.price_per_gram) || 0;
+            const totalOldVal = oldStock * oldCost;
+            const totalNewVal = qty * unitCost;
+            item.price_per_gram = (totalOldVal + totalNewVal) / item[stockKey];
+        }
+        await saveLocalData(storeName, item);
+    }
+
+    showToast('Pembelian berhasil dicatat dan stok gudang ter-update!', 'success');
+    document.getElementById('procurement-modal').classList.add('hidden');
+    
+    await refreshAllData();
+    runBackgroundSync();
 }

@@ -1174,9 +1174,15 @@
                     <!-- Sub-tab 2: Workshop -->
                     <div class="admin-tab-pane" id="tab-prod-workshop">
                         <div class="premium-card">
-                            <h3>Penugasan Pengrajin Cincin</h3>
-                            <p>Kelola perbaikan cincin dan tentukan status pengerjaan fisik di bengkel/workshop.</p>
-                            <br />
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; flex-wrap: wrap; gap: 15px;">
+                                <div>
+                                    <h3 style="margin-bottom: 5px">Penugasan Pengrajin Cincin</h3>
+                                    <p style="font-size: 13px; color: var(--text-muted)">Kelola perbaikan cincin dan tentukan status pengerjaan fisik di bengkel/workshop.</p>
+                                </div>
+                                <button class="premium-btn" onclick="printCollectiveSuratJalan('workshop')">
+                                    <i class="fa-solid fa-print"></i> Cetak Surat Jalan Kolektif (Workshop)
+                                </button>
+                            </div>
                             <div class="table-scroll-container">
                                 <table class="premium-table">
                                     <thead>
@@ -1378,8 +1384,11 @@
                                 <div class="admin-pane-header">
                                     <h3>Gudang Logam Olahan (Stok Setengah Jadi)</h3>
                                     <div style="display: flex; gap: 8px">
+                                        <button class="premium-btn btn-sec font-compact" onclick="printCollectiveSuratJalan('melting')">
+                                            <i class="fa-solid fa-print"></i> Cetak SPK Peleburan
+                                        </button>
                                         <button
-                                            class="premium-btn btn-sec font-compact"
+                                            class="premium-btn font-compact"
                                             onclick="showMeltingJobModal()"
                                         >
                                             <i class="fa-solid fa-fire-burner"></i> Catat SPK Peleburan
@@ -1434,21 +1443,40 @@
                             <div class="admin-tab-pane" id="tab-logistic-procurement">
                                 <div class="admin-pane-header">
                                     <h3>Pengadaan Barang & Logam Murni (Procurement)</h3>
-                                    <button
-                                        class="premium-btn btn-sec font-compact btn-admin-add"
-                                        data-type="rawmaterial"
-                                    >
-                                        <i class="fa-solid fa-plus"></i> Request / Tambah Bahan
-                                    </button>
+                                    <div style="display: flex; gap: 8px">
+                                        <button class="premium-btn btn-sec font-compact btn-admin-add" data-type="rawmaterial">
+                                            <i class="fa-solid fa-plus"></i> Tambah Master Bahan Mentah
+                                        </button>
+                                        <button class="premium-btn font-compact" onclick="showProcurementModal()">
+                                            <i class="fa-solid fa-truck-loading"></i> Catat PO (Restock / Pembelian)
+                                        </button>
+                                    </div>
                                 </div>
-                                <table class="premium-table font-compact" id="table-admin-rawmaterials">
+                                <table class="premium-table font-compact" id="table-admin-rawmaterials" style="margin-bottom: 25px;">
                                     <thead>
                                         <tr>
                                             <th>ID Bahan Mentah</th>
                                             <th>Nama Logam Murni / Alloy</th>
                                             <th>Stok Tersedia (Gram)</th>
-                                            <th>Harga Pasar (Rp/gr)</th>
+                                            <th>HPP Rata-rata (Rp/gr)</th>
                                             <th style="width: 130px; text-align: center">Aksi</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody></tbody>
+                                </table>
+
+                                <h3>Riwayat Pembelian & Restock Barang</h3>
+                                <table class="premium-table font-compact" id="table-admin-procurementtransactions">
+                                    <thead>
+                                        <tr>
+                                            <th>ID Transaksi</th>
+                                            <th>Tanggal</th>
+                                            <th>Kategori</th>
+                                            <th>Item ID</th>
+                                            <th>Qty Restock</th>
+                                            <th>HPP/Unit Beli (Rp)</th>
+                                            <th>Supplier</th>
+                                            <th>Dicatat Oleh</th>
                                         </tr>
                                     </thead>
                                     <tbody></tbody>
@@ -2946,6 +2974,58 @@
                     <button class="premium-btn" id="btn-save-prod" disabled>
                         <i class="fa-solid fa-floppy-disk"></i> Validasi & Simpan
                     </button>
+                </div>
+            </div>
+        </div>
+        <!-- 9. PROCUREMENT (RESTOCK) MODAL -->
+        <div id="procurement-modal" class="modal-overlay hidden">
+            <div class="modal-card modal-medium">
+                <div class="modal-header">
+                    <h2><i class="fa-solid fa-truck-loading"></i> Catat Pembelian & Restock (PO)</h2>
+                    <button class="modal-close-btn" onclick="document.getElementById('procurement-modal').classList.add('hidden')">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <p style="margin-bottom: 15px;">Pilih kategori barang dan isi detail pembelian untuk meng-update stok secara otomatis.</p>
+                    
+                    <div class="input-group">
+                        <label>Kategori Inventaris</label>
+                        <select id="proc-category" onchange="populateProcurementItems()">
+                            <option value="rawmaterial">Logam Murni & Raw Material</option>
+                            <option value="packaging">Packaging & Kelengkapan</option>
+                        </select>
+                    </div>
+
+                    <div class="input-group">
+                        <label>Pilih Item</label>
+                        <select id="proc-item-id">
+                            <!-- Populated dynamically -->
+                        </select>
+                    </div>
+
+                    <div class="input-row" style="display: flex; gap: 10px;">
+                        <div class="input-group" style="flex: 1;">
+                            <label>Kuantitas (Gram / Pcs)</label>
+                            <input type="number" step="0.01" id="proc-qty" placeholder="0" />
+                        </div>
+                        <div class="input-group" style="flex: 1;">
+                            <label>Harga Satuan Beli (Rp)</label>
+                            <input type="number" id="proc-unit-cost" placeholder="0" />
+                        </div>
+                    </div>
+
+                    <div class="input-group">
+                        <label>Nama Supplier / Pihak Ketiga</label>
+                        <input type="text" id="proc-supplier" placeholder="Contoh: PT. Emas Mulia" />
+                    </div>
+
+                    <div class="input-group">
+                        <label>Catatan Tambahan</label>
+                        <textarea id="proc-notes" rows="2" placeholder="Catatan pembelian..."></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button class="premium-btn btn-sec" onclick="document.getElementById('procurement-modal').classList.add('hidden')">Batal</button>
+                    <button class="premium-btn" onclick="executeProcurementSubmit()">Simpan & Update Stok</button>
                 </div>
             </div>
         </div>
