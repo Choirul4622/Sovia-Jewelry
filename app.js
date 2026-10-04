@@ -360,11 +360,11 @@ function normalizeTransaction(tx) {
     if (!tx) return tx;
     if (tx.cowok_active !== undefined) {
         const val = tx.cowok_active;
-        tx.cowok_active = val === true || val === 'TRUE' || String(val).toLowerCase() === 'true' ? 'TRUE' : 'FALSE';
+        tx.cowok_active = val === true || String(val).toUpperCase() === 'TRUE' ? 'TRUE' : 'FALSE';
     }
     if (tx.cewek_active !== undefined) {
         const val = tx.cewek_active;
-        tx.cewek_active = val === true || val === 'TRUE' || String(val).toLowerCase() === 'true' ? 'TRUE' : 'FALSE';
+        tx.cewek_active = val === true || String(val).toUpperCase() === 'TRUE' ? 'TRUE' : 'FALSE';
     }
     return tx;
 }
@@ -3719,12 +3719,7 @@ async function executeProductionAssignSubmit() {
                     const oldWeight = parseFloat(match[`${type}_weight`]) || 0;
                     const targetWeight = parseFloat(match[`${type}_target_weight`]) || 0;
 
-                    const mName = match[`${type}_material`];
-                    let metalId = '';
-                    if (State.masterData.metals) {
-                        const metalObj = State.masterData.metals.find((m) => m.name === mName);
-                        if (metalObj) metalId = metalObj.id;
-                    }
+                    const metalId = match[`${type}_material`] || '';
 
                     const jobId = 'PROD-' + new Date().getTime() + '-' + type.toUpperCase();
                     // NEW MECHANISM: Initial weight is strictly the new materials. Old ring is kept in warehouse.
@@ -3759,6 +3754,7 @@ async function executeProductionAssignSubmit() {
         showToast(`Cincin ${repNum} didelegasikan ke ${assignedWks}! SPK diproses.`, 'success');
         document.getElementById('crud-modal').classList.add('hidden');
         await refreshAllData();
+        runBackgroundSync();
     }
 }
 
