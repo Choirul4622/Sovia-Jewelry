@@ -1452,35 +1452,39 @@
                                         </button>
                                     </div>
                                 </div>
-                                <table class="premium-table font-compact" id="table-admin-rawmaterials" style="margin-bottom: 25px;">
-                                    <thead>
-                                        <tr>
-                                            <th>ID Bahan Mentah</th>
-                                            <th>Nama Logam Murni / Alloy</th>
-                                            <th>Stok Tersedia (Gram)</th>
-                                            <th>HPP Rata-rata (Rp/gr)</th>
-                                            <th style="width: 130px; text-align: center">Aksi</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody></tbody>
-                                </table>
+                                <div class="premium-card" style="padding: 0; overflow-x: auto; margin-bottom: 25px;">
+                                    <table class="premium-table font-compact" id="table-admin-rawmaterials">
+                                        <thead>
+                                            <tr>
+                                                <th>ID Bahan Mentah</th>
+                                                <th>Nama Logam Murni / Alloy</th>
+                                                <th>Stok Tersedia (Gram)</th>
+                                                <th>HPP Rata-rata (Rp/gr)</th>
+                                                <th style="width: 130px; text-align: center">Aksi</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody></tbody>
+                                    </table>
+                                </div>
 
                                 <h3>Riwayat Pembelian & Restock Barang</h3>
-                                <table class="premium-table font-compact" id="table-admin-procurementtransactions">
-                                    <thead>
-                                        <tr>
-                                            <th>ID Transaksi</th>
-                                            <th>Tanggal</th>
-                                            <th>Kategori</th>
-                                            <th>Item ID</th>
-                                            <th>Qty Restock</th>
-                                            <th>HPP/Unit Beli (Rp)</th>
-                                            <th>Supplier</th>
-                                            <th>Dicatat Oleh</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody></tbody>
-                                </table>
+                                <div class="premium-card" style="padding: 0; overflow-x: auto;">
+                                    <table class="premium-table font-compact" id="table-admin-procurementtransactions">
+                                        <thead>
+                                            <tr>
+                                                <th>ID Transaksi</th>
+                                                <th>Tanggal</th>
+                                                <th>Kategori</th>
+                                                <th>Item ID</th>
+                                                <th>Qty Restock</th>
+                                                <th>HPP/Unit Beli (Rp)</th>
+                                                <th>Supplier</th>
+                                                <th>Dicatat Oleh</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody></tbody>
+                                    </table>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -2985,42 +2989,44 @@
                     <button class="modal-close-btn" onclick="document.getElementById('procurement-modal').classList.add('hidden')">&times;</button>
                 </div>
                 <div class="modal-body">
-                    <p style="margin-bottom: 15px;">Pilih kategori barang dan isi detail pembelian untuk meng-update stok secara otomatis.</p>
+                    <div class="premium-alert" style="margin-bottom: 20px;">
+                        <i class="fa-solid fa-circle-info"></i> Pilih kategori barang dan isi detail pembelian untuk meng-update stok secara otomatis.
+                    </div>
                     
-                    <div class="input-group">
+                    <div class="form-group">
                         <label>Kategori Inventaris</label>
-                        <select id="proc-category" onchange="populateProcurementItems()">
+                        <select id="proc-category" class="premium-input" onchange="populateProcurementItems()">
                             <option value="rawmaterial">Logam Murni & Raw Material</option>
                             <option value="packaging">Packaging & Kelengkapan</option>
                         </select>
                     </div>
 
-                    <div class="input-group">
+                    <div class="form-group">
                         <label>Pilih Item</label>
-                        <select id="proc-item-id">
+                        <select id="proc-item-id" class="premium-input">
                             <!-- Populated dynamically -->
                         </select>
                     </div>
 
-                    <div class="input-row" style="display: flex; gap: 10px;">
-                        <div class="input-group" style="flex: 1;">
+                    <div class="form-group" style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px">
+                        <div>
                             <label>Kuantitas (Gram / Pcs)</label>
-                            <input type="number" step="0.01" id="proc-qty" placeholder="0" />
+                            <input type="number" step="0.01" id="proc-qty" class="premium-input" placeholder="0" required />
                         </div>
-                        <div class="input-group" style="flex: 1;">
+                        <div>
                             <label>Harga Satuan Beli (Rp)</label>
-                            <input type="number" id="proc-unit-cost" placeholder="0" />
+                            <input type="number" id="proc-unit-cost" class="premium-input" placeholder="0" required />
                         </div>
                     </div>
 
-                    <div class="input-group">
+                    <div class="form-group">
                         <label>Nama Supplier / Pihak Ketiga</label>
-                        <input type="text" id="proc-supplier" placeholder="Contoh: PT. Emas Mulia" />
+                        <input type="text" id="proc-supplier" class="premium-input" placeholder="Contoh: PT. Emas Mulia" required />
                     </div>
 
-                    <div class="input-group">
+                    <div class="form-group" style="margin-bottom: 0;">
                         <label>Catatan Tambahan</label>
-                        <textarea id="proc-notes" rows="2" placeholder="Catatan pembelian..."></textarea>
+                        <textarea id="proc-notes" class="premium-input" rows="2" placeholder="Catatan pembelian atau nomor nota..."></textarea>
                     </div>
                 </div>
                 <div class="modal-footer">

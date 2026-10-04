@@ -3178,10 +3178,19 @@ async function loadAdminTable(panelSuffix, storeName, keys) {
         let cellsHtml = '';
         keys.forEach((k) => {
             let val = item[k];
+            if (val === undefined || val === null) val = '-';
+            
             // Format price variables if they are numbers
-            if (typeof val === 'number' && (k.includes('price') || k.includes('fee'))) {
+            if (typeof val === 'number' && (k.includes('price') || k.includes('fee') || k.includes('cost') || k === 'average_cost_per_gram')) {
                 val = formatRupiah(val);
             }
+            // Format dates
+            if (k === 'date' && val !== '-') {
+                try {
+                    val = new Date(val).toLocaleString('id-ID', { dateStyle: 'medium', timeStyle: 'short' });
+                } catch(e) {}
+            }
+            
             cellsHtml += `<td>${val}</td>`;
         });
 
