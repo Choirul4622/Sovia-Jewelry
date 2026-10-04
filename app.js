@@ -1220,9 +1220,11 @@ function validateRepairForm() {
         const weight = parseFloat(document.getElementById('cowok-weight').value) || 0;
         const size = document.getElementById('cowok-size').value;
         const repType = document.getElementById('cowok-repair-type').value;
+        const isReproduct = document.getElementById('cowok-is-reproduct').checked;
+        const targetWeight = parseFloat(document.getElementById('cowok-target-weight').value) || 0;
 
-        if (!material || weight <= 0 || !size || !repType) {
-            showToast('Informasi cincin cowok belum diisi lengkap (Bahan, Berat, Ukuran, Repair)!', 'warning');
+        if (!material || weight <= 0 || !size || (!isReproduct && !repType) || (isReproduct && targetWeight <= 0)) {
+            showToast('Informasi cincin cowok belum diisi lengkap (Bahan, Berat, Ukuran, Repair/Target Baru)!', 'warning');
             return false;
         }
     }
@@ -1232,9 +1234,11 @@ function validateRepairForm() {
         const weight = parseFloat(document.getElementById('cewek-weight').value) || 0;
         const size = document.getElementById('cewek-size').value;
         const repType = document.getElementById('cewek-repair-type').value;
+        const isReproduct = document.getElementById('cewek-is-reproduct').checked;
+        const targetWeight = parseFloat(document.getElementById('cewek-target-weight').value) || 0;
 
-        if (!material || weight <= 0 || !size || !repType) {
-            showToast('Informasi cincin cewek belum diisi lengkap (Bahan, Berat, Ukuran, Repair)!', 'warning');
+        if (!material || weight <= 0 || !size || (!isReproduct && !repType) || (isReproduct && targetWeight <= 0)) {
+            showToast('Informasi cincin cewek belum diisi lengkap (Bahan, Berat, Ukuran, Repair/Target Baru)!', 'warning');
             return false;
         }
     }
