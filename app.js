@@ -3018,6 +3018,10 @@ async function pushDataToGAS(action, payload) {
             return true;
         } else {
             console.error('Google Apps Script Backend Error: ', result ? result.message : 'Unknown error');
+            if (result && result.message && result.message.includes('not found')) {
+                // Drop from queue to prevent infinite loops for dummy/deleted data
+                return true; 
+            }
             return false;
         }
     } catch (e) {
