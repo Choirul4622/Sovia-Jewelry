@@ -1224,6 +1224,9 @@
                             <button class="admin-tab-btn" data-tab="tab-prod-qa">
                                 <i class="fa-solid fa-clipboard-check"></i> Pemeriksaan (QA & QC)
                             </button>
+                            <button class="admin-tab-btn" data-tab="tab-productionjobs">
+                                <i class="fa-solid fa-scale-balanced"></i> Riwayat SPK & Susut
+                            </button>
                         </div>
 
                         <div class="admin-tab-content">
@@ -1262,14 +1265,25 @@
                     <!-- Sub-tab 2: Workshop -->
                     <div class="admin-tab-pane" id="tab-prod-workshop">
                         <div class="premium-card">
-                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; flex-wrap: wrap; gap: 15px;">
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; flex-wrap: wrap; gap: 12px;">
                                 <div>
-                                    <h3 style="margin-bottom: 5px">Penugasan Pengrajin Cincin</h3>
-                                    <p style="font-size: 13px; color: var(--text-muted)">Kelola perbaikan cincin dan tentukan status pengerjaan fisik di bengkel/workshop.</p>
+                                    <h3 style="margin-bottom: 5px">Penugasan Pengrajin Cincin & SPK</h3>
+                                    <p style="font-size: 13px; color: var(--text-muted)">Kelola perbaikan cincin fisik di bengkel, SPK lebur, dan serah terima pengrajin.</p>
                                 </div>
-                                <button class="premium-btn" onclick="printCollectiveSuratJalan('workshop')">
-                                    <i class="fa-solid fa-print"></i> Cetak Surat Jalan Kolektif (Workshop)
-                                </button>
+                                <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+                                    <button class="premium-btn btn-sec font-compact" onclick="printCollectiveSuratJalan('workshop')">
+                                        <i class="fa-solid fa-print"></i> Surat Jalan Kolektif
+                                    </button>
+                                    <button class="premium-btn btn-sec font-compact" onclick="printCollectiveSuratJalan('melting')">
+                                        <i class="fa-solid fa-print"></i> SPK Peleburan
+                                    </button>
+                                    <button class="premium-btn font-compact" onclick="showMeltingJobModal()">
+                                        <i class="fa-solid fa-fire-burner"></i> Catat SPK Peleburan
+                                    </button>
+                                    <button class="premium-btn font-compact" onclick="showProductionJobModal()">
+                                        <i class="fa-solid fa-hammer"></i> Catat SPK Produksi (Tukang)
+                                    </button>
+                                </div>
                             </div>
                             <div class="table-scroll-container">
                                 <table class="premium-table">
@@ -1299,6 +1313,9 @@
                     <div class="admin-tab-pane" id="tab-prod-qa">
                         <!-- QA - Quality Assurance Panel -->
                         <div class="premium-card">
+                            <span class="badge success" style="margin-bottom: 12px; display: inline-block; font-size: 11px;">
+                                <i class="fa-solid fa-list-check"></i> Tahap 1: Pasca Produksi Workshop
+                            </span>
                             <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 8px">
                                 <div
                                     style="
@@ -1317,9 +1334,9 @@
                                     ></i>
                                 </div>
                                 <div>
-                                    <h3 style="margin: 0">Quality Assurance (QA)</h3>
+                                    <h3 style="margin: 0">Quality Assurance (QA Fisik Cincin)</h3>
                                     <p style="margin: 0; font-size: 12px; color: var(--text-muted)">
-                                        Pemeriksaan kualitas fisik cincin setelah selesai produksi di workshop.
+                                        Pemeriksaan kualitas fisik cincin setelah selesai produksi di workshop (dimensi, kerapatan batu, dan kehalusan poles).
                                     </p>
                                 </div>
                             </div>
@@ -1346,6 +1363,9 @@
 
                         <!-- QC - Quality Control Panel -->
                         <div class="premium-card">
+                            <span class="badge primary" style="margin-bottom: 12px; display: inline-block; font-size: 11px;">
+                                <i class="fa-solid fa-camera"></i> Tahap 2: Final Check Sebelum Kirim
+                            </span>
                             <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 8px">
                                 <div
                                     style="
@@ -1361,10 +1381,9 @@
                                     <i class="fa-solid fa-shield-halved" style="color: #fff; font-size: 16px"></i>
                                 </div>
                                 <div>
-                                    <h3 style="margin: 0">Quality Control (QC)</h3>
+                                    <h3 style="margin: 0">Quality Control (QC & Realpict Produk)</h3>
                                     <p style="margin: 0; font-size: 12px; color: var(--text-muted)">
-                                        Final check sebelum produk dikirim ke logistik — packaging, label, dan
-                                        kesesuaian produk.
+                                        Final check sebelum produk diserahkan ke logistik — upload foto realpict, kelengkapan kotak, kartu garansi, dan label pengiriman.
                                     </p>
                                 </div>
                             </div>
@@ -1390,6 +1409,45 @@
                             </div>
                         </div>
                     </div>
+
+                    <!-- Sub-tab 4: Riwayat & Audit SPK Tukang -->
+                    <div class="admin-tab-pane" id="tab-productionjobs">
+                        <div class="premium-card">
+                            <div class="section-card-toolbar">
+                                <div>
+                                    <h3 style="margin-bottom: 4px"><i class="fa-solid fa-scale-balanced"></i> Riwayat SPK Produksi, WIP & Kontrol Susut Tukang</h3>
+                                    <p style="font-size: 13px; color: var(--text-muted)">
+                                        Monitoring pengembalian logam oleh pengrajin, deteksi susut (loss), serbuk sweeping, dan audit toleransi susut 4%.
+                                    </p>
+                                </div>
+                                <div style="display: flex; gap: 8px;">
+                                    <button class="premium-btn font-compact" onclick="showProductionJobModal()">
+                                        <i class="fa-solid fa-hammer"></i> Catat SPK Produksi (Tukang)
+                                    </button>
+                                </div>
+                            </div>
+                            <div class="table-scroll-container">
+                                <table class="premium-table font-compact" id="table-admin-productionjobs">
+                                    <thead>
+                                        <tr>
+                                            <th>ID SPK</th>
+                                            <th>Repair Num</th>
+                                            <th>Tanggal</th>
+                                            <th>Workshop</th>
+                                            <th>Material</th>
+                                            <th>Initial (gr)</th>
+                                            <th>Final (gr)</th>
+                                            <th>Scrap/Serbuk (gr)</th>
+                                            <th>Loss (gr)</th>
+                                            <th>% Loss</th>
+                                            <th>Status</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody></tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </div>
 
@@ -1408,10 +1466,10 @@
                                 <i class="fa-solid fa-truck-fast"></i> Pengiriman & Ekspedisi
                             </button>
                             <button class="admin-tab-btn" data-tab="tab-logistic-inventory">
-                                <i class="fa-solid fa-boxes-stacked"></i> Stok Logam Olahan & SPK
+                                <i class="fa-solid fa-boxes-stacked"></i> Gudang Logam Olahan
                             </button>
                             <button class="admin-tab-btn" data-tab="tab-logistic-warehouse">
-                                <i class="fa-solid fa-gem"></i> Logam Murni & Gudang
+                                <i class="fa-solid fa-box-open"></i> Gudang Packaging
                             </button>
                             <button class="admin-tab-btn" data-tab="tab-logistic-procurement">
                                 <i class="fa-solid fa-cart-shopping"></i> Pengadaan (Restock PO)
@@ -1478,7 +1536,10 @@
                             <!-- Sub-tab 2: Inventory -->
                             <div class="admin-tab-pane" id="tab-logistic-inventory">
                                 <div class="admin-pane-header">
-                                    <h3>Gudang Logam Olahan (Stok Setengah Jadi)</h3>
+                                    <div>
+                                        <h3 style="margin-bottom: 4px">Gudang Logam Olahan (Stok Setengah Jadi & Paduan WIP)</h3>
+                                        <p style="font-size: 13px; color: var(--text-muted)">Persediaan logam paduan hasil leburan siap pengerjaan fisik beserta nilai modal HPP aktual.</p>
+                                    </div>
                                     <div style="display: flex; gap: 8px">
                                         <button class="premium-btn btn-sec font-compact" onclick="printCollectiveSuratJalan('melting')">
                                             <i class="fa-solid fa-print"></i> Cetak SPK Peleburan
@@ -1514,7 +1575,10 @@
                             <!-- Sub-tab 3: Warehouse -->
                             <div class="admin-tab-pane" id="tab-logistic-warehouse">
                                 <div class="admin-pane-header">
-                                    <h3>Gudang Logistik & Stok Packaging</h3>
+                                    <div>
+                                        <h3 style="margin-bottom: 4px">Gudang Logistik & Stok Packaging Produk</h3>
+                                        <p style="font-size: 13px; color: var(--text-muted)">Persediaan box perhiasan, pouch beludru, kartu garansi resmi, dan perlengkapan pengiriman.</p>
+                                    </div>
                                     <button
                                         class="premium-btn btn-sec font-compact btn-admin-add"
                                         data-type="packaging"
@@ -1538,32 +1602,17 @@
                             <!-- Sub-tab 4: Procurement -->
                             <div class="admin-tab-pane" id="tab-logistic-procurement">
                                 <div class="admin-pane-header">
-                                    <h3>Pengadaan Barang & Logam Murni (Procurement)</h3>
-                                    <div style="display: flex; gap: 8px">
-                                        <button class="premium-btn btn-sec font-compact btn-admin-add" data-type="rawmaterial">
-                                            <i class="fa-solid fa-plus"></i> Tambah Master Bahan Mentah
-                                        </button>
-                                        <button class="premium-btn font-compact" onclick="showProcurementModal()">
-                                            <i class="fa-solid fa-truck-loading"></i> Catat PO (Restock / Pembelian)
-                                        </button>
+                                    <div>
+                                        <h3 style="margin-bottom: 4px">Pengadaan Barang & Pembelian Restock (PO)</h3>
+                                        <p style="font-size: 13px; color: var(--text-muted)">
+                                            Pencatatan pembelian bahan baku logam murni maupun packaging dari supplier pihak ketiga dan riwayat faktur restock.
+                                        </p>
                                     </div>
-                                </div>
-                                <div class="premium-card" style="padding: 0; overflow-x: auto; margin-bottom: 25px;">
-                                    <table class="premium-table font-compact" id="table-admin-rawmaterials">
-                                        <thead>
-                                            <tr>
-                                                <th>ID Bahan Mentah</th>
-                                                <th>Nama Logam Murni / Alloy</th>
-                                                <th>Stok Tersedia (Gram)</th>
-                                                <th>HPP Rata-rata (Rp/gr)</th>
-                                                <th style="width: 130px; text-align: center">Aksi</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody></tbody>
-                                    </table>
+                                    <button class="premium-btn font-compact" onclick="showProcurementModal()">
+                                        <i class="fa-solid fa-truck-loading"></i> Catat PO (Restock / Pembelian)
+                                    </button>
                                 </div>
 
-                                <h3>Riwayat Pembelian & Restock Barang</h3>
                                 <div class="premium-card" style="padding: 0; overflow-x: auto;">
                                     <table class="premium-table font-compact" id="table-admin-procurementtransactions">
                                         <thead>
@@ -1730,7 +1779,7 @@
                             <button class="admin-tab-btn" data-tab="tab-payments" data-category="operations"><i class="fa-solid fa-wallet"></i> Sistem Pembayaran</button>
                             <button class="admin-tab-btn" data-tab="tab-formulas" data-category="manufacturing"><i class="fa-solid fa-flask"></i> Resep Formulasi</button>
                             <button class="admin-tab-btn" data-tab="tab-bundles" data-category="catalog"><i class="fa-solid fa-box-open"></i> Aturan Bundling</button>
-                            <button class="admin-tab-btn" data-tab="tab-productionjobs" data-category="manufacturing"><i class="fa-solid fa-clipboard-list"></i> Data SPK Produksi (Batch/Lot)</button>
+                            <button class="admin-tab-btn" data-tab="tab-rawmaterials" data-category="manufacturing"><i class="fa-solid fa-gem"></i> Bahan Mentah Murni</button>
                         </div>
 
                         <!-- Admin Sub-Panel Containers -->
@@ -1955,31 +2004,31 @@
                                 </table>
                             </div>
 
-                            <!-- Sub-tab 11: Production Jobs -->
-                            <div class="admin-tab-pane" id="tab-productionjobs">
+                            <!-- Sub-tab 11: Raw Materials -->
+                            <div class="admin-tab-pane" id="tab-rawmaterials">
                                 <div class="admin-pane-header">
-                                    <h3>Data Historis SPK Produksi & WIP</h3>
+                                    <div>
+                                        <h3 style="margin-bottom: 4px">Master Bahan Baku Murni (Raw Material)</h3>
+                                        <p style="font-size: 13px; color: var(--text-muted)">
+                                            Definisi master logam murni dan alloy yang digunakan sebagai bahan baku resep formulasi dan acuan HPP modal per gram.
+                                        </p>
+                                    </div>
+                                    <button class="premium-btn btn-sec font-compact btn-admin-add" data-type="rawmaterial">
+                                        <i class="fa-solid fa-plus"></i> Tambah Master Bahan Mentah
+                                    </button>
                                 </div>
-                                <div class="premium-card" style="padding: 0; overflow-x: auto">
-                                    <table class="premium-table font-compact" id="table-admin-productionjobs">
-                                        <thead>
-                                            <tr>
-                                                <th>ID SPK</th>
-                                                <th>Repair Num</th>
-                                                <th>Tanggal</th>
-                                                <th>Workshop</th>
-                                                <th>Material</th>
-                                                <th>Initial (gr)</th>
-                                                <th>Final (gr)</th>
-                                                <th>Scrap/Serbuk (gr)</th>
-                                                <th>Loss (gr)</th>
-                                                <th>% Loss</th>
-                                                <th>Status</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody></tbody>
-                                    </table>
-                                </div>
+                                <table class="premium-table font-compact" id="table-admin-rawmaterials">
+                                    <thead>
+                                        <tr>
+                                            <th>ID Bahan Mentah</th>
+                                            <th>Nama Logam Murni / Alloy</th>
+                                            <th>Stok Tersedia (Gram)</th>
+                                            <th>HPP Acuan Pasar (Rp/gr)</th>
+                                            <th style="width: 130px; text-align: center">Aksi</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody></tbody>
+                                </table>
                             </div>
                         </div>
                     </div>
