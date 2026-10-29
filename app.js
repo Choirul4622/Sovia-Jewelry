@@ -646,7 +646,7 @@ async function showMainApp() {
     await refreshAllData();
 }
 
-function switchPanel(panelId) {
+function switchPanel(panelId, subTabId = null) {
     State.currentPanel = panelId;
 
     // Update navbar active item
@@ -667,20 +667,64 @@ function switchPanel(panelId) {
         }
     });
 
-    // Update Topbar Title
-    let title = 'Dashboard';
-    if (panelId === 'sales-panel') title = 'Sales (Formulir Repair)';
-    else if (panelId === 'accounting-panel') title = 'Accounting & Invoice';
-    else if (panelId === 'production-panel') title = 'Production & Workshops';
-    else if (panelId === 'logistic-panel') title = 'Logistic & Delivery';
-    else if (panelId === 'chat-panel') {
-        title = 'Diskusi Chat';
-        if (typeof renderChatPanel === 'function') {
-            renderChatPanel();
-        }
-    } else if (panelId === 'admin-panel') title = 'Administrator Control';
+    // Module definitions for Title & Breadcrumbs
+    const moduleMap = {
+        'dashboard-panel': { section: 'Ikhtisar', title: 'Dashboard Utama' },
+        'sales-panel': { section: 'Operasional Bisnis', title: 'Sales & Transaksi Repair' },
+        'accounting-panel': { section: 'Operasional Bisnis', title: 'Accounting & Kasir' },
+        'production-panel': { section: 'Workshop & SCM', title: 'Manajemen Produksi' },
+        'logistic-panel': { section: 'Workshop & SCM', title: 'Logistik & Inventaris' },
+        'chat-panel': { section: 'Kolaborasi & Sistem', title: 'Diskusi & Chat' },
+        'admin-panel': { section: 'Kolaborasi & Sistem', title: 'Master Data & Admin' }
+    };
 
-    document.getElementById('topbar-title').textContent = title;
+    const mod = moduleMap[panelId] || { section: 'Sistem', title: 'Panel' };
+    const displayTitle = mod.title;
+
+    if (panelId === 'chat-panel' && typeof renderChatPanel === 'function') {
+        renderChatPanel();
+    }
+
+    const titleEl = document.getElementById('topbar-title');
+    if (titleEl) titleEl.textContent = displayTitle;
+
+    const bcSection = document.getElementById('bc-section');
+    const bcPage = document.getElementById('bc-current-page');
+    if (bcSection) bcSection.textContent = mod.section;
+    if (bcPage) bcPage.textContent = displayTitle;
+
+    if (subTabId) {
+        switchSubTab(panelId, subTabId);
+    }
+}
+
+function switchSubTab(panelId, tabId) {
+    const panel = document.getElementById(panelId);
+    if (!panel) return;
+    let activeBtnTitle = '';
+    panel.querySelectorAll('.admin-tab-btn').forEach((b) => {
+        if (b.dataset.tab === tabId) {
+            b.classList.add('active');
+            activeBtnTitle = b.textContent.trim();
+        } else {
+            b.classList.remove('active');
+        }
+    });
+    panel.querySelectorAll('.admin-tab-pane').forEach((p) => {
+        if (p.id === tabId) {
+            p.classList.add('active');
+        } else {
+            p.classList.remove('active');
+        }
+    });
+
+    if (activeBtnTitle) {
+        const bcPage = document.getElementById('bc-current-page');
+        const titleEl = document.getElementById('topbar-title');
+        if (bcPage && titleEl) {
+            bcPage.textContent = `${titleEl.textContent} / ${activeBtnTitle}`;
+        }
+    }
 }
 
 // ==========================================================================
@@ -1090,6 +1134,16 @@ function getImageBase64(file, previewId) {
 async function populateFormForEdit(tx) {
     State.activeEditId = tx.repair_number;
     switchPanel('sales-panel');
+    switchSubTab('sales-panel', 'tab-sales-form');
+
+    const banner = document.getElementById('sales-form-mode-banner');
+    if (banner) {
+        banner.classList.remove('hidden');
+        document.getElementById('banner-mode-title').textContent = `Mode Edit Transaksi (${tx.repair_number})`;
+        document.getElementById('banner-mode-desc').textContent = `Sedang mengedit data ${tx.customer_name}. Simpan untuk memperbarui transaksi.`;
+    }
+    const heading = document.getElementById('sales-form-heading');
+    if (heading) heading.innerHTML = `<i class="fa-solid fa-pen-to-square"></i> Edit Formulir Repair: ${tx.repair_number}`;
 
     document.getElementById('rep-number').value = tx.repair_number;
     document.getElementById('rep-date').value = tx.date;
@@ -1171,6 +1225,11 @@ function setUploadPreview(previewId, imgUrl, textLabel) {
 function resetForm() {
     State.activeEditId = null;
     document.getElementById('repair-entry-form').reset();
+
+    const banner = document.getElementById('sales-form-mode-banner');
+    if (banner) banner.classList.add('hidden');
+    const heading = document.getElementById('sales-form-heading');
+    if (heading) heading.innerHTML = '<i class="fa-solid fa-file-signature"></i> Formulir Data Repair Cincin';
 
     if (State.currentUser) {
         // Regenerate unique number
@@ -1507,13 +1566,41 @@ async function renderAccountingBoard() {
     const tbody = document.getElementById('tbody-accounting-repairs');
     tbody.innerHTML = '';
 
+    const searchVal = (document.getElementById('accounting-search')?.value || '').trim().toLowerCase();
+    const filterVal = document.getElementById('accounting-status-filter')?.value || 'ALL';
+
     let records = 0;
 
     list.forEach((tx) => {
-        records++;
         const dpTotal = (parseFloat(tx.dp1_amount) || 0) + (parseFloat(tx.dp2_amount) || 0);
         const totalPrice = parseFloat(tx.total_price) || 0;
         const outstanding = totalPrice - dpTotal;
+
+        // Apply search filter
+        if (searchVal) {
+            const matchSearch =
+                tx.repair_number.toLowerCase().includes(searchVal) ||
+                tx.customer_name.toLowerCase().includes(searchVal) ||
+                (tx.customer_phone && tx.customer_phone.includes(searchVal));
+            if (!matchSearch) return;
+        }
+
+        // Apply status filter
+        if (filterVal === 'PENDING_APPROVAL') {
+            const needsApproval =
+                tx.dp_approval === 'Pending' ||
+                (tx.pelunasan_approval === 'Pending' && ((parseFloat(tx.dp2_amount) || 0) > 0 || tx.dp2_method));
+            if (!needsApproval) return;
+        } else if (filterVal === 'UNPAID') {
+            if (outstanding <= 0) return;
+        } else if (filterVal === 'PAID') {
+            if (outstanding > 0) return;
+        } else if (filterVal === 'REFUND') {
+            const dp1 = parseFloat(tx.dp1_amount) || 0;
+            if (dp1 <= totalPrice) return;
+        }
+
+        records++;
         const payStatus = outstanding <= 0 ? 'Lunas' : 'Belum Lunas';
         const badgeClass = outstanding <= 0 ? 'badge success' : 'badge danger';
 
@@ -4116,6 +4203,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     // --- BINDING: QUICK ACTIONS ---
     document.getElementById('btn-quick-new-repair').addEventListener('click', () => {
         switchPanel('sales-panel');
+        switchSubTab('sales-panel', 'tab-sales-form');
         resetForm();
     });
 
@@ -4270,6 +4358,9 @@ document.addEventListener('DOMContentLoaded', async () => {
         resetForm();
         await refreshAllData();
 
+        // Switch to history tab to view newly saved/updated repair
+        switchSubTab('sales-panel', 'tab-sales-history');
+
         // Auto trigger background sync check
         runBackgroundSync();
     });
@@ -4277,6 +4368,45 @@ document.addEventListener('DOMContentLoaded', async () => {
     // Recent History Table Filter events
     document.getElementById('history-search').addEventListener('input', () => renderRepairHistory());
     document.getElementById('history-status-filter').addEventListener('change', () => renderRepairHistory());
+
+    // Accounting Board Filters
+    const accSearch = document.getElementById('accounting-search');
+    if (accSearch) accSearch.addEventListener('input', () => renderAccountingBoard());
+    const accFilter = document.getElementById('accounting-status-filter');
+    if (accFilter) accFilter.addEventListener('change', () => renderAccountingBoard());
+
+    // Sales Sub-Tab Navigation Actions
+    const btnGotoNew = document.getElementById('btn-goto-new-repair');
+    if (btnGotoNew) {
+        btnGotoNew.addEventListener('click', () => {
+            switchSubTab('sales-panel', 'tab-sales-form');
+            resetForm();
+        });
+    }
+
+    const btnBackToHistory = document.getElementById('btn-back-to-history');
+    if (btnBackToHistory) {
+        btnBackToHistory.addEventListener('click', () => {
+            if (State.activeEditId) {
+                if (confirm('Kembali ke daftar histori? Perubahan edit yang belum disimpan akan hilang.')) {
+                    resetForm();
+                    switchSubTab('sales-panel', 'tab-sales-history');
+                }
+            } else {
+                switchSubTab('sales-panel', 'tab-sales-history');
+            }
+        });
+    }
+
+    const btnCancelEdit = document.getElementById('btn-cancel-edit-mode');
+    if (btnCancelEdit) {
+        btnCancelEdit.addEventListener('click', () => {
+            if (confirm('Batalkan mode edit?')) {
+                resetForm();
+                switchSubTab('sales-panel', 'tab-sales-history');
+            }
+        });
+    }
 
     // --- BINDING: MODALS CONTROLS ---
 
@@ -4326,7 +4456,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     });
 
-    // Scoped tab triggers for any panel using admin-tab styles (Admin, Logistic, etc)
+    // Scoped tab triggers for any panel using admin-tab styles (Admin, Logistic, Production, Sales)
     document.querySelectorAll('.admin-tab-btn').forEach((btn) => {
         btn.addEventListener('click', () => {
             const panel = btn.closest('.app-panel');
@@ -4338,7 +4468,45 @@ document.addEventListener('DOMContentLoaded', async () => {
                 document.querySelectorAll('.admin-tab-pane').forEach((p) => p.classList.remove('active'));
             }
             btn.classList.add('active');
-            document.getElementById(btn.dataset.tab).classList.add('active');
+            const targetPane = document.getElementById(btn.dataset.tab);
+            if (targetPane) targetPane.classList.add('active');
+
+            // Update breadcrumb with sub-tab title
+            const subTitle = btn.textContent.trim();
+            const bcPage = document.getElementById('bc-current-page');
+            const titleEl = document.getElementById('topbar-title');
+            if (bcPage && titleEl) {
+                bcPage.textContent = `${titleEl.textContent} / ${subTitle}`;
+            }
+        });
+    });
+
+    // Admin Master Data category pill filtering
+    document.querySelectorAll('.admin-category-filter-bar .category-pill').forEach((pill) => {
+        pill.addEventListener('click', () => {
+            const cat = pill.dataset.category;
+            document.querySelectorAll('.admin-category-filter-bar .category-pill').forEach((p) => p.classList.remove('active'));
+            pill.classList.add('active');
+
+            const adminTabBar = document.getElementById('admin-sub-tab-bar') || document.querySelector('#admin-panel .admin-tab-bar');
+            if (!adminTabBar) return;
+
+            let firstVisibleBtn = null;
+            adminTabBar.querySelectorAll('.admin-tab-btn').forEach((btn) => {
+                const btnCat = btn.dataset.category;
+                if (cat === 'all' || btnCat === cat) {
+                    btn.style.display = '';
+                    if (!firstVisibleBtn) firstVisibleBtn = btn;
+                } else {
+                    btn.style.display = 'none';
+                }
+            });
+
+            // If the currently active tab is now hidden, automatically activate the first visible one
+            const currentActive = adminTabBar.querySelector('.admin-tab-btn.active');
+            if (currentActive && currentActive.style.display === 'none' && firstVisibleBtn) {
+                firstVisibleBtn.click();
+            }
         });
     });
 

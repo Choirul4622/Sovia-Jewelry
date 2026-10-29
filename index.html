@@ -188,33 +188,40 @@
                 </div>
 
                 <nav class="sidebar-menu">
+                    <div class="sidebar-group-label">Ikhtisar</div>
                     <a href="#" class="menu-item active" data-target="dashboard-panel">
                         <i class="fa-solid fa-chart-pie"></i>
-                        <span>Dashboard</span>
+                        <span>Dashboard Utama</span>
                     </a>
+
+                    <div class="sidebar-group-label">Operasional Bisnis</div>
                     <a href="#" class="menu-item" data-target="sales-panel">
                         <i class="fa-solid fa-receipt"></i>
-                        <span>Sales (Form Repair)</span>
+                        <span>Sales & Transaksi</span>
                     </a>
                     <a href="#" class="menu-item" data-target="accounting-panel">
                         <i class="fa-solid fa-calculator"></i>
-                        <span>Accounting</span>
+                        <span>Accounting & Kasir</span>
                     </a>
+
+                    <div class="sidebar-group-label">Workshop & SCM</div>
                     <a href="#" class="menu-item" data-target="production-panel">
                         <i class="fa-solid fa-industry"></i>
-                        <span>Production</span>
+                        <span>Manajemen Produksi</span>
                     </a>
                     <a href="#" class="menu-item" data-target="logistic-panel">
                         <i class="fa-solid fa-truck-ramp-box"></i>
-                        <span>Logistic</span>
+                        <span>Logistik & Inventaris</span>
                     </a>
+
+                    <div class="sidebar-group-label">Kolaborasi & Sistem</div>
                     <a href="#" class="menu-item" data-target="chat-panel" id="menu-item-chat">
                         <i class="fa-solid fa-comments"></i>
-                        <span>Diskusi Chat</span>
+                        <span>Diskusi & Chat</span>
                     </a>
                     <a href="#" class="menu-item" data-target="admin-panel" id="menu-item-admin">
                         <i class="fa-solid fa-user-gear"></i>
-                        <span>Administrator</span>
+                        <span>Master Data & Admin</span>
                     </a>
                 </nav>
 
@@ -234,7 +241,14 @@
                         <button class="toggle-sidebar-btn" id="btn-sidebar-toggle">
                             <i class="fa-solid fa-bars-staggered"></i>
                         </button>
-                        <h2 id="topbar-title">Dashboard</h2>
+                        <div class="topbar-title-wrap">
+                            <div class="topbar-breadcrumb" id="topbar-breadcrumb">
+                                <span class="bc-section" id="bc-section">Ikhtisar</span>
+                                <i class="fa-solid fa-chevron-right bc-sep"></i>
+                                <span class="bc-page" id="bc-current-page">Dashboard Utama</span>
+                            </div>
+                            <h2 id="topbar-title">Dashboard Utama</h2>
+                        </div>
                     </div>
                     <div class="topbar-right">
                         <!-- Network Status & Sync Queue -->
@@ -374,19 +388,118 @@
                         </div>
                     </div>
 
-                    <!-- 2. SALES VIEW (FORM REPAIR & HISTORY TABLE) -->
+                    <!-- 2. SALES VIEW (HISTORI & FORMULIR REPAIR) -->
                     <div id="sales-panel" class="app-panel">
                         <div class="panel-header-section">
-                            <h1>Formulir Repair Cincin</h1>
+                            <h1>Layanan Sales & Transaksi Repair</h1>
                             <p>
-                                Input data perbaikan cincin cowok/cewek, kalkulasi biaya otomatis, dan kelola histori
-                                transaksi.
+                                Pemantauan riwayat transaksi perbaikan cincin, pencarian data pelanggan, cetak nota, dan input formulir repair baru.
                             </p>
                         </div>
 
-                        <!-- Dynamic Form Repair Card -->
-                        <div class="premium-card">
-                            <form id="repair-entry-form" novalidate>
+                        <!-- Inner Navigation Sub-Tabs -->
+                        <div class="admin-tab-bar sales-tab-bar" id="sales-tab-bar">
+                            <button class="admin-tab-btn active" data-tab="tab-sales-history" id="tab-btn-sales-history">
+                                <i class="fa-solid fa-table-list"></i> Histori Transaksi & Monitoring
+                            </button>
+                            <button class="admin-tab-btn" data-tab="tab-sales-form" id="tab-btn-sales-form">
+                                <i class="fa-solid fa-circle-plus"></i> Formulir Input / Edit Repair
+                            </button>
+                        </div>
+
+                        <div class="admin-tab-content">
+                            <!-- SUB-TAB 1: DAFTAR HISTORI & MONITORING REPAIR -->
+                            <div class="admin-tab-pane active" id="tab-sales-history">
+                                <div class="premium-card">
+                                    <div class="section-card-toolbar">
+                                        <div>
+                                            <h3 style="margin-bottom: 4px"><i class="fa-solid fa-clock-rotate-left"></i> Histori Transaksi Repair Cincin</h3>
+                                            <p style="font-size: 13px; color: var(--text-muted)">
+                                                Mencari, mencetak form SPK / nota kasir, bagikan ke WhatsApp, serta pantau progress pengerjaan.
+                                            </p>
+                                        </div>
+                                        <button type="button" class="premium-btn" id="btn-goto-new-repair">
+                                            <i class="fa-solid fa-circle-plus"></i> Buat Form Repair Baru
+                                        </button>
+                                    </div>
+
+                                    <!-- Table Filter Controls -->
+                                    <div class="table-controls" style="margin-top: 15px">
+                                        <div class="search-input-wrap">
+                                            <i class="fa-solid fa-magnifying-glass"></i>
+                                            <input
+                                                type="text"
+                                                id="history-search"
+                                                placeholder="Cari berdasarkan Nomor Repair, Nama Customer, No. WA..."
+                                            />
+                                        </div>
+                                        <div class="filter-select-wrap">
+                                            <select id="history-status-filter">
+                                                <option value="ALL">Semua Status Transaksi</option>
+                                                <option value="Draft">Draft (Belum Diproses)</option>
+                                                <option value="Synced">Synced (Sheets DB)</option>
+                                                <option value="Pending Sync">Pending Sync (Lokal)</option>
+                                                <option value="Completed">Selesai (Completed)</option>
+                                            </select>
+                                        </div>
+                                    </div>
+
+                                    <!-- History Table -->
+                                    <div class="table-scroll-container">
+                                        <table class="premium-table" id="table-repair-history">
+                                            <thead>
+                                                <tr>
+                                                    <th>No. Repair</th>
+                                                    <th>Tanggal</th>
+                                                    <th>Deadline</th>
+                                                    <th>Pelanggan</th>
+                                                    <th>Toko / Sales</th>
+                                                    <th>Total Biaya</th>
+                                                    <th>DP Dibayar</th>
+                                                    <th>Status</th>
+                                                    <th style="width: 260px">Aksi</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody id="tbody-repair-history">
+                                                <!-- Dynamic rows loaded from IndexedDB -->
+                                                <tr class="table-empty-row">
+                                                    <td colspan="9">Tidak ada data transaksi repair ditemukan.</td>
+                                                </tr>
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- SUB-TAB 2: FORMULIR INPUT / EDIT REPAIR -->
+                            <div class="admin-tab-pane" id="tab-sales-form">
+                                <div class="form-mode-banner hidden" id="sales-form-mode-banner">
+                                    <div class="banner-content">
+                                        <i class="fa-solid fa-pen-to-square"></i>
+                                        <div>
+                                            <strong id="banner-mode-title">Mode Edit Transaksi</strong>
+                                            <span id="banner-mode-desc">Data transaksi dimuat untuk pengeditan. Simpan untuk menerapkan pembaruan.</span>
+                                        </div>
+                                    </div>
+                                    <button type="button" class="premium-btn btn-sec font-compact" id="btn-cancel-edit-mode">
+                                        <i class="fa-solid fa-xmark"></i> Batal Edit
+                                    </button>
+                                </div>
+
+                                <div class="premium-card">
+                                    <div class="form-header-toolbar">
+                                        <div>
+                                            <h3 id="sales-form-heading"><i class="fa-solid fa-file-signature"></i> Formulir Data Repair Cincin</h3>
+                                            <p style="font-size: 13px; color: var(--text-muted)">
+                                                Input data perbaikan cincin cowok/cewek, kalkulasi biaya otomatis, dan kelola histori transaksi.
+                                            </p>
+                                        </div>
+                                        <button type="button" class="premium-btn btn-sec font-compact" id="btn-back-to-history">
+                                            <i class="fa-solid fa-arrow-left"></i> Kembali ke Histori
+                                        </button>
+                                    </div>
+
+                                    <form id="repair-entry-form" novalidate style="margin-top: 15px">
                                 <!-- Tab header / Section Header -->
                                 <div class="form-section-title">
                                     <span class="step-num">1</span>
@@ -976,61 +1089,6 @@
                                 </div>
                             </form>
                         </div>
-
-                        <!-- Recent Repair History -->
-                        <div class="panel-header-section" style="margin-top: 50px">
-                            <h2>Daftar Histori Repair Terbaru</h2>
-                            <p>
-                                Melihat, mencari, mencetak form/nota, membagikan ke WhatsApp, serta mengedit/menghapus
-                                riwayat transaksi perbaikan cincin.
-                            </p>
-                        </div>
-
-                        <div class="premium-card">
-                            <!-- Table Filter Controls -->
-                            <div class="table-controls">
-                                <div class="search-input-wrap">
-                                    <i class="fa-solid fa-magnifying-glass"></i>
-                                    <input
-                                        type="text"
-                                        id="history-search"
-                                        placeholder="Cari berdasarkan Nomor Repair atau Nama Customer..."
-                                    />
-                                </div>
-                                <div class="filter-select-wrap">
-                                    <select id="history-status-filter">
-                                        <option value="ALL">Semua Status</option>
-                                        <option value="Draft">Draft</option>
-                                        <option value="Synced">Synced (Sheets)</option>
-                                        <option value="Pending Sync">Pending Sync (Lokal)</option>
-                                        <option value="Completed">Selesai</option>
-                                    </select>
-                                </div>
-                            </div>
-
-                            <!-- History Table -->
-                            <div class="table-scroll-container">
-                                <table class="premium-table" id="table-repair-history">
-                                    <thead>
-                                        <tr>
-                                            <th>No. Repair</th>
-                                            <th>Tanggal</th>
-                                            <th>Deadline</th>
-                                            <th>Pelanggan</th>
-                                            <th>Toko / Sales</th>
-                                            <th>Total Biaya</th>
-                                            <th>DP Dibayar</th>
-                                            <th>Status</th>
-                                            <th style="width: 260px">Aksi</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody id="tbody-repair-history">
-                                        <!-- Dynamic rows loaded from IndexedDB -->
-                                        <tr class="table-empty-row">
-                                            <td colspan="9">Tidak ada data transaksi repair ditemukan.</td>
-                                        </tr>
-                                    </tbody>
-                                </table>
                             </div>
                         </div>
                     </div>
@@ -1089,12 +1147,36 @@
                         </div>
 
                         <div class="premium-card">
-                            <h3>Daftar Penerimaan Piutang / Pelunasan</h3>
-                            <p>
-                                Kondisi keuangan transaksi terkini (hanya Admin dan Accounting yang dapat memvalidasi
-                                data keuangan secara global).
-                            </p>
-                            <br />
+                            <div class="section-card-toolbar">
+                                <div>
+                                    <h3 style="margin-bottom: 4px"><i class="fa-solid fa-file-invoice-dollar"></i> Daftar Penerimaan Piutang & Pelunasan</h3>
+                                    <p style="font-size: 13px; color: var(--text-muted)">
+                                        Monitoring tagihan transaksi, verifikasi setoran DP & pelunasan kasir/transfer secara global.
+                                    </p>
+                                </div>
+                            </div>
+
+                            <!-- Table Filter Controls -->
+                            <div class="table-controls" style="margin-top: 15px; margin-bottom: 15px">
+                                <div class="search-input-wrap">
+                                    <i class="fa-solid fa-magnifying-glass"></i>
+                                    <input
+                                        type="text"
+                                        id="accounting-search"
+                                        placeholder="Cari transaksi berdasarkan No. Repair, Nama Customer, No. WA..."
+                                    />
+                                </div>
+                                <div class="filter-select-wrap">
+                                    <select id="accounting-status-filter">
+                                        <option value="ALL">Semua Kondisi Keuangan</option>
+                                        <option value="PENDING_APPROVAL">Perlu Approval (DP / Pelunasan)</option>
+                                        <option value="UNPAID">Ada Sisa Piutang (Belum Lunas)</option>
+                                        <option value="PAID">Lunas (Selesai Tagihan)</option>
+                                        <option value="REFUND">Perlu Refund Kelebihan DP</option>
+                                    </select>
+                                </div>
+                            </div>
+
                             <div class="table-scroll-container">
                                 <table class="premium-table">
                                     <thead>
@@ -1133,9 +1215,15 @@
 
                         <!-- Inner Navigation Sub-Tabs -->
                         <div class="admin-tab-bar">
-                            <button class="admin-tab-btn active" data-tab="tab-prod-design">Desain & Render</button>
-                            <button class="admin-tab-btn" data-tab="tab-prod-workshop">Workshop (Pengrajin)</button>
-                            <button class="admin-tab-btn" data-tab="tab-prod-qa">Pemeriksaan (QA & QC)</button>
+                            <button class="admin-tab-btn active" data-tab="tab-prod-design">
+                                <i class="fa-solid fa-cube"></i> Desain & Render
+                            </button>
+                            <button class="admin-tab-btn" data-tab="tab-prod-workshop">
+                                <i class="fa-solid fa-hammer"></i> Workshop & SPK Tukang
+                            </button>
+                            <button class="admin-tab-btn" data-tab="tab-prod-qa">
+                                <i class="fa-solid fa-clipboard-check"></i> Pemeriksaan (QA & QC)
+                            </button>
                         </div>
 
                         <div class="admin-tab-content">
@@ -1316,10 +1404,18 @@
                         </div>
                         <!-- Inner Navigation Sub-Tabs -->
                         <div class="admin-tab-bar">
-                            <button class="admin-tab-btn active" data-tab="tab-logistic-shipping">Pengiriman</button>
-                            <button class="admin-tab-btn" data-tab="tab-logistic-inventory">Inventory</button>
-                            <button class="admin-tab-btn" data-tab="tab-logistic-warehouse">Warehouse</button>
-                            <button class="admin-tab-btn" data-tab="tab-logistic-procurement">Procurement</button>
+                            <button class="admin-tab-btn active" data-tab="tab-logistic-shipping">
+                                <i class="fa-solid fa-truck-fast"></i> Pengiriman & Ekspedisi
+                            </button>
+                            <button class="admin-tab-btn" data-tab="tab-logistic-inventory">
+                                <i class="fa-solid fa-boxes-stacked"></i> Stok Logam Olahan & SPK
+                            </button>
+                            <button class="admin-tab-btn" data-tab="tab-logistic-warehouse">
+                                <i class="fa-solid fa-gem"></i> Logam Murni & Gudang
+                            </button>
+                            <button class="admin-tab-btn" data-tab="tab-logistic-procurement">
+                                <i class="fa-solid fa-cart-shopping"></i> Pengadaan (Restock PO)
+                            </button>
                         </div>
 
                         <!-- Logistic Sub-Panel Containers -->
@@ -1603,19 +1699,38 @@
                             <p>Halaman konfigurasi database master sistem informasi SOVIA JEWELRY secara global.</p>
                         </div>
 
+                        <!-- Master Data Category Filter Pills -->
+                        <div class="admin-category-filter-bar" id="admin-category-filter-bar">
+                            <button type="button" class="category-pill active" data-category="all">
+                                <i class="fa-solid fa-layer-group"></i> Semua Data (11)
+                            </button>
+                            <button type="button" class="category-pill" data-category="org">
+                                <i class="fa-solid fa-users-gear"></i> Organisasi & Cabang (2)
+                            </button>
+                            <button type="button" class="category-pill" data-category="catalog">
+                                <i class="fa-solid fa-tags"></i> Layanan & Bundling (3)
+                            </button>
+                            <button type="button" class="category-pill" data-category="manufacturing">
+                                <i class="fa-solid fa-fire-burner"></i> Logam & Produksi (4)
+                            </button>
+                            <button type="button" class="category-pill" data-category="operations">
+                                <i class="fa-solid fa-credit-card"></i> Pembayaran & Ekspedisi (2)
+                            </button>
+                        </div>
+
                         <!-- Inner Navigation Sub-Tabs -->
-                        <div class="admin-tab-bar">
-                            <button class="admin-tab-btn active" data-tab="tab-users">Manajemen User</button>
-                            <button class="admin-tab-btn" data-tab="tab-stores">Store & Sales</button>
-                            <button class="admin-tab-btn" data-tab="tab-catalog">Katalog Barang & Jasa</button>
-                            <button class="admin-tab-btn" data-tab="tab-metals">Bahan Logam</button>
-                            <button class="admin-tab-btn" data-tab="tab-repairs">Manajemen Repair</button>
-                            <button class="admin-tab-btn" data-tab="tab-workshops">Pengrajin & Workshop</button>
-                            <button class="admin-tab-btn" data-tab="tab-cities">Kab/Kota Pengiriman</button>
-                            <button class="admin-tab-btn" data-tab="tab-payments">Sistem Pembayaran</button>
-                            <button class="admin-tab-btn" data-tab="tab-formulas">Resep Formulasi</button>
-                            <button class="admin-tab-btn" data-tab="tab-bundles">Aturan Bundling</button>
-                            <button class="admin-tab-btn" data-tab="tab-productionjobs">Data SPK Produksi (Batch/Lot)</button>
+                        <div class="admin-tab-bar" id="admin-sub-tab-bar">
+                            <button class="admin-tab-btn active" data-tab="tab-users" data-category="org"><i class="fa-solid fa-user-shield"></i> Manajemen User</button>
+                            <button class="admin-tab-btn" data-tab="tab-stores" data-category="org"><i class="fa-solid fa-store"></i> Store & Sales</button>
+                            <button class="admin-tab-btn" data-tab="tab-catalog" data-category="catalog"><i class="fa-solid fa-gem"></i> Katalog Barang & Jasa</button>
+                            <button class="admin-tab-btn" data-tab="tab-metals" data-category="manufacturing"><i class="fa-solid fa-ring"></i> Bahan Logam</button>
+                            <button class="admin-tab-btn" data-tab="tab-repairs" data-category="catalog"><i class="fa-solid fa-screwdriver-wrench"></i> Manajemen Repair</button>
+                            <button class="admin-tab-btn" data-tab="tab-workshops" data-category="manufacturing"><i class="fa-solid fa-hammer"></i> Pengrajin & Workshop</button>
+                            <button class="admin-tab-btn" data-tab="tab-cities" data-category="operations"><i class="fa-solid fa-city"></i> Kab/Kota Pengiriman</button>
+                            <button class="admin-tab-btn" data-tab="tab-payments" data-category="operations"><i class="fa-solid fa-wallet"></i> Sistem Pembayaran</button>
+                            <button class="admin-tab-btn" data-tab="tab-formulas" data-category="manufacturing"><i class="fa-solid fa-flask"></i> Resep Formulasi</button>
+                            <button class="admin-tab-btn" data-tab="tab-bundles" data-category="catalog"><i class="fa-solid fa-box-open"></i> Aturan Bundling</button>
+                            <button class="admin-tab-btn" data-tab="tab-productionjobs" data-category="manufacturing"><i class="fa-solid fa-clipboard-list"></i> Data SPK Produksi (Batch/Lot)</button>
                         </div>
 
                         <!-- Admin Sub-Panel Containers -->
