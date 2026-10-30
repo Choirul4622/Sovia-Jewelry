@@ -3002,6 +3002,17 @@
                         otomatis batas toleransi susut.
                     </p>
 
+                    <!-- Integrasi Nomor Repair Proyek -->
+                    <div class="form-group" style="margin-bottom: 15px">
+                        <label for="prod-select-repair"><i class="fa-solid fa-hashtag"></i> Hubungkan ke Nomor Repair / Proyek Pelanggan</label>
+                        <select id="prod-select-repair">
+                            <option value="">-- Pengerjaan Umum (Tanpa Nomor Repair) --</option>
+                        </select>
+                        <small style="color: var(--text-muted)">Pilih repair order untuk mengintegrasikan SPK ini dengan proyek pelanggan, bahan baku, dan riwayat revisi.</small>
+                    </div>
+                    <div id="prod-repair-project-info" class="hidden" style="background: rgba(197, 168, 92, 0.08); border: 1px dashed var(--gold); padding: 12px; border-radius: var(--border-radius-sm); margin-bottom: 15px; font-size: 12px; line-height: 1.6;">
+                    </div>
+
                     <div class="form-group" style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px">
                         <div>
                             <label>Pengrajin (Workshop)</label>

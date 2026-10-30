@@ -1859,7 +1859,8 @@ async function renderProductionBoard() {
             <td>
                 <div class="action-buttons-flex" style="flex-direction:column; gap:4px; align-items:flex-start;">
                     <div style="display:flex; gap:4px;">
-                        <button class="action-btn-circle btn-prod-assign" data-id="${tx.repair_number}" title="Delegasikan Pengrajin"><i class="fa-solid fa-hammer"></i></button>
+                        <button class="action-btn-circle btn-prod-print-spk" data-id="${tx.repair_number}" title="Cetak Form Pengerjaan & SPK" style="background: rgba(197, 168, 92, 0.2); color: var(--gold); border-color: var(--gold);"><i class="fa-solid fa-print"></i></button>
+                        <button class="action-btn-circle btn-prod-assign" data-id="${tx.repair_number}" title="Delegasikan Pengrajin & Input Bahan"><i class="fa-solid fa-hammer"></i></button>
                         <button class="action-btn-circle btn-prod-complete" data-id="${tx.repair_number}" title="Tandai Selesai Produksi" ${tx.production_status === 'Completed' ? 'disabled style="opacity:0.4"' : ''}><i class="fa-solid fa-circle-check"></i></button>
                     </div>
                     
@@ -1887,6 +1888,9 @@ async function renderProductionBoard() {
     }
 
     // Attach listeners
+    document.querySelectorAll('.btn-prod-print-spk').forEach((btn) => {
+        btn.addEventListener('click', () => showReceiptPrintModal(btn.dataset.id, 'FORM'));
+    });
     document.querySelectorAll('.btn-prod-assign').forEach((btn) => {
         btn.addEventListener('click', () => showProductionAssignModal(btn.dataset.id));
     });
@@ -2196,34 +2200,107 @@ async function renderQABoard() {
 
             const txs = await getLocalData('repair_transactions');
             const match = txs.find((t) => t.repair_number === id);
-            if (match) {
-                match.qa_status = result;
-                match.qa_notes = notes;
-                match.qa_checked_by = checkedBy;
-                match.qa_checked_at = checkedAt;
-                if (result === 'Passed') {
-                    match.qc_status = 'Pending';
-                } else {
-                    // Gagal QA: kembalikan ke produksi
-                    match.production_status = 'Active';
-                }
+            if (!match) return;
+
+            match.qa_notes = notes;
+            match.qa_checked_by = checkedBy;
+            match.qa_checked_at = checkedAt;
+
+            if (result === 'Passed') {
+                match.qa_status = 'Passed';
+                match.qc_status = 'Pending';
                 match.status = 'Pending Sync';
                 await saveLocalData('repair_transactions', match);
                 await queueSyncTask('UPDATE_REPAIR_STATUS', {
                     repair_number: id,
-                    qa_status: result,
+                    qa_status: 'Passed',
                     qa_notes: notes,
                     qa_checked_by: checkedBy,
                     qa_checked_at: checkedAt,
-                    qc_status: result === 'Passed' ? 'Pending' : match.qc_status,
-                    production_status: result === 'Failed' ? 'Active' : match.production_status
+                    qc_status: 'Pending'
                 });
                 runBackgroundSync();
-                showToast(
-                    `QA ${result === 'Passed' ? 'Lulus' : 'Gagal'} untuk ${id}. ${result === 'Passed' ? 'Diteruskan ke QC.' : 'Dikembalikan ke Produksi.'}`,
-                    result === 'Passed' ? 'success' : 'warning'
-                );
+                showToast(`QA Lulus untuk ${id}! Diteruskan ke QC Final.`, 'success');
                 await refreshAllData();
+            } else {
+                // Gagal QA: Konfirmasi apakah Remake Total atau Perbaikan Minor
+                const isRemake = confirm(
+                    `HASIL PEMERIKSAAN QA: GAGAL (${id})\n\n` +
+                    `Apakah cincin ini memerlukan PRODUKSI ULANG TOTAL (REMAKE)?\n\n` +
+                    `[OK] = REMAKE (Produksi Ulang):\n` +
+                    `- Cincin reject dialihkan ke stok leburan (scrap).\n` +
+                    `- SPK sebelumnya ditutup sebagai REJECTED (QA FAILED).\n` +
+                    `- Status kembali ke Produksi untuk didelegasikan dengan alokasi bahan baru dari gudang.\n\n` +
+                    `[Cancel] = PERBAIKAN MINOR (Revisi poles/finishing oleh tukang tanpa bahan baru).`
+                );
+
+                if (isRemake) {
+                    match.qa_status = 'Failed (Remake)';
+                    match.revision_count = (parseInt(match.revision_count) || 0) + 1;
+                    match.production_status = 'Active';
+
+                    // 1. Recover cincin reject ke master_processedmetals tipe Scrap/Leburan
+                    const metals = (await getLocalData('master_processedmetals')) || [];
+                    const cowokFinal = parseFloat(match.cowok_weight_final) || 0;
+                    if (cowokFinal > 0 && match.cowok_material) {
+                        let scrapItem = metals.find((m) => m.metal_id === match.cowok_material && m.type === 'Scrap/Leburan');
+                        if (scrapItem) {
+                            scrapItem.stock_gram = (parseFloat(scrapItem.stock_gram) || 0) + cowokFinal;
+                            await saveLocalData('master_processedmetals', scrapItem);
+                            await queueSyncTask('UPDATE_PROCESSED_METAL', scrapItem);
+                        }
+                    }
+                    const cewekFinal = parseFloat(match.cewek_weight_final) || 0;
+                    if (cewekFinal > 0 && match.cewek_material) {
+                        let scrapItem = metals.find((m) => m.metal_id === match.cewek_material && m.type === 'Scrap/Leburan');
+                        if (scrapItem) {
+                            scrapItem.stock_gram = (parseFloat(scrapItem.stock_gram) || 0) + cewekFinal;
+                            await saveLocalData('master_processedmetals', scrapItem);
+                            await queueSyncTask('UPDATE_PROCESSED_METAL', scrapItem);
+                        }
+                    }
+
+                    // 2. Tandai SPK pengerjaan sebelumnya sebagai REJECTED (QA FAILED) agar residu & susut tercatat terpisah
+                    const prodJobs = (await getLocalData('master_productionjobs')) || [];
+                    for (let j of prodJobs) {
+                        if (j.repair_number === id && (j.status === 'WIP' || j.status === 'CLEARED' || j.status === 'PENALTY')) {
+                            j.status = 'REJECTED (QA FAILED)';
+                            await saveLocalData('master_productionjobs', j);
+                            await queueSyncTask('UPDATE_PRODUCTION_JOB', j);
+                        }
+                    }
+
+                    match.status = 'Pending Sync';
+                    await saveLocalData('repair_transactions', match);
+                    await queueSyncTask('UPDATE_REPAIR_STATUS', {
+                        repair_number: id,
+                        qa_status: 'Failed (Remake)',
+                        qa_notes: notes,
+                        qa_checked_by: checkedBy,
+                        qa_checked_at: checkedAt,
+                        revision_count: match.revision_count,
+                        production_status: 'Active'
+                    });
+                    runBackgroundSync();
+                    showToast(`Cincin ${id} ditandai Remake (Revisi #${match.revision_count}). Cincin reject dialihkan ke scrap gudang.`, 'warning');
+                    await refreshAllData();
+                } else {
+                    match.qa_status = 'Failed (Minor Fix)';
+                    match.production_status = 'Active';
+                    match.status = 'Pending Sync';
+                    await saveLocalData('repair_transactions', match);
+                    await queueSyncTask('UPDATE_REPAIR_STATUS', {
+                        repair_number: id,
+                        qa_status: 'Failed (Minor Fix)',
+                        qa_notes: notes,
+                        qa_checked_by: checkedBy,
+                        qa_checked_at: checkedAt,
+                        production_status: 'Active'
+                    });
+                    runBackgroundSync();
+                    showToast(`Cincin ${id} dikembalikan ke Workshop untuk perbaikan minor.`, 'info');
+                    await refreshAllData();
+                }
             }
         });
     });
@@ -2380,24 +2457,41 @@ async function printIndividualLogistic(repairNum) {
 }
 
 async function showProductionAssignModal(repairNum) {
-    let wksOptions = '<option value="" disabled selected>Pilih Pengrajin</option>';
-    State.masterData.workshops.forEach((w) => {
-        wksOptions += `<option value="${w.name}">${w.name}</option>`;
-    });
-
     const txs = await getLocalData('repair_transactions');
     const tx = txs.find((t) => t.repair_number === repairNum);
     if (!tx) return;
 
+    let wksOptions = '<option value="" disabled>Pilih Pengrajin</option>';
+    State.masterData.workshops.forEach((w) => {
+        const isSelected = tx.assigned_workshop === w.name ? 'selected' : '';
+        wksOptions += `<option value="${w.name}" ${isSelected}>${w.name}</option>`;
+    });
+
+    const isQAFailed = tx.qa_status && tx.qa_status.includes('Failed');
+    let qaFailedBanner = '';
+    if (isQAFailed) {
+        qaFailedBanner = `
+            <div style="background:rgba(220, 53, 69, 0.08); border-left:4px solid var(--red); padding:10px 14px; border-radius:6px; margin-bottom:14px; font-size:12.5px;">
+                <div style="color:var(--red); font-weight:bold; margin-bottom:4px;">
+                    <i class="fa-solid fa-triangle-exclamation"></i> SPK REVISI: Cincin Gagal QA Sebelumnya!
+                </div>
+                <div>Catatan QA: <strong>"${tx.qa_notes || 'Cacat produksi fisik'}"</strong></div>
+                <div style="font-size:11.5px; color:var(--text-muted); margin-top:4px;">
+                    Alokasikan bahan baru dari gudang di bawah ini untuk memulai pengerjaan ulang (Remake). SPK baru akan dicatat sebagai batch revisi terpisah.
+                </div>
+            </div>
+        `;
+    }
+
     let cowokReproFields = '';
-    if (String(tx.cowok_is_reproduct).toUpperCase() === 'TRUE') {
+    if (String(tx.cowok_is_reproduct).toUpperCase() === 'TRUE' || isQAFailed) {
         cowokReproFields = `
-            <div style="background:var(--bg-light); padding:10px; border-radius:8px; margin-bottom:10px; border:1px solid rgba(197, 168, 92, 0.3);">
+            <div style="background:var(--bg-light); padding:12px; border-radius:8px; margin-bottom:12px; border:1px solid rgba(197, 168, 92, 0.3);">
                 <strong><i class="fa-solid fa-mars"></i> SPK Cincin Pria (${tx.cowok_material || '-'})</strong><br/>
-                <small>Berat Bekas (Disimpan Gudang): <span id="spk-c-old">${tx.cowok_weight || 0}</span> gr | Target Baru: ${tx.cowok_target_weight || 0} gr</small>
-                <div class="form-group" style="margin-top:10px;">
-                    <label>Bahan Emas Murni/Alloy (Gram) dari Gudang</label>
-                    <input type="number" id="crud-p-cowok-add" step="0.01" value="0" oninput="document.getElementById('spk-c-total').textContent = parseFloat(this.value||0).toFixed(2)">
+                <small>Berat Bekas (Gudang HQ): <span id="spk-c-old">${tx.cowok_weight || 0}</span> gr | Target Baru: ${tx.cowok_target_weight || '-'} gr</small>
+                <div class="form-group" style="margin-top:10px; margin-bottom:4px;">
+                    <label>Bahan Logam Baru dari Gudang (Gram Diserahkan)</label>
+                    <input type="number" id="crud-p-cowok-add" step="0.01" value="0" placeholder="0.00" oninput="document.getElementById('spk-c-total').textContent = parseFloat(this.value||0).toFixed(2)">
                     <small>Total Modal Berat Awal Tukang: <strong id="spk-c-total" style="color:var(--gold);">0.00</strong> gr</small>
                 </div>
             </div>
@@ -2405,14 +2499,14 @@ async function showProductionAssignModal(repairNum) {
     }
 
     let cewekReproFields = '';
-    if (String(tx.cewek_is_reproduct).toUpperCase() === 'TRUE') {
+    if (String(tx.cewek_is_reproduct).toUpperCase() === 'TRUE' || isQAFailed) {
         cewekReproFields = `
-            <div style="background:var(--bg-light); padding:10px; border-radius:8px; margin-bottom:10px; border:1px solid rgba(197, 168, 92, 0.3);">
+            <div style="background:var(--bg-light); padding:12px; border-radius:8px; margin-bottom:12px; border:1px solid rgba(197, 168, 92, 0.3);">
                 <strong><i class="fa-solid fa-venus"></i> SPK Cincin Wanita (${tx.cewek_material || '-'})</strong><br/>
-                <small>Berat Bekas (Disimpan Gudang): <span id="spk-cw-old">${tx.cewek_weight || 0}</span> gr | Target Baru: ${tx.cewek_target_weight || 0} gr</small>
-                <div class="form-group" style="margin-top:10px;">
-                    <label>Bahan Emas Murni/Alloy (Gram) dari Gudang</label>
-                    <input type="number" id="crud-p-cewek-add" step="0.01" value="0" oninput="document.getElementById('spk-cw-total').textContent = parseFloat(this.value||0).toFixed(2)">
+                <small>Berat Bekas (Gudang HQ): <span id="spk-cw-old">${tx.cewek_weight || 0}</span> gr | Target Baru: ${tx.cewek_target_weight || '-'} gr</small>
+                <div class="form-group" style="margin-top:10px; margin-bottom:4px;">
+                    <label>Bahan Logam Baru dari Gudang (Gram Diserahkan)</label>
+                    <input type="number" id="crud-p-cewek-add" step="0.01" value="0" placeholder="0.00" oninput="document.getElementById('spk-cw-total').textContent = parseFloat(this.value||0).toFixed(2)">
                     <small>Total Modal Berat Awal Tukang: <strong id="spk-cw-total" style="color:var(--gold);">0.00</strong> gr</small>
                 </div>
             </div>
@@ -2421,6 +2515,7 @@ async function showProductionAssignModal(repairNum) {
 
     const fields = `
         <input type="hidden" id="crud-p-repnum" value="${repairNum}">
+        ${qaFailedBanner}
         <div class="form-group">
             <label for="crud-p-wks">Pilih Bengkel Pengrajin (Workshop)</label>
             <select id="crud-p-wks" required>
@@ -2429,10 +2524,10 @@ async function showProductionAssignModal(repairNum) {
         </div>
         ${cowokReproFields}
         ${cewekReproFields}
-        ${String(tx.cowok_is_reproduct).toUpperCase() !== 'TRUE' && String(tx.cewek_is_reproduct).toUpperCase() !== 'TRUE' ? '<small style="color:var(--text-muted);"><i class="fa-solid fa-info-circle"></i> Repair biasa (bukan reproduksi), tidak membutuhkan input modal logam awal.</small>' : ''}
+        ${String(tx.cowok_is_reproduct).toUpperCase() !== 'TRUE' && String(tx.cewek_is_reproduct).toUpperCase() !== 'TRUE' && !isQAFailed ? '<small style="color:var(--text-muted);"><i class="fa-solid fa-info-circle"></i> Repair biasa (bukan reproduksi), tidak membutuhkan input modal logam awal.</small>' : ''}
     `;
 
-    document.getElementById('crud-modal-title').textContent = `Delegasi Pengrajin & SPK (${repairNum})`;
+    document.getElementById('crud-modal-title').textContent = `Delegasi Pengrajin & SPK (${repairNum})${isQAFailed ? ' [REVISI]' : ''}`;
     document.getElementById('crud-form-fields').innerHTML = fields;
 
     const crudModal = document.getElementById('crud-modal');
@@ -2606,6 +2701,18 @@ async function showReceiptPrintModal(repairNum, type = 'RECEIPT', mockTx = null)
     }
     if (!tx) return;
 
+    // Fetch related production jobs to show verified modal awal / SPK history
+    const allProdJobs = (await getLocalData('master_productionjobs')) || [];
+    const repairJobs = allProdJobs.filter((j) => j.repair_number === tx.repair_number);
+    const cowokJob = repairJobs
+        .filter((j) => j.id.includes('COWOK') || (tx.cowok_material && j.metal_id === tx.cowok_material))
+        .sort((a, b) => new Date(b.date || 0) - new Date(a.date || 0))[0];
+    const cewekJob = repairJobs
+        .filter((j) => j.id.includes('CEWEK') || (tx.cewek_material && j.metal_id === tx.cewek_material))
+        .sort((a, b) => new Date(b.date || 0) - new Date(a.date || 0))[0];
+
+    const isRevision = (parseInt(tx.revision_count) || 0) > 0 || (tx.qa_status && tx.qa_status.includes('Failed'));
+
     const modalBody = document.getElementById('print-receipt-body');
 
     // Core details rendering
@@ -2616,6 +2723,8 @@ async function showReceiptPrintModal(repairNum, type = 'RECEIPT', mockTx = null)
 
     const isCowok = String(tx.cowok_active).toUpperCase() === 'TRUE';
     const isCewek = String(tx.cewek_active).toUpperCase() === 'TRUE';
+    const isCowokRepro = String(tx.cowok_is_reproduct).toUpperCase() === 'TRUE';
+    const isCewekRepro = String(tx.cewek_is_reproduct).toUpperCase() === 'TRUE';
 
     // Build extra items rows html
     const addItems = JSON.parse(tx.additional_items_json || '[]');
@@ -2635,7 +2744,18 @@ async function showReceiptPrintModal(repairNum, type = 'RECEIPT', mockTx = null)
         itemsRowsHtml = `<tr><td colspan="4" style="text-align:center; color:#777;">Tidak ada barang/jasa tambahan</td></tr>`;
     }
 
-    const receiptTitle = type === 'FORM' ? 'SURAT PENGERJAAN REPAIR JEWELRY' : 'BUKTI TANDA TERIMA REPAIR';
+    const receiptTitle = type === 'FORM' ? 'SURAT PENGERJAAN REPAIR & SPK WORKSHOP' : 'BUKTI TANDA TERIMA REPAIR';
+
+    const revisionBannerHtml = isRevision && type === 'FORM' ? `
+        <div style="background: rgba(220, 53, 69, 0.08); border: 2px dashed #dc3545; border-radius: 6px; padding: 10px 14px; margin-bottom: 14px; text-align: center;">
+            <strong style="color: #c0392b; font-size: 13px;"><i class="fa-solid fa-triangle-exclamation"></i> SPK PRODUKSI ULANG (REVISI REMAKE #${tx.revision_count || 1}) - PASCA GAGAL QA</strong>
+            <p style="margin: 4px 0 0 0; font-size: 11px; color: #555;">Catatan Kegagalan QA: <strong>"${tx.qa_notes || 'Cacat produksi fisik'}"</strong>. Modal timbangan awal di bawah ini adalah bahan murni baru dari gudang HQ.</p>
+        </div>
+    ` : '';
+
+    const workshopAssignMeta = type === 'FORM' ? `
+        <p><strong>Workshop Ditugaskan:</strong> <span style="color:#2980b9; font-weight:700;">${tx.assigned_workshop || 'Belum Didelegasikan'}</span></p>
+    ` : '';
 
     modalBody.innerHTML = `
         <div class="print-document">
@@ -2651,8 +2771,11 @@ async function showReceiptPrintModal(repairNum, type = 'RECEIPT', mockTx = null)
                     <p><strong>Nomor:</strong> ${tx.repair_number}</p>
                     <p><strong>Tanggal Repair:</strong> ${formatSimpleDate(tx.date)}</p>
                     <p><strong>Target Deadline:</strong> <span style="color:#e67e22; font-weight:700;">${formatSimpleDate(tx.deadline)}</span></p>
+                    ${workshopAssignMeta}
                 </div>
             </div>
+
+            ${revisionBannerHtml}
 
             <div class="preview-cust-section">
                 <h4>DATA CUSTOMER</h4>
@@ -2681,10 +2804,29 @@ async function showReceiptPrintModal(repairNum, type = 'RECEIPT', mockTx = null)
                             <span>Bahan Logam:</span>
                             <strong>${cowokMetal ? cowokMetal.name : '-'}</strong>
                         </div>
+                        ${type === 'FORM' ? `
+                        <div class="preview-details-row">
+                            <span>Sifat Pengerjaan:</span>
+                            <strong>${isCowokRepro ? '<span style="color:#e67e22;">PRODUKSI ULANG (REMAKE)</span>' : 'REPAIR REGULER'}</strong>
+                        </div>
+                        <div class="preview-details-row">
+                            <span>Modal Logam Awal (Tukang):</span>
+                            <strong style="color:var(--gold); font-size:12.5px;">${cowokJob ? cowokJob.initial_gram + ' gram' : (isCowokRepro ? 'Menunggu penyerahan bahan' : (tx.cowok_weight || 0) + ' gram')}</strong>
+                        </div>
+                        <div class="preview-details-row">
+                            <span>Berat Cincin Lama (HQ):</span>
+                            <strong>${tx.cowok_weight || 0} gram</strong>
+                        </div>
+                        <div class="preview-details-row">
+                            <span>Target Berat Jadi:</span>
+                            <strong>${tx.cowok_target_weight ? tx.cowok_target_weight + ' gram' : '-'}</strong>
+                        </div>
+                        ` : `
                         <div class="preview-details-row">
                             <span>Berat Cincin:</span>
                             <strong>${tx.cowok_weight} gram</strong>
                         </div>
+                        `}
                         <div class="preview-details-row">
                             <span>Ukuran Cincin:</span>
                             <strong>${tx.cowok_size}</strong>
@@ -2726,10 +2868,29 @@ async function showReceiptPrintModal(repairNum, type = 'RECEIPT', mockTx = null)
                             <span>Bahan Logam:</span>
                             <strong>${cewekMetal ? cewekMetal.name : '-'}</strong>
                         </div>
+                        ${type === 'FORM' ? `
+                        <div class="preview-details-row">
+                            <span>Sifat Pengerjaan:</span>
+                            <strong>${isCewekRepro ? '<span style="color:#e67e22;">PRODUKSI ULANG (REMAKE)</span>' : 'REPAIR REGULER'}</strong>
+                        </div>
+                        <div class="preview-details-row">
+                            <span>Modal Logam Awal (Tukang):</span>
+                            <strong style="color:var(--gold); font-size:12.5px;">${cewekJob ? cewekJob.initial_gram + ' gram' : (isCewekRepro ? 'Menunggu penyerahan bahan' : (tx.cewek_weight || 0) + ' gram')}</strong>
+                        </div>
+                        <div class="preview-details-row">
+                            <span>Berat Cincin Lama (HQ):</span>
+                            <strong>${tx.cewek_weight || 0} gram</strong>
+                        </div>
+                        <div class="preview-details-row">
+                            <span>Target Berat Jadi:</span>
+                            <strong>${tx.cewek_target_weight ? tx.cewek_target_weight + ' gram' : '-'}</strong>
+                        </div>
+                        ` : `
                         <div class="preview-details-row">
                             <span>Berat Cincin:</span>
                             <strong>${tx.cewek_weight} gram</strong>
                         </div>
+                        `}
                         <div class="preview-details-row">
                             <span>Ukuran Cincin:</span>
                             <strong>${tx.cewek_size}</strong>
@@ -2781,6 +2942,80 @@ async function showReceiptPrintModal(repairNum, type = 'RECEIPT', mockTx = null)
                 </table>
             </div>
 
+            ${type === 'FORM' ? `
+            <div class="preview-workshop-section" style="margin-top:20px; border:1.5px solid #2c3e50; border-radius:6px; padding:12px; background:#fcfcfc;">
+                <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid #ddd; padding-bottom:6px; margin-bottom:10px;">
+                    <h4 style="margin:0; font-size:12px; text-transform:uppercase; color:#2c3e50;">
+                        <i class="fa-solid fa-scale-balanced"></i> Lembar Verifikasi Bahan & Rekap Susut Pengrajin
+                    </h4>
+                    <span style="font-size:11px; font-weight:bold; color:var(--gold);">Workshop: ${tx.assigned_workshop || '-'}</span>
+                </div>
+                <table class="premium-table" style="font-size:11px; width:100%; border-collapse:collapse; margin-bottom:10px;">
+                    <thead>
+                        <tr style="background:#eaeded; text-align:center;">
+                            <th style="padding:6px; text-align:left;">Komponen</th>
+                            <th style="padding:6px;">Bahan Logam</th>
+                            <th style="padding:6px;">Modal Awal Gudang</th>
+                            <th style="padding:6px;">Target Berat Jadi</th>
+                            <th style="padding:6px;">Hasil Real Tukang</th>
+                            <th style="padding:6px;">Scrap (Kembali)</th>
+                            <th style="padding:6px;">Serbuk (Dust)</th>
+                            <th style="padding:6px;">Susut (Maks 4%)</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${isCowok ? `
+                        <tr>
+                            <td style="padding:6px; font-weight:600;">Cincin Cowok</td>
+                            <td style="padding:6px;">${cowokMetal ? cowokMetal.name : '-'}</td>
+                            <td style="padding:6px; text-align:center; font-weight:bold; color:#2c3e50;">${cowokJob ? cowokJob.initial_gram + ' gr' : (isCowokRepro ? '-' : (tx.cowok_weight || 0) + ' gr')}</td>
+                            <td style="padding:6px; text-align:center;">${tx.cowok_target_weight ? tx.cowok_target_weight + ' gr' : '-'}</td>
+                            <td style="padding:6px; text-align:center; color:#777;">[Diisi saat selesai]</td>
+                            <td style="padding:6px; text-align:center; color:#777;">[Diisi saat selesai]</td>
+                            <td style="padding:6px; text-align:center; color:#777;">[Diisi saat selesai]</td>
+                            <td style="padding:6px; text-align:center; color:#777;">[Maks 4%]</td>
+                        </tr>
+                        ` : ''}
+                        ${isCewek ? `
+                        <tr>
+                            <td style="padding:6px; font-weight:600;">Cincin Cewek</td>
+                            <td style="padding:6px;">${cewekMetal ? cewekMetal.name : '-'}</td>
+                            <td style="padding:6px; text-align:center; font-weight:bold; color:#2c3e50;">${cewekJob ? cewekJob.initial_gram + ' gr' : (isCewekRepro ? '-' : (tx.cewek_weight || 0) + ' gr')}</td>
+                            <td style="padding:6px; text-align:center;">${tx.cewek_target_weight ? tx.cewek_target_weight + ' gr' : '-'}</td>
+                            <td style="padding:6px; text-align:center; color:#777;">[Diisi saat selesai]</td>
+                            <td style="padding:6px; text-align:center; color:#777;">[Diisi saat selesai]</td>
+                            <td style="padding:6px; text-align:center; color:#777;">[Diisi saat selesai]</td>
+                            <td style="padding:6px; text-align:center; color:#777;">[Maks 4%]</td>
+                        </tr>
+                        ` : ''}
+                    </tbody>
+                </table>
+                <p style="font-size:10px; color:#555; margin:0; line-height:1.4;">
+                    <strong>Ketentuan Workshop:</strong> Pengrajin bertanggung jawab penuh atas logam modal yang diserahkan. Seluruh cincin jadi, sisa potongan (scrap), dan serbuk gilingan wajib diserahkan kembali ke Gudang HQ saat pengerjaan tuntas. Kehilangan di atas batas susut wajar (4.0%) dikenakan potongan penalti jasa pengrajin.
+                </p>
+            </div>
+
+            <div style="margin-top: 35px; display: flex; justify-content: space-between; font-size:11px; text-align:center;">
+                <div style="width: 150px;">
+                    <p>Diserahkan Oleh,</p>
+                    <br><br><br>
+                    <p><strong>(${State.currentUser?.username || 'Bagian Produksi HQ'})</strong></p>
+                    <p>SCM & Gudang Logam</p>
+                </div>
+                <div style="width: 150px;">
+                    <p>Diterima & Dikerjakan,</p>
+                    <br><br><br>
+                    <p><strong>(${tx.assigned_workshop || 'Workshop / Pengrajin'})</strong></p>
+                    <p>Tukang Perhiasan</p>
+                </div>
+                <div style="width: 150px;">
+                    <p>Verifikasi Kelulusan,</p>
+                    <br><br><br>
+                    <p><strong>( _________________ )</strong></p>
+                    <p>Quality Assurance (QA)</p>
+                </div>
+            </div>
+            ` : `
             <div class="preview-pricing-grid">
                 <div>
                     <p style="font-size: 11px; line-height: 1.5; color:#555;">
@@ -2827,7 +3062,7 @@ async function showReceiptPrintModal(repairNum, type = 'RECEIPT', mockTx = null)
                 <div style="width: 150px;">
                     <p>Hormat Kami,</p>
                     <br><br><br>
-                    <p><strong>(${tx.store_sales_name.split(' (')[0]})</strong></p>
+                    <p><strong>(${tx.store_sales_name ? tx.store_sales_name.split(' (')[0] : 'Sales Toko'})</strong></p>
                     <p>Sales Toko</p>
                 </div>
                 <div style="width: 150px;">
@@ -2837,6 +3072,7 @@ async function showReceiptPrintModal(repairNum, type = 'RECEIPT', mockTx = null)
                     <p>Tanda Tangan</p>
                 </div>
             </div>
+            `}
         </div>
     `;
 
@@ -3282,6 +3518,24 @@ async function loadAdminTable(panelSuffix, storeName, keys) {
         let cellsHtml = '';
         keys.forEach((k) => {
             let val = item[k];
+
+            // Special formatters for production jobs
+            if (k === 'workshop') val = item.workshop || item.workshop_id || '-';
+            if (k === 'scrap_dust_gram') {
+                const s = parseFloat(item.scrap_gram) || 0;
+                const d = parseFloat(item.dust_gram) || 0;
+                val = `${s.toFixed(2)} / ${d.toFixed(2)} gr`;
+            }
+            if (k === 'loss_percentage' && val !== undefined && val !== null && !isNaN(parseFloat(val))) {
+                val = parseFloat(val).toFixed(2) + '%';
+            }
+            if (k === 'status' && typeof val === 'string') {
+                if (val === 'CLEARED') val = '<span class="badge success">Aman</span>';
+                else if (val === 'PENALTY') val = '<span class="badge danger">Penalti</span>';
+                else if (val.includes('REJECTED')) val = '<span class="badge danger">Reject (QA)</span>';
+                else if (val === 'WIP') val = '<span class="badge warning">WIP</span>';
+            }
+
             if (val === undefined || val === null) val = '-';
             
             // Format price variables if they are numbers
@@ -3843,29 +4097,39 @@ async function executeProductionAssignSubmit() {
         match.assigned_workshop = assignedWks;
         match.production_status = 'Active'; // Automatically moves status to active pengerjaan
         match.status = 'Pending Sync';
+
+        const isQAFailed = match.qa_status && match.qa_status.includes('Failed');
+        if (isQAFailed) {
+            match.qa_status = 'In Revision';
+        }
         await saveLocalData('repair_transactions', match);
 
         await queueSyncTask('UPDATE_REPAIR_STATUS', {
             repair_number: repNum,
             assigned_workshop: assignedWks,
-            production_status: 'Active'
+            production_status: 'Active',
+            qa_status: match.qa_status,
+            revision_count: match.revision_count || 0
         });
 
         // ----------------------------------------------------
-        // SPK PRODUKSI TERINTEGRASI (BUAT RECORD BARU JIKA REPRO)
+        // SPK PRODUKSI TERINTEGRASI (BUAT RECORD BARU JIKA REPRO / REVISI QA)
         // ----------------------------------------------------
         const processSPK = async (type) => {
-            if (String(match[`${type}_is_reproduct`]).toUpperCase() === 'TRUE') {
+            const isReproduct = String(match[`${type}_is_reproduct`]).toUpperCase() === 'TRUE';
+            const needsNewMetal = isReproduct || isQAFailed;
+
+            if (needsNewMetal) {
                 const addGramInput = document.getElementById(`crud-p-${type}-add`);
                 if (addGramInput) {
                     const addGram = parseFloat(addGramInput.value) || 0;
                     const oldWeight = parseFloat(match[`${type}_weight`]) || 0;
                     const targetWeight = parseFloat(match[`${type}_target_weight`]) || 0;
-
                     const metalId = match[`${type}_material`] || '';
 
-                    const jobId = 'PROD-' + new Date().getTime() + '-' + type.toUpperCase();
-                    // NEW MECHANISM: Initial weight is strictly the new materials. Old ring is kept in warehouse.
+                    const revSuffix = isQAFailed ? `-REV${match.revision_count || 1}` : '';
+                    const jobId = 'PROD-' + new Date().getTime() + '-' + type.toUpperCase() + revSuffix;
+                    // Initial weight is strictly the new materials released from warehouse
                     const initialTotal = addGram;
 
                     const payload = {
@@ -3881,19 +4145,16 @@ async function executeProductionAssignSubmit() {
                         loss_gram: 0,
                         loss_percentage: 0,
                         status: 'WIP',
+                        iteration: match.revision_count || 1,
                         penalty_applied: 'FALSE',
-                        recorded_by: State.currentUser.username
+                        recorded_by: State.currentUser?.username || 'system'
                     };
 
                     await queueSyncTask('SAVE_PRODUCTION_JOB', payload);
                     await saveLocalData('master_productionjobs', payload);
-                    
-                    // Trigger Print SPK Tukang
-                    printSPKTukang(match, type, assignedWks, initialTotal, targetWeight);
+                    if (!State.masterData.productionjobs) State.masterData.productionjobs = [];
+                    State.masterData.productionjobs.push(payload);
                 }
-            } else {
-                // If not reproduct, we still might need to print a normal repair form
-                printSPKTukang(match, type, assignedWks, match[`${type}_weight`] || 0, match[`${type}_weight`] || 0);
             }
         };
 
@@ -3904,6 +4165,11 @@ async function executeProductionAssignSubmit() {
         document.getElementById('crud-modal').classList.add('hidden');
         await refreshAllData();
         runBackgroundSync();
+
+        // Otomatis buka form cetak SPK Pengerjaan dengan modal awal tercatat
+        setTimeout(() => {
+            showReceiptPrintModal(repNum, 'FORM');
+        }, 350);
     }
 }
 
@@ -5962,10 +6228,12 @@ document.getElementById('btn-save-melting')?.addEventListener('click', async () 
 // 13. PRODUCTION JOB (SPK TUKANG) CONTROLLER
 // ==========================================================================
 
-function showProductionJobModal() {
+async function showProductionJobModal() {
     const modal = document.getElementById('production-job-modal');
     const wsSelect = document.getElementById('prod-workshop-id');
     const metalSelect = document.getElementById('prod-metal-id');
+    const repSelect = document.getElementById('prod-select-repair');
+    const repInfo = document.getElementById('prod-repair-project-info');
 
     // Reset Form
     wsSelect.innerHTML = '<option value="">Pilih Workshop...</option>';
@@ -5977,6 +6245,29 @@ function showProductionJobModal() {
     document.getElementById('prod-loss-breakdown').classList.add('hidden');
     document.getElementById('btn-save-prod').disabled = true;
 
+    if (repSelect) {
+        repSelect.innerHTML = '<option value="">-- Pengerjaan Umum (Tanpa Nomor Repair) --</option>';
+        if (repInfo) {
+            repInfo.classList.add('hidden');
+            repInfo.innerHTML = '';
+        }
+        const txs = (await getLocalData('repair_transactions')) || [];
+        const activeRepairs = txs.filter((t) => 
+            t.production_status === 'Active' || 
+            (t.qa_status && t.qa_status.includes('Failed')) || 
+            t.qa_status === 'In Revision' ||
+            (t.dp_approval === 'Approved' && t.production_status !== 'Completed')
+        );
+
+        activeRepairs.forEach((tx) => {
+            const opt = document.createElement('option');
+            opt.value = tx.repair_number;
+            const revTag = (tx.qa_status && tx.qa_status.includes('Failed')) || tx.qa_status === 'In Revision' ? ' [REVISI QA]' : '';
+            opt.textContent = `${tx.repair_number} - ${tx.customer_name} (${tx.assigned_workshop || 'Workshop Belum Ditetapkan'})${revTag}`;
+            repSelect.appendChild(opt);
+        });
+    }
+
     if (!State.masterData.workshops || !State.masterData.metals) {
         showToast('Data master belum siap. Pastikan Anda online.', 'warning');
         return;
@@ -5985,31 +6276,78 @@ function showProductionJobModal() {
     // Populate Workshops
     State.masterData.workshops.forEach((ws) => {
         const option = document.createElement('option');
-        option.value = ws.id;
+        option.value = ws.name || ws.id;
         option.textContent = ws.name;
         wsSelect.appendChild(option);
     });
 
-    // Populate Metals that have Solid/Lempeng stock
-    let validMetals = new Set();
-    if (State.masterData.processedmetals) {
-        State.masterData.processedmetals.forEach((pm) => {
-            if (pm.type === 'Solid/Lempeng' && pm.stock_gram > 0) validMetals.add(pm.metal_id);
-        });
-    }
-
-    validMetals.forEach((mId) => {
-        const metal = State.masterData.metals.find((m) => m.id === mId);
-        if (metal) {
-            const option = document.createElement('option');
-            option.value = mId;
-            option.textContent = metal.name;
-            metalSelect.appendChild(option);
-        }
+    // Populate Metals that have Solid/Lempeng stock or master metals
+    State.masterData.metals.forEach((metal) => {
+        const option = document.createElement('option');
+        option.value = metal.id;
+        option.textContent = metal.name;
+        metalSelect.appendChild(option);
     });
 
     modal.classList.remove('hidden');
 }
+
+// Listener pemilihan nomor repair di modal SPK manual
+document.getElementById('prod-select-repair')?.addEventListener('change', async (e) => {
+    const repNum = e.target.value;
+    const repInfo = document.getElementById('prod-repair-project-info');
+    const wsSelect = document.getElementById('prod-workshop-id');
+    const metalSelect = document.getElementById('prod-metal-id');
+
+    if (!repNum) {
+        if (repInfo) {
+            repInfo.classList.add('hidden');
+            repInfo.innerHTML = '';
+        }
+        return;
+    }
+
+    const txs = (await getLocalData('repair_transactions')) || [];
+    const tx = txs.find((t) => t.repair_number === repNum);
+    if (!tx || !repInfo) return;
+
+    const isQAFailed = (tx.qa_status && tx.qa_status.includes('Failed')) || tx.qa_status === 'In Revision';
+    repInfo.classList.remove('hidden');
+    repInfo.innerHTML = `
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+            <strong style="color:var(--text-primary); font-size:12.5px;"><i class="fa-solid fa-gem"></i> ${tx.repair_number} - ${tx.customer_name}</strong>
+            <span class="badge ${isQAFailed ? 'danger' : 'warning'}">${isQAFailed ? 'SPK REVISI PASCA QA' : (tx.production_status || 'Aktif')}</span>
+        </div>
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:6px; font-size:11px; color:var(--text-secondary);">
+            <div>Deadline: <strong>${formatSimpleDate(tx.deadline)}</strong></div>
+            <div>Workshop Ditugaskan: <strong>${tx.assigned_workshop || '-'}</strong></div>
+            <div>Cincin Pria: <strong>${tx.cowok_material || '-'} (${tx.cowok_weight || 0}g &rarr; Target: ${tx.cowok_target_weight || '-'}g)</strong></div>
+            <div>Cincin Wanita: <strong>${tx.cewek_material || '-'} (${tx.cewek_weight || 0}g &rarr; Target: ${tx.cewek_target_weight || '-'}g)</strong></div>
+        </div>
+        ${isQAFailed ? `<div style="margin-top:6px; color:var(--red); font-size:11px;"><i class="fa-solid fa-triangle-exclamation"></i> <strong>Catatan QA:</strong> ${tx.qa_notes || 'Cacat produksi fisik'}</div>` : ''}
+    `;
+
+    // Auto-select workshop if matching
+    if (tx.assigned_workshop && wsSelect) {
+        for (let opt of wsSelect.options) {
+            if (opt.value === tx.assigned_workshop || opt.textContent.trim() === tx.assigned_workshop.trim()) {
+                wsSelect.value = opt.value;
+                break;
+            }
+        }
+    }
+
+    // Auto-select metal if matching
+    const prefMetal = tx.cowok_material || tx.cewek_material;
+    if (prefMetal && metalSelect) {
+        for (let opt of metalSelect.options) {
+            if (opt.value === prefMetal || opt.textContent.includes(prefMetal)) {
+                metalSelect.value = opt.value;
+                break;
+            }
+        }
+    }
+});
 
 document.getElementById('btn-modal-prod-close')?.addEventListener('click', () => {
     document.getElementById('production-job-modal').classList.add('hidden');
@@ -6080,6 +6418,7 @@ function calculateProductionLoss() {
 document.getElementById('btn-save-prod')?.addEventListener('click', async () => {
     const wsId = document.getElementById('prod-workshop-id').value;
     const mId = document.getElementById('prod-metal-id').value;
+    const repNum = document.getElementById('prod-select-repair')?.value || '';
     const initial = parseFloat(document.getElementById('prod-initial-weight').value) || 0;
     const final = parseFloat(document.getElementById('prod-final-weight').value) || 0;
     const scrap = parseFloat(document.getElementById('prod-scrap-weight').value) || 0;
@@ -6098,7 +6437,7 @@ document.getElementById('btn-save-prod')?.addEventListener('click', async () => 
         if (pm) currentStock = pm.stock_gram;
     }
 
-    if (initial > currentStock) {
+    if (initial > currentStock && currentStock > 0) {
         showToast(`Stok Lempeng tidak cukup! Tersedia: ${currentStock} gr`, 'error');
         return;
     }
@@ -6107,8 +6446,16 @@ document.getElementById('btn-save-prod')?.addEventListener('click', async () => 
     const lossPct = (loss / initial) * 100;
     const jobId = 'PRD-' + new Date().getTime();
 
+    // Check iteration if linked to repair
+    let iteration = 1;
+    if (repNum) {
+        const existingJobs = State.masterData.productionjobs ? State.masterData.productionjobs.filter((j) => j.repair_number === repNum) : [];
+        if (existingJobs.length > 0) iteration = existingJobs.length + 1;
+    }
+
     const payload = {
         id: jobId,
+        repair_number: repNum,
         date: new Date().toISOString(),
         workshop_id: wsId,
         metal_id: mId,
@@ -6119,8 +6466,9 @@ document.getElementById('btn-save-prod')?.addEventListener('click', async () => 
         loss_gram: loss,
         loss_percentage: lossPct,
         status: penaltyApplied ? 'PENALTY' : 'CLEARED',
+        iteration: iteration,
         penalty_applied: penaltyApplied,
-        recorded_by: State.currentUser.username
+        recorded_by: State.currentUser ? State.currentUser.username : 'system'
     };
 
     const syncItem = {
@@ -6130,15 +6478,27 @@ document.getElementById('btn-save-prod')?.addEventListener('click', async () => 
     };
 
     await saveLocalData('sync_queue', syncItem);
+    await saveLocalData('master_productionjobs', payload);
+    if (!State.masterData.productionjobs) State.masterData.productionjobs = [];
+    State.masterData.productionjobs.push(payload);
+
     document.getElementById('production-job-modal').classList.add('hidden');
 
     if (penaltyApplied) {
-        showToast('SPK Tersimpan dengan peringatan! Penalti pemotongan gaji dicatat.', 'warning');
+        showToast('SPK Tersimpan dengan peringatan! Penalti pemotongan dicatat.', 'warning');
     } else {
         showToast('Serah terima SPK Produksi berhasil.', 'success');
     }
 
     runBackgroundSync();
+    await refreshAllData();
+
+    // Cetak Lembar Form SPK jika terhubung ke Nomor Repair
+    if (repNum) {
+        if (confirm(`SPK Produksi untuk ${repNum} berhasil disimpan. Apakah Anda ingin langsung mencetak Lembar SPK Pengerjaan untuk Workshop?`)) {
+            showReceiptPrintModal(repNum, 'FORM');
+        }
+    }
 });
 
 // ==========================================================================
@@ -6151,12 +6511,12 @@ async function showProductionCompleteModal(repairNum) {
 
     document.getElementById('prod-complete-id').value = repairNum;
 
-    // We need to fetch the SPKs created for this repair (if it was repro)
+    // We need to fetch the SPKs created for this repair (strictly active WIP iteration!)
     let totalInitial = 0;
     let hasRepro = false;
 
     if (State.masterData.productionjobs) {
-        const jobs = State.masterData.productionjobs.filter((j) => j.repair_number === repairNum);
+        const jobs = State.masterData.productionjobs.filter((j) => j.repair_number === repairNum && j.status === 'WIP');
         jobs.forEach((j) => {
             totalInitial += parseFloat(j.initial_gram) || 0;
             hasRepro = true;
@@ -6324,7 +6684,7 @@ async function executeProductionCompleteSubmit(repNum, cowokW, cewekW, scrap, du
         let totalInitial = jobs.reduce((sum, j) => sum + (parseFloat(j.initial_gram) || 0), 0);
 
         for (let j of jobs) {
-            const isCowokJob = j.id.endsWith('COWOK');
+            const isCowokJob = j.id.includes('COWOK');
             const finalW = isCowokJob ? cowokW : cewekW;
             const initG = parseFloat(j.initial_gram) || 0;
             const portion = totalInitial > 0 ? initG / totalInitial : 0;
