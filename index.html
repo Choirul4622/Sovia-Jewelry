@@ -1268,18 +1268,12 @@
                         <div class="premium-card">
                             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; flex-wrap: wrap; gap: 12px;">
                                 <div>
-                                    <h3 style="margin-bottom: 5px">Penugasan Pengrajin Cincin & SPK</h3>
-                                    <p style="font-size: 13px; color: var(--text-muted)">Kelola perbaikan cincin fisik di bengkel, SPK lebur, dan serah terima pengrajin.</p>
+                                    <h3 style="margin-bottom: 5px">Penugasan Pengrajin Cincin & SPK Workshop</h3>
+                                    <p style="font-size: 13px; color: var(--text-muted)">Kelola perbaikan cincin fisik di bengkel, penugasan pengrajin, dan serah terima modal kerja.</p>
                                 </div>
                                 <div style="display: flex; gap: 8px; flex-wrap: wrap;">
                                     <button class="premium-btn btn-sec font-compact" onclick="printCollectiveSuratJalan('workshop')">
                                         <i class="fa-solid fa-print"></i> Surat Jalan Kolektif
-                                    </button>
-                                    <button class="premium-btn btn-sec font-compact" onclick="printCollectiveSuratJalan('melting')">
-                                        <i class="fa-solid fa-print"></i> SPK Peleburan
-                                    </button>
-                                    <button class="premium-btn font-compact" onclick="showMeltingJobModal()">
-                                        <i class="fa-solid fa-fire-burner"></i> Catat SPK Peleburan
                                     </button>
                                     <button class="premium-btn font-compact" onclick="showProductionJobModal()">
                                         <i class="fa-solid fa-hammer"></i> Catat SPK Produksi (Tukang)
@@ -1597,19 +1591,13 @@
                                     </div>
                                     <div style="display: flex; gap: 8px">
                                         <button class="premium-btn btn-sec font-compact" onclick="printCollectiveSuratJalan('melting')">
-                                            <i class="fa-solid fa-print"></i> Cetak SPK Peleburan
+                                            <i class="fa-solid fa-print"></i> Cetak Rekap SPK Peleburan
                                         </button>
                                         <button
                                             class="premium-btn font-compact"
                                             onclick="showMeltingJobModal()"
                                         >
                                             <i class="fa-solid fa-fire-burner"></i> Catat SPK Peleburan
-                                        </button>
-                                        <button class="premium-btn font-compact" onclick="showProductionJobModal()">
-                                            <i class="fa-solid fa-hammer"></i> Catat SPK Produksi (Tukang)
-                                        </button>
-                                        <button class="premium-btn btn-accent font-compact" onclick="showCollectiveResidueModal()">
-                                            <i class="fa-solid fa-boxes-packing"></i> Setor Residu Kolektif
                                         </button>
                                         <button class="premium-btn btn-sec font-compact" onclick="showRefiningJobModal()">
                                             <i class="fa-solid fa-fire-burner"></i> SPK Pemurnian Residu Dust
@@ -1651,6 +1639,7 @@
                                                     <th>Susut Lebur (gr)</th>
                                                     <th>HPP / Gram</th>
                                                     <th>Operator</th>
+                                                    <th style="width: 100px; text-align: center">Aksi</th>
                                                 </tr>
                                             </thead>
                                             <tbody></tbody>

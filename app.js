@@ -502,7 +502,9 @@ async function pullDataFromServer() {
                 master_rawmaterials: data.rawmaterials,
                 master_processedmetals: data.processedmetals,
                 master_meltingjobs: data.meltingjobs,
-                master_productionjobs: data.productionjobs
+                master_productionjobs: data.productionjobs,
+                master_procurementtransactions: data.procurementtransactions,
+                master_collective_residues: data.collective_residues
             };
 
             for (const storeName in masterStores) {
@@ -3542,7 +3544,7 @@ async function renderAdminPanels() {
         'id',
         'date',
         'metal_id',
-        'total_input_cost',
+        'input_gram',
         'yield_gram',
         'shrinkage_gram',
         'cost_per_gram',
@@ -3604,8 +3606,16 @@ async function loadAdminTable(panelSuffix, storeName, keys) {
 
             // Special formatters for melting jobs
             if (storeName === 'master_meltingjobs') {
+                if (k === 'input_gram') {
+                    const y = parseFloat(item.yield_gram) || 0;
+                    const s = parseFloat(item.shrinkage_gram) || 0;
+                    val = `${(y + s).toFixed(2)} gr`;
+                }
                 if (k === 'yield_gram' || k === 'shrinkage_gram') {
                     val = `${(parseFloat(val) || 0).toFixed(2)} gr`;
+                }
+                if (k === 'cost_per_gram') {
+                    val = formatRupiah(val);
                 }
                 if (k === 'metal_id') {
                     const met = State.masterData.metals.find((m) => m.id === val);
@@ -3644,7 +3654,15 @@ async function loadAdminTable(panelSuffix, storeName, keys) {
             } else {
                 cellsHtml += `<td style="text-align:center; color:var(--text-muted); font-size: 11px;"><i>Tuntas</i></td>`;
             }
-        } else if (!['master_processedmetals', 'master_meltingjobs'].includes(storeName)) {
+        } else if (storeName === 'master_meltingjobs') {
+            cellsHtml += `
+                <td style="text-align:center;">
+                    <button class="action-btn-circle btn-print-melting" data-id="${idVal}" title="Cetak Lembar Kerja SPK Peleburan" style="width: 28px; height: 28px; font-size: 11px;">
+                        <i class="fa-solid fa-print"></i>
+                    </button>
+                </td>
+            `;
+        } else if (!['master_processedmetals'].includes(storeName)) {
             cellsHtml += `
                 <td>
                     <div class="action-buttons-flex">
@@ -3669,6 +3687,13 @@ async function loadAdminTable(panelSuffix, storeName, keys) {
             } else {
                 showToast('SPK ini adalah pengerjaan umum tanpa nomor repair spesifik.', 'info');
             }
+        });
+    });
+
+    // Attach listener for melting job single print buttons
+    tbody.querySelectorAll('.btn-print-melting').forEach((btn) => {
+        btn.addEventListener('click', () => {
+            printMeltingJobSingle(btn.dataset.id);
         });
     });
 
@@ -6382,6 +6407,10 @@ document.getElementById('btn-save-melting')?.addEventListener('click', async () 
     showToast(`SPK Peleburan berhasil! ${yieldWeight} gr Lempeng ditambahkan ke Gudang Logam Olahan.`, 'success');
     runBackgroundSync();
     await refreshAllData();
+
+    if (confirm(`SPK Peleburan ${jobId} berhasil diproses.\nApakah Anda ingin langsung mencetak Lembar Kerja SPK Peleburan ini?`)) {
+        printMeltingJobSingle(jobId);
+    }
 });
 
 // ==========================================================================
@@ -6987,70 +7016,118 @@ async function executeProductionCompleteSubmit(repNum, cowokW, cewekW, scrap, du
 }
 
 // ==========================================================================
-// 10. CETAK SURAT JALAN KOLEKTIF
+// 10. CETAK SURAT JALAN & SPK PELEBURAN
 // ==========================================================================
 async function printCollectiveSuratJalan(type) {
-    const txs = await getLocalData('repair_transactions');
     let title = '';
     let filteredTxs = [];
-    
-    if (type === 'logistic') {
-        title = 'SURAT JALAN KOLEKTIF - PENGIRIMAN LOGISTIK';
-        filteredTxs = txs.filter(t => String(t.logistic_ready).toUpperCase() === 'TRUE' && String(t.logistic_shipped).toUpperCase() !== 'TRUE');
-    } else if (type === 'workshop') {
-        title = 'SURAT JALAN KOLEKTIF - DELEGASI WORKSHOP';
-        // Find those assigned but not yet completed
-        filteredTxs = txs.filter(t => (t.cowok_wks && String(t.production_status) !== 'Completed') || (t.cewek_wks && String(t.production_status) !== 'Completed'));
-    } else if (type === 'melting') {
-        title = 'SURAT PERINTAH KERJA (SPK) - PELEBURAN LOGAM';
-    }
-    
-    if (type !== 'melting' && filteredTxs.length === 0) {
-        showToast('Tidak ada data aktif untuk dicetak', 'warning');
-        return;
-    }
-
+    let tableHeadersHtml = '';
+    let tableRows = '';
     const todayStr = new Date().toLocaleDateString('id-ID');
     
-    let tableRows = '';
-    if (type === 'melting') {
-        tableRows = `
+    if (type === 'logistic') {
+        const txs = await getLocalData('repair_transactions');
+        title = 'SURAT JALAN KOLEKTIF - PENGIRIMAN LOGISTIK';
+        filteredTxs = txs.filter(t => String(t.logistic_ready).toUpperCase() === 'TRUE' && String(t.logistic_shipped).toUpperCase() !== 'TRUE');
+        if (filteredTxs.length === 0) {
+            showToast('Tidak ada data aktif untuk dicetak', 'warning');
+            return;
+        }
+        tableHeadersHtml = `
             <tr>
-                <td>1</td>
-                <td></td>
-                <td></td>
-                <td></td>
-                <td></td>
-                <td></td>
-            </tr>
-            <tr>
-                <td>2</td>
-                <td></td>
-                <td></td>
-                <td></td>
-                <td></td>
-                <td></td>
-            </tr>
-            <tr>
-                <td>3</td>
-                <td></td>
-                <td></td>
-                <td></td>
-                <td></td>
-                <td></td>
+                <th style="width: 5%">No</th>
+                <th style="width: 18%">No. Repair</th>
+                <th style="width: 22%">Nama Pelanggan</th>
+                <th style="width: 20%">Kurir / Ekspedisi</th>
+                <th style="width: 25%">Alamat Tujuan</th>
+                <th style="width: 10%; text-align: center;">Ceklis</th>
             </tr>
         `;
-    } else {
         filteredTxs.forEach((tx, idx) => {
             const custName = tx.customer_name ? tx.customer_name.split(' ')[0] : 'NN';
             tableRows += `
                 <tr>
-                    <td>${idx + 1}</td>
+                    <td style="text-align: center;">${idx + 1}</td>
                     <td><strong>${tx.repair_number}</strong></td>
                     <td>${custName} (Dienkripsi)</td>
-                    <td>${type === 'logistic' ? (tx.logistic_courier || '-') : ((tx.cowok_wks || '') + ' ' + (tx.cewek_wks || ''))}</td>
-                    <td>${type === 'logistic' ? (tx.logistic_address || '-') : 'Tunggu Produksi'}</td>
-                    <td></td>
+                    <td>${tx.logistic_courier || '-'}</td>
+                    <td>${tx.logistic_address || '-'}</td>
+                    <td style="text-align: center;">[ &nbsp; ]</td>
+                </tr>
+            `;
+        });
+    } else if (type === 'workshop') {
+        const txs = await getLocalData('repair_transactions');
+        title = 'SURAT JALAN KOLEKTIF - DELEGASI WORKSHOP';
+        filteredTxs = txs.filter(t => (t.cowok_wks && String(t.production_status) !== 'Completed') || (t.cewek_wks && String(t.production_status) !== 'Completed'));
+        if (filteredTxs.length === 0) {
+            showToast('Tidak ada data aktif untuk dicetak', 'warning');
+            return;
+        }
+        tableHeadersHtml = `
+            <tr>
+                <th style="width: 5%">No</th>
+                <th style="width: 18%">No. Repair</th>
+                <th style="width: 22%">Nama Pelanggan</th>
+                <th style="width: 20%">Tujuan Workshop</th>
+                <th style="width: 25%">Rincian Cincin</th>
+                <th style="width: 10%; text-align: center;">Ceklis</th>
+            </tr>
+        `;
+        filteredTxs.forEach((tx, idx) => {
+            const custName = tx.customer_name ? tx.customer_name.split(' ')[0] : 'NN';
+            tableRows += `
+                <tr>
+                    <td style="text-align: center;">${idx + 1}</td>
+                    <td><strong>${tx.repair_number}</strong></td>
+                    <td>${custName} (Dienkripsi)</td>
+                    <td>${(tx.cowok_wks || '') + ' ' + (tx.cewek_wks || '')}</td>
+                    <td>${tx.cowok_material || tx.cewek_material || 'Tunggu Produksi'}</td>
+                    <td style="text-align: center;">[ &nbsp; ]</td>
+                </tr>
+            `;
+        });
+    } else if (type === 'melting') {
+        title = 'REKAPITULASI BUKU BESAR SPK PELEBURAN LOGAM';
+        const meltingJobs = (await getLocalData('master_meltingjobs')) || [];
+        if (meltingJobs.length === 0) {
+            showToast('Belum ada riwayat SPK peleburan yang tersimpan untuk direkap.', 'warning');
+            return;
+        }
+        tableHeadersHtml = `
+            <tr>
+                <th style="width: 4%; text-align: center;">No</th>
+                <th style="width: 16%">ID SPK Lebur</th>
+                <th style="width: 12%">Tanggal</th>
+                <th style="width: 18%">Resep Paduan</th>
+                <th style="width: 11%; text-align: right;">Bahan Masuk</th>
+                <th style="width: 11%; text-align: right;">Hasil Lempeng</th>
+                <th style="width: 10%; text-align: right;">Susut Lebur</th>
+                <th style="width: 12%; text-align: right;">HPP / Gram</th>
+                <th style="width: 6%; text-align: center;">Operator</th>
+            </tr>
+        `;
+        const metals = State.masterData.metals || [];
+        meltingJobs.forEach((job, idx) => {
+            const metal = metals.find((m) => m.id === job.metal_id);
+            const metalName = metal ? metal.name : job.metal_id;
+            const yieldG = parseFloat(job.yield_gram) || 0;
+            const shrinkG = parseFloat(job.shrinkage_gram) || 0;
+            const inputG = yieldG + shrinkG;
+            const costG = parseFloat(job.cost_per_gram) || 0;
+            const dateStr = formatSimpleDate(job.date);
+
+            tableRows += `
+                <tr>
+                    <td style="text-align: center;">${idx + 1}</td>
+                    <td><strong>${job.id}</strong></td>
+                    <td>${dateStr}</td>
+                    <td><strong>${metalName}</strong></td>
+                    <td style="text-align: right;">${inputG.toFixed(2)} gr</td>
+                    <td style="text-align: right; font-weight: bold; color: #276749;">${yieldG.toFixed(2)} gr</td>
+                    <td style="text-align: right; color: #c53030;">${shrinkG.toFixed(2)} gr</td>
+                    <td style="text-align: right;">${formatRupiah(costG)}</td>
+                    <td style="text-align: center;">${job.recorded_by || 'Admin'}</td>
                 </tr>
             `;
         });
@@ -7061,34 +7138,27 @@ async function printCollectiveSuratJalan(type) {
     <head>
         <title>${title}</title>
         <style>
-            body { font-family: 'Arial', sans-serif; padding: 20px; color: #333; }
-            .header { text-align: center; border-bottom: 2px solid #000; padding-bottom: 10px; margin-bottom: 20px; }
-            .header h1 { margin: 0; font-size: 22px; text-transform: uppercase; }
-            .header p { margin: 5px 0 0 0; font-size: 14px; }
-            .content-table { width: 100%; border-collapse: collapse; margin-bottom: 20px; font-size: 13px; }
-            .content-table th, .content-table td { border: 1px solid #000; padding: 8px; text-align: left; }
-            .content-table th { background-color: #f5f5f5; }
+            body { font-family: 'Helvetica Neue', Arial, sans-serif; padding: 20px; color: #2d3748; font-size: 12.5px; }
+            .header { text-align: center; border-bottom: 2px solid #c5a85c; padding-bottom: 10px; margin-bottom: 20px; }
+            .header h1 { margin: 0; font-size: 18px; text-transform: uppercase; color: #1a202c; letter-spacing: 0.5px; }
+            .header p { margin: 5px 0 0 0; font-size: 12px; color: #718096; }
+            .content-table { width: 100%; border-collapse: collapse; margin-bottom: 20px; font-size: 12px; }
+            .content-table th, .content-table td { border: 1px solid #cbd5e0; padding: 7px 10px; text-align: left; }
+            .content-table th { background-color: #edf2f7; text-transform: uppercase; font-size: 11px; font-weight: 600; }
             .footer { margin-top: 40px; display: flex; justify-content: space-between; text-align: center; }
-            .sign-box { width: 200px; }
-            .sign-box p { margin-bottom: 70px; font-weight: bold; }
+            .sign-box { width: 220px; }
+            .sign-box p { margin-bottom: 60px; font-weight: bold; font-size: 12px; }
         </style>
     </head>
     <body onload="window.print(); setTimeout(() => window.close(), 1000);">
         <div class="header">
-            <h1>${title}</h1>
-            <p><strong>Tanggal:</strong> ${todayStr} | <strong>Dicetak Oleh:</strong> ${State.currentUser ? State.currentUser.username : 'Admin'}</p>
+            <h1>SOVIA JEWELRY — ${title}</h1>
+            <p><strong>Tanggal Cetak:</strong> ${todayStr} | <strong>Operator:</strong> ${State.currentUser ? State.currentUser.username : 'Admin'}</p>
         </div>
         
         <table class="content-table">
             <thead>
-                <tr>
-                    <th style="width: 5%">No</th>
-                    <th style="width: 15%">No. Referensi</th>
-                    <th style="width: 20%">Nama Pelanggan</th>
-                    <th style="width: 20%">${type === 'logistic' ? 'Kurir / Ekspedisi' : (type === 'workshop' ? 'Tujuan Workshop' : 'Jenis Logam')}</th>
-                    <th style="width: 25%">${type === 'logistic' ? 'Alamat Tujuan' : (type === 'workshop' ? 'Keterangan' : 'Berat (Gram)')}</th>
-                    <th style="width: 15%">Ceklis Fisik</th>
-                </tr>
+                ${tableHeadersHtml}
             </thead>
             <tbody>
                 ${tableRows}
@@ -7098,13 +7168,13 @@ async function printCollectiveSuratJalan(type) {
         <div class="footer">
             <div class="sign-box">
                 <p>Diserahkan Oleh,</p>
-                <hr>
-                <span>Bagian Administrasi</span>
+                <hr style="border: 0.5px dashed #718096;">
+                <span>( Pengawas Gudang / Logistik )</span>
             </div>
             <div class="sign-box">
                 <p>Diterima Oleh,</p>
-                <hr>
-                <span>( ............................ )</span>
+                <hr style="border: 0.5px dashed #718096;">
+                <span>( Teknisi / Penerima )</span>
             </div>
         </div>
     </body>
@@ -7118,6 +7188,185 @@ async function printCollectiveSuratJalan(type) {
         printWin.document.close();
     }
 }
+
+// Cetak Lembar Kerja SPK Peleburan Tunggal (Melting Batch Card)
+async function printMeltingJobSingle(jobId) {
+    const meltingJobs = (await getLocalData('master_meltingjobs')) || [];
+    const job = meltingJobs.find((j) => j.id === jobId);
+    if (!job) {
+        showToast('Data SPK Peleburan tidak ditemukan.', 'error');
+        return;
+    }
+
+    const metals = State.masterData.metals || [];
+    const metal = metals.find((m) => m.id === job.metal_id);
+    const metalName = metal ? metal.name : job.metal_id;
+
+    let inputRaw = [];
+    try {
+        inputRaw = typeof job.input_raw_json === 'string' ? JSON.parse(job.input_raw_json) : (job.input_raw_json || []);
+    } catch (e) {
+        inputRaw = [];
+    }
+
+    let rawRowsHtml = '';
+    let totalInputGram = 0;
+    inputRaw.forEach((r, idx) => {
+        const g = parseFloat(r.gram) || 0;
+        const c = parseFloat(r.cost) || 0;
+        totalInputGram += g;
+        rawRowsHtml += `
+            <tr>
+                <td style="text-align: center;">${idx + 1}</td>
+                <td><strong>${r.name || r.raw_id}</strong></td>
+                <td style="text-align: right;">${g.toFixed(2)} gr</td>
+                <td style="text-align: right;">${formatRupiah(c)}</td>
+            </tr>
+        `;
+    });
+
+    const yieldGram = parseFloat(job.yield_gram) || 0;
+    const shrinkage = parseFloat(job.shrinkage_gram) || 0;
+    const shrinkPct = totalInputGram > 0 ? (shrinkage / totalInputGram) * 100 : 0;
+    const totalCost = parseFloat(job.total_input_cost) || 0;
+    const costPerGram = parseFloat(job.cost_per_gram) || (yieldGram > 0 ? totalCost / yieldGram : 0);
+    const dateFormatted = new Date(job.date).toLocaleString('id-ID', { dateStyle: 'full', timeStyle: 'short' });
+
+    const htmlContent = `
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <title>SPK Peleburan Logam - ${job.id}</title>
+        <style>
+            @page { size: A4 portrait; margin: 15mm; }
+            body { font-family: 'Helvetica Neue', Arial, sans-serif; color: #1a202c; margin: 0; padding: 20px; font-size: 13px; line-height: 1.4; }
+            .header-wrap { display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 2px solid #c5a85c; padding-bottom: 12px; margin-bottom: 20px; }
+            .brand h1 { margin: 0; font-size: 20px; text-transform: uppercase; color: #1a202c; letter-spacing: 1px; }
+            .brand p { margin: 3px 0 0; font-size: 11px; color: #718096; }
+            .doc-tag { text-align: right; }
+            .doc-tag .badge { background: #c5a85c; color: #fff; padding: 4px 10px; font-size: 11px; font-weight: bold; border-radius: 4px; display: inline-block; }
+            .doc-tag .id { font-size: 14px; font-weight: bold; margin-top: 4px; color: #2d3748; }
+
+            .meta-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; background: #f7fafc; border: 1px solid #e2e8f0; border-radius: 6px; padding: 12px 16px; margin-bottom: 20px; }
+            .meta-item { font-size: 12px; }
+            .meta-item strong { color: #2d3748; }
+
+            h3 { font-size: 13px; text-transform: uppercase; margin: 18px 0 8px; color: #2d3748; border-left: 3px solid #c5a85c; padding-left: 8px; }
+
+            table { width: 100%; border-collapse: collapse; margin-bottom: 15px; font-size: 12px; }
+            th, td { border: 1px solid #cbd5e0; padding: 7px 10px; }
+            th { background-color: #edf2f7; font-weight: 600; text-transform: uppercase; font-size: 11px; }
+            tfoot tr td { font-weight: bold; background-color: #f7fafc; }
+
+            .summary-box { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin: 20px 0; }
+            .summary-card { border: 1px solid #e2e8f0; border-radius: 6px; padding: 10px; text-align: center; background: #fff; }
+            .summary-card .lbl { font-size: 10px; text-transform: uppercase; color: #718096; display: block; margin-bottom: 4px; }
+            .summary-card .val { font-size: 14px; font-weight: bold; color: #2d3748; }
+
+            .footer-sign { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; margin-top: 40px; text-align: center; }
+            .sign-col { border-top: 1px dashed #a0aec0; padding-top: 8px; }
+            .sign-col .space { height: 60px; }
+            .sign-col .role { font-size: 11px; font-weight: bold; color: #4a5568; }
+            .sign-col .name { font-size: 12px; color: #2d3748; margin-top: 4px; }
+        </style>
+    </head>
+    <body onload="window.print(); setTimeout(() => window.close(), 1000);">
+        <div class="header-wrap">
+            <div class="brand">
+                <h1>SOVIA JEWELRY</h1>
+                <p>DIVISI GUDANG LOGAM & PELEBURAN (FURNACE DEPT.)</p>
+            </div>
+            <div class="doc-tag">
+                <span class="badge">LEMBAR KERJA RESMI</span>
+                <div class="id">${job.id}</div>
+            </div>
+        </div>
+
+        <div class="meta-grid">
+            <div class="meta-item">Tanggal Peleburan: <strong>${dateFormatted}</strong></div>
+            <div class="meta-item">Operator / Petugas: <strong>${job.recorded_by || 'Admin'}</strong></div>
+            <div class="meta-item">Formula Paduan: <strong style="color: #b7791f; font-size: 13px;">${metalName}</strong></div>
+            <div class="meta-item">Tujuan Output: <strong>Solid / Lempeng Siap Pakai</strong></div>
+        </div>
+
+        <h3>1. Rincian Bahan Mentah Murni Masuk Kowi (Raw Materials Input)</h3>
+        <table>
+            <thead>
+                <tr>
+                    <th style="width: 40px; text-align: center;">No</th>
+                    <th>Nama Komponen Bahan Mentah</th>
+                    <th style="width: 130px; text-align: right;">Berat Ditimbang</th>
+                    <th style="width: 140px; text-align: right;">Estimasi Biaya Bahan</th>
+                </tr>
+            </thead>
+            <tbody>
+                ${rawRowsHtml || '<tr><td colspan="4" style="text-align: center;">- Tidak ada rincian bahan mentah tercatat -</td></tr>'}
+            </tbody>
+            <tfoot>
+                <tr>
+                    <td colspan="2" style="text-align: right;">TOTAL BAHAN MURNI MASUK:</td>
+                    <td style="text-align: right;">${totalInputGram.toFixed(2)} gr</td>
+                    <td style="text-align: right;">${formatRupiah(totalCost)}</td>
+                </tr>
+            </tfoot>
+        </table>
+
+        <h3>2. Hasil Timbangan Akhir & Akuntansi Biaya (Yield & Shrinkage)</h3>
+        <div class="summary-box">
+            <div class="summary-card">
+                <span class="lbl">Bahan Masuk</span>
+                <span class="val">${totalInputGram.toFixed(2)} gr</span>
+            </div>
+            <div class="summary-card" style="border-color: #38a169;">
+                <span class="lbl" style="color: #276749;">Hasil Lempeng Jadi</span>
+                <span class="val" style="color: #276749;">${yieldGram.toFixed(2)} gr</span>
+            </div>
+            <div class="summary-card" style="border-color: #e53e3e;">
+                <span class="lbl" style="color: #9b2c2c;">Susut Lebur (Loss/Slag)</span>
+                <span class="val" style="color: #9b2c2c;">${shrinkage.toFixed(2)} gr (${shrinkPct.toFixed(2)}%)</span>
+            </div>
+            <div class="summary-card" style="border-color: #c5a85c;">
+                <span class="lbl" style="color: #b7791f;">HPP Aktual / Gram</span>
+                <span class="val" style="color: #b7791f;">${formatRupiah(costPerGram)}</span>
+            </div>
+        </div>
+
+        <div style="font-size: 11px; color: #718096; margin-top: 10px; font-style: italic;">
+            * Lembar SPK ini adalah dokumen sah pemotongan stok bahan mentah murni dan penambahan stok lempeng paduan di Gudang Logam Olahan Sovia Jewelry.
+        </div>
+
+        <div class="footer-sign">
+            <div class="sign-col">
+                <div class="role">Petugas Timbang Bahan (Gudang)</div>
+                <div class="space"></div>
+                <div class="name">( ............................................ )</div>
+            </div>
+            <div class="sign-col">
+                <div class="role">Teknisi Peleburan (Furnace)</div>
+                <div class="space"></div>
+                <div class="name">( ............................................ )</div>
+            </div>
+            <div class="sign-col">
+                <div class="role">Pengawas Produksi / QC</div>
+                <div class="space"></div>
+                <div class="name">( ............................................ )</div>
+            </div>
+        </div>
+    </body>
+    </html>
+    `;
+
+    const printWin = window.open('', '_blank');
+    if (printWin) {
+        printWin.document.open();
+        printWin.document.write(htmlContent);
+        printWin.document.close();
+    }
+}
+window.printMeltingJobSingle = printMeltingJobSingle;
+window.printCollectiveSuratJalan = printCollectiveSuratJalan;
+window.showMeltingJobModal = showMeltingJobModal;
+window.showProductionJobModal = showProductionJobModal;
 
 // ==========================================================================
 // 11. PROCUREMENT / RESTOCK LOGIC
