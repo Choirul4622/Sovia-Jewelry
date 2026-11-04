@@ -155,11 +155,19 @@ button {
     left: 0;
     width: 100%;
     height: 100%;
-    background-color: var(--dark-primary);
-    z-index: 9999;
+    background-color: rgba(18, 22, 28, 0.94);
+    backdrop-filter: blur(8px);
+    z-index: 99999;
     display: flex;
     justify-content: center;
     align-items: center;
+    transition: opacity 0.35s ease, visibility 0.35s ease;
+}
+
+#loading-overlay.hidden {
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
 }
 
 .spinner-container {
@@ -3655,4 +3663,141 @@ button {
     .chat-message-bubble {
         max-width: 90%;
     }
+}
+
+/* ==========================================================================
+   ENHANCEMENTS: SYNC INDICATOR, RESIDUE MODAL & CRAFTSMAN RECONCILIATION
+   ========================================================================== */
+
+.sync-active-indicator {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: rgba(197, 168, 92, 0.15);
+    border: 1px solid var(--gold);
+    color: var(--gold);
+    padding: 3px 10px;
+    border-radius: 20px;
+    font-size: 11.5px;
+    font-weight: 600;
+}
+
+.spk-view-switcher {
+    display: flex;
+    gap: 6px;
+    background: var(--bg-light);
+    padding: 4px;
+    border-radius: var(--border-radius-sm);
+    border: 1px solid var(--border-color);
+}
+
+.spk-view-tab-btn {
+    padding: 6px 14px;
+    border: none;
+    background: transparent;
+    border-radius: var(--border-radius-sm);
+    font-size: 12.5px;
+    font-weight: 500;
+    color: var(--text-muted);
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.spk-view-tab-btn:hover {
+    color: var(--text-primary);
+    background: rgba(0, 0, 0, 0.04);
+}
+
+.spk-view-tab-btn.active {
+    background: var(--surface);
+    color: var(--gold);
+    font-weight: 600;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+}
+
+.scrap-mode-card {
+    border: 1px solid var(--border-color);
+    padding: 10px 14px;
+    border-radius: var(--border-radius-sm);
+    background: var(--surface);
+    cursor: pointer;
+    transition: border-color 0.2s ease, background 0.2s ease;
+}
+
+.scrap-mode-card:hover {
+    border-color: var(--gold);
+}
+
+.scrap-mode-card input[type="radio"]:checked + span {
+    color: var(--gold);
+    font-weight: 600;
+}
+
+/* --- Refining (Pemurnian Residu) Styles --- */
+.refining-yield-row {
+    display: grid;
+    grid-template-columns: 2fr 1.5fr auto;
+    gap: 10px;
+    align-items: center;
+    background: var(--bg-light);
+    padding: 10px 12px;
+    border-radius: var(--border-radius-sm);
+    border: 1px solid var(--border-color);
+    margin-bottom: 8px;
+    transition: var(--transition-smooth);
+}
+
+.refining-yield-row:hover {
+    border-color: var(--gold);
+}
+
+.refining-summary-box {
+    background: rgba(197, 168, 92, 0.06);
+    border: 1px solid var(--gold);
+    border-radius: var(--border-radius-sm);
+    padding: 14px 16px;
+    margin-bottom: 16px;
+}
+
+.refining-summary-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 12px;
+    text-align: center;
+    margin-top: 10px;
+}
+
+.refining-summary-item {
+    background: var(--surface);
+    padding: 10px 8px;
+    border-radius: 6px;
+    border: 1px solid var(--border-color);
+}
+
+.refining-summary-item .label {
+    font-size: 11px;
+    color: var(--text-muted);
+    display: block;
+    margin-bottom: 4px;
+}
+
+.refining-summary-item .val {
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--text-primary);
+}
+
+.badge.pending-refining {
+    background: rgba(230, 126, 34, 0.12);
+    color: #d35400;
+    border: 1px solid rgba(230, 126, 34, 0.3);
+}
+
+.badge.refined {
+    background: rgba(46, 204, 113, 0.12);
+    color: #27ae60;
+    border: 1px solid rgba(46, 204, 113, 0.3);
 }

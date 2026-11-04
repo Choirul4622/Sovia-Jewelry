@@ -34,6 +34,7 @@
                     />
                 </div>
                 <p id="loading-text">Memuat Sistem...</p>
+                <p id="loading-subtext" style="font-size: 12px; color: rgba(255, 255, 255, 0.7); margin-top: 6px;">Menghubungkan ke server cloud...</p>
             </div>
         </div>
 
@@ -1283,6 +1284,9 @@
                                     <button class="premium-btn font-compact" onclick="showProductionJobModal()">
                                         <i class="fa-solid fa-hammer"></i> Catat SPK Produksi (Tukang)
                                     </button>
+                                    <button class="premium-btn btn-accent font-compact" onclick="showCollectiveResidueModal()">
+                                        <i class="fa-solid fa-boxes-packing"></i> Setor Residu Kolektif
+                                    </button>
                                 </div>
                             </div>
                             <div class="table-scroll-container">
@@ -1424,27 +1428,78 @@
                                     <button class="premium-btn font-compact" onclick="showProductionJobModal()">
                                         <i class="fa-solid fa-hammer"></i> Catat SPK Produksi (Tukang)
                                     </button>
+                                    <button class="premium-btn btn-accent font-compact" onclick="showCollectiveResidueModal()">
+                                        <i class="fa-solid fa-boxes-packing"></i> Setor Residu Kolektif
+                                    </button>
                                 </div>
                             </div>
-                            <div class="table-scroll-container">
-                                <table class="premium-table font-compact" id="table-admin-productionjobs">
-                                    <thead>
-                                        <tr>
-                                            <th>ID SPK</th>
-                                            <th>Repair Num</th>
-                                            <th>Tanggal</th>
-                                            <th>Workshop</th>
-                                            <th>Material</th>
-                                            <th>Initial (gr)</th>
-                                            <th>Final (gr)</th>
-                                            <th>Scrap/Serbuk (gr)</th>
-                                            <th>Loss (gr)</th>
-                                            <th>% Loss</th>
-                                            <th>Status</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody></tbody>
-                                </table>
+
+                            <!-- View Switcher -->
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; flex-wrap: wrap; gap: 10px;">
+                                <div class="spk-view-switcher">
+                                    <button class="spk-view-tab-btn active" id="btn-view-spk-list">
+                                        <i class="fa-solid fa-list-check"></i> Log SPK Pengerjaan (Per Repair)
+                                    </button>
+                                    <button class="spk-view-tab-btn" id="btn-view-reconciliation">
+                                        <i class="fa-solid fa-scale-balanced"></i> Rekonsiliasi Neraca Pengrajin (Global)
+                                    </button>
+                                </div>
+                                <div style="font-size: 12px; color: var(--text-muted);">
+                                    <span class="badge success" style="font-size: 11px;">Batas Toleransi Susut: 4.0%</span>
+                                </div>
+                            </div>
+
+                            <!-- View 1: SPK List Table -->
+                            <div id="pane-spk-list">
+                                <div class="table-scroll-container">
+                                    <table class="premium-table font-compact" id="table-admin-productionjobs">
+                                        <thead>
+                                            <tr>
+                                                <th>ID SPK</th>
+                                                <th>Repair Num</th>
+                                                <th>Tanggal</th>
+                                                <th>Workshop</th>
+                                                <th>Material</th>
+                                                <th>Initial (gr)</th>
+                                                <th>Final (gr)</th>
+                                                <th>Scrap/Serbuk (gr)</th>
+                                                <th>Loss (gr)</th>
+                                                <th>% Loss</th>
+                                                <th>Status</th>
+                                                <th style="width: 110px; text-align: center;">Aksi</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody></tbody>
+                                    </table>
+                                </div>
+                            </div>
+
+                            <!-- View 2: Craftsman Reconciliation Table -->
+                            <div id="pane-craftsman-reconciliation" class="hidden">
+                                <div style="background: rgba(197, 168, 92, 0.06); border: 1px solid var(--gold); border-radius: 8px; padding: 12px 16px; margin-bottom: 15px; font-size: 12.5px; line-height: 1.5;">
+                                    <strong><i class="fa-solid fa-circle-info"></i> Prinsip Neraca Logam Pengrajin (Refining Model A - Industry Best Practice):</strong>
+                                    Pengrajin bertanggung jawab atas total modal awal lempeng (Debit). Pengembalian (Kredit) dihitung dari akumulasi cincin jadi + scrap bersih + <strong>logam murni hasil pemurnian serbuk dust</strong>. Ampas kotoran non-logam (slag) diakui sah tereliminasi dalam pemurnian, sehingga evaluasi susut bersih &le; 4.0% terukur akurat dan adil.
+                                </div>
+                                <div class="table-scroll-container">
+                                    <table class="premium-table font-compact" id="table-craftsman-reconciliation">
+                                        <thead>
+                                            <tr>
+                                                <th>Pengrajin (Workshop)</th>
+                                                <th>Jenis Logam</th>
+                                                <th>Modal Awal (Debit)</th>
+                                                <th>Cincin Jadi (Kredit)</th>
+                                                <th>Total Scrap (Kredit)</th>
+                                                <th>Dust Kotor (Info)</th>
+                                                <th>Murni Dimurnikan (Kredit)</th>
+                                                <th>Ampas Slag (Info)</th>
+                                                <th>Net Susut (gr)</th>
+                                                <th>% Net Susut</th>
+                                                <th>Status Audit (4%)</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody></tbody>
+                                    </table>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -1553,6 +1608,12 @@
                                         <button class="premium-btn font-compact" onclick="showProductionJobModal()">
                                             <i class="fa-solid fa-hammer"></i> Catat SPK Produksi (Tukang)
                                         </button>
+                                        <button class="premium-btn btn-accent font-compact" onclick="showCollectiveResidueModal()">
+                                            <i class="fa-solid fa-boxes-packing"></i> Setor Residu Kolektif
+                                        </button>
+                                        <button class="premium-btn btn-sec font-compact" onclick="showRefiningJobModal()">
+                                            <i class="fa-solid fa-fire-burner"></i> SPK Pemurnian Residu Dust
+                                        </button>
                                     </div>
                                 </div>
                                 <div class="premium-card" style="padding: 0; overflow-x: auto">
@@ -1569,6 +1630,60 @@
                                         </thead>
                                         <tbody></tbody>
                                     </table>
+                                </div>
+
+                                <div style="margin-top: 25px;">
+                                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                                        <div>
+                                            <h4 style="margin: 0; font-size: 14px;"><i class="fa-solid fa-fire-burner"></i> Riwayat SPK Peleburan Logam (Buku Besar Inflow Solid/Lempeng)</h4>
+                                            <p style="font-size: 12px; color: var(--text-muted); margin: 2px 0 0 0;">Catatan batch leburan konversi bahan mentah menjadi logam olahan solid/lempeng beserta HPP aktual dan susut lebur.</p>
+                                        </div>
+                                    </div>
+                                    <div class="premium-card" style="padding: 0; overflow-x: auto">
+                                        <table class="premium-table font-compact" id="table-admin-meltingjobs">
+                                            <thead>
+                                                <tr>
+                                                    <th>ID SPK Lebur</th>
+                                                    <th>Tanggal</th>
+                                                    <th>Resep Logam</th>
+                                                    <th>Bahan Masuk (gr)</th>
+                                                    <th>Hasil Lempeng (gr)</th>
+                                                    <th>Susut Lebur (gr)</th>
+                                                    <th>HPP / Gram</th>
+                                                    <th>Operator</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody></tbody>
+                                        </table>
+                                    </div>
+                                </div>
+
+                                <div style="margin-top: 25px;">
+                                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                                        <div>
+                                            <h4 style="margin: 0; font-size: 14px;"><i class="fa-solid fa-gem"></i> Antrean & Riwayat Pemurnian Residu Dust (Refining Ledger - Model A)</h4>
+                                            <p style="font-size: 12px; color: var(--text-muted); margin: 2px 0 0 0;">Pengawasan pemurnian serbuk poles/sweeping pengrajin. Mengkonversi serbuk kotor menjadi logam murni 99.9% di Gudang Bahan Mentah.</p>
+                                        </div>
+                                    </div>
+                                    <div class="premium-card" style="padding: 0; overflow-x: auto">
+                                        <table class="premium-table font-compact" id="table-admin-refiningjobs">
+                                            <thead>
+                                                <tr>
+                                                    <th>ID Setoran</th>
+                                                    <th>Tanggal</th>
+                                                    <th>Pengrajin (Workshop)</th>
+                                                    <th>Logam Asal</th>
+                                                    <th>Dust Kotor (gr)</th>
+                                                    <th>Status Pemurnian</th>
+                                                    <th>Hasil Logam Murni</th>
+                                                    <th>Ampas Slag (gr)</th>
+                                                    <th>Rendemen Yield</th>
+                                                    <th style="width: 130px; text-align: center">Aksi</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody></tbody>
+                                        </table>
+                                    </div>
                                 </div>
                             </div>
 
@@ -2784,27 +2899,33 @@
                     <div
                         style="background: rgba(0, 0, 0, 0.02); padding: 15px; border-radius: 8px; margin-bottom: 15px"
                     >
-                        <h4 style="margin-top: 0; margin-bottom: 10px">2. Sisa Potongan & Leburan</h4>
-                        <div class="form-group">
-                            <label>Scrap Bersih (Potongan Utuh)</label>
+                        <h4 style="margin-top: 0; margin-bottom: 10px"><i class="fa-solid fa-shapes"></i> 2. Penyerahan Potongan Scrap (Residu Padat)</h4>
+                        <div style="display: flex; gap: 12px; margin-bottom: 12px; font-size: 13px; flex-wrap: wrap;">
+                            <label class="scrap-mode-card" style="display: flex; align-items: center; gap: 6px;">
+                                <input type="radio" name="prod-scrap-mode" id="scrap-mode-direct" value="direct" checked>
+                                <span>Serahkan Langsung (Per Cincin)</span>
+                            </label>
+                            <label class="scrap-mode-card" style="display: flex; align-items: center; gap: 6px;">
+                                <input type="radio" name="prod-scrap-mode" id="scrap-mode-collective" value="collective">
+                                <span>Disetor Kolektif (Ditampung Meja)</span>
+                            </label>
+                        </div>
+
+                        <div id="prod-scrap-direct-group" class="form-group" style="margin-bottom: 0;">
+                            <label for="prod-complete-scrap">Berat Scrap Potongan Cincin Ini (Gram)</label>
                             <input
                                 type="number"
                                 id="prod-complete-scrap"
                                 step="0.01"
-                                placeholder="Contoh: 1.50"
+                                placeholder="Contoh: 0.60"
                                 value="0"
                             />
+                            <small style="color: var(--text-muted)">Logam scrap ini otomatis masuk kembali ke Gudang Logam Olahan (Scrap/Leburan).</small>
                         </div>
-                        <div class="form-group" style="margin-bottom: 0">
-                            <label>Serbuk Kotor (Sweeping)</label>
-                            <input
-                                type="number"
-                                id="prod-complete-dust"
-                                step="0.01"
-                                placeholder="Contoh: 0.50"
-                                value="0"
-                            />
+                        <div id="prod-scrap-collective-note" class="hidden" style="font-size: 12px; color: var(--gold); background: rgba(197, 168, 92, 0.08); padding: 8px 12px; border-radius: 6px; border-left: 3px solid var(--gold);">
+                            <i class="fa-solid fa-info-circle"></i> Sisa potongan ditampung di cawan/meja pengrajin dan akan diserahkan berkala via <strong>Setoran Residu Kolektif</strong>.
                         </div>
+                        <input type="hidden" id="prod-complete-dust" value="0" />
                     </div>
 
                     <div
@@ -2993,13 +3114,12 @@
         <div id="production-job-modal" class="modal-overlay hidden">
             <div class="modal-card modal-medium">
                 <div class="modal-header">
-                    <h2 id="production-modal-title"><i class="fa-solid fa-hammer"></i> Serah Terima SPK Produksi</h2>
+                    <h2 id="production-modal-title"><i class="fa-solid fa-hammer"></i> Terbitkan SPK & Serah Terima Logam (Tahap 1)</h2>
                     <button class="modal-close-btn" id="btn-modal-prod-close">&times;</button>
                 </div>
                 <div class="modal-body" style="max-height: 70vh; overflow-y: auto; padding-right: 10px">
                     <p style="font-size: 13px; color: var(--text-muted); margin-bottom: 15px">
-                        Input rincian timbangan logam setelah pengrajin selesai memproses pesanan. Sistem mendeteksi
-                        otomatis batas toleransi susut.
+                        Input penyerahan bahan modal awal lempeng kepada pengrajin. Stok di Gudang Logam Olahan otomatis terpotong saat SPK diterbitkan.
                     </p>
 
                     <!-- Integrasi Nomor Repair Proyek -->
@@ -3031,19 +3151,30 @@
                     <div
                         style="background: rgba(0, 0, 0, 0.02); padding: 15px; border-radius: 8px; margin-bottom: 15px"
                     >
-                        <div class="form-group">
+                        <div class="form-group" style="margin-bottom: 0;">
                             <label>Berat Total Logam Awal Diserahkan (Gram)</label>
                             <input
                                 type="number"
                                 id="prod-initial-weight"
                                 step="0.01"
-                                placeholder="Contoh: 50.00"
+                                placeholder="Contoh: 5.00"
                                 required
                             />
+                            <small style="color: var(--text-muted)">Stok Solid/Lempeng di Gudang Logam Olahan akan otomatis terpotong sejumlah nilai ini.</small>
                         </div>
                     </div>
 
+                    <!-- Instant Return Toggle -->
+                    <div style="margin-bottom: 15px;">
+                        <label style="display: flex; align-items: center; gap: 8px; font-size: 13px; cursor: pointer; color: var(--text-secondary);">
+                            <input type="checkbox" id="prod-check-instant-return">
+                            <span>Sertakan Timbangan Selesai Sekaligus (Instant Closing)</span>
+                        </label>
+                    </div>
+
                     <div
+                        id="prod-instant-return-section"
+                        class="hidden"
                         style="
                             background: rgba(197, 168, 92, 0.05);
                             border: 1px dashed var(--primary-color);
@@ -3063,7 +3194,6 @@
                                 id="prod-final-weight"
                                 step="0.01"
                                 placeholder="Total berat cincin utuh"
-                                required
                             />
                         </div>
 
@@ -3074,7 +3204,6 @@
                                 id="prod-scrap-weight"
                                 step="0.01"
                                 placeholder="Berat lempeng/potongan yang kembali"
-                                required
                             />
                         </div>
 
@@ -3085,7 +3214,6 @@
                                 id="prod-dust-weight"
                                 step="0.01"
                                 placeholder="Berat debu kotor/gergajian"
-                                required
                             />
                         </div>
                     </div>
@@ -3151,7 +3279,146 @@
                 <div class="modal-footer">
                     <button class="premium-btn btn-sec" id="btn-cancel-prod">Batal</button>
                     <button class="premium-btn" id="btn-save-prod" disabled>
-                        <i class="fa-solid fa-floppy-disk"></i> Validasi & Simpan
+                        <i class="fa-solid fa-paper-plane"></i> Terbitkan SPK & Serahkan Logam
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- 8B. COLLECTIVE RESIDUE MODAL (SETORAN RESIDU LOGAM KOLEKTIF) -->
+        <div id="collective-residue-modal" class="modal-overlay hidden">
+            <div class="modal-card modal-medium">
+                <div class="modal-header">
+                    <h2><i class="fa-solid fa-boxes-packing"></i> Setoran Residu Logam Kolektif</h2>
+                    <button class="modal-close-btn" id="btn-modal-collective-close">&times;</button>
+                </div>
+                <div class="modal-body" style="max-height: 70vh; overflow-y: auto;">
+                    <p style="font-size: 13px; color: var(--text-muted); margin-bottom: 15px;">
+                        Catat penyerahan sisa potongan (scrap meja) dan serbuk gilingan/poles (dust sweeping) dari pengrajin. Sisa potongan scrap langsung menambah stok Gudang Logam Olahan (Scrap/Leburan). Serbuk kotor (dust) dicatat sebagai titipan serbuk yang akan dimurnikan (refining) sebelum diakui sebagai logam murni.
+                    </p>
+                    <div class="form-group" style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 15px;">
+                        <div>
+                            <label for="col-res-workshop">Pengrajin / Workshop</label>
+                            <select id="col-res-workshop" required>
+                                <option value="">Pilih Workshop...</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label for="col-res-metal">Jenis Logam Residu</label>
+                            <select id="col-res-metal" required>
+                                <option value="">Pilih Logam...</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div style="background: rgba(197, 168, 92, 0.05); border: 1px dashed var(--gold); padding: 15px; border-radius: 8px; margin-bottom: 15px;">
+                        <h4 style="margin-top: 0; margin-bottom: 12px; color: var(--gold);"><i class="fa-solid fa-scale-balanced"></i> Rincian Timbangan Residu Kolektif</h4>
+                        <div class="form-group" style="margin-bottom: 12px;">
+                            <label for="col-res-scrap">1. Total Potongan Scrap Bersih (Gram)</label>
+                            <input type="number" id="col-res-scrap" step="0.01" value="0" placeholder="0.00">
+                            <small style="color: var(--text-muted)">Sisa potongan & kawat bersih. Otomatis masuk stok Scrap/Leburan Gudang Logam Olahan.</small>
+                        </div>
+                        <div class="form-group" style="margin-bottom: 12px;">
+                            <label for="col-res-dust">2. Total Serbuk Poles & Sweeping Meja (Gram Kotor)</label>
+                            <input type="number" id="col-res-dust" step="0.01" value="0" placeholder="0.00">
+                            <small style="color: var(--text-muted)">Serbuk debu kotor meja kerja. Masuk antrean pemurnian (Pending Refining) sebelum diakui sebagai logam murni.</small>
+                        </div>
+                        <div style="background: var(--surface); padding: 10px; border-radius: 6px; display: flex; justify-content: space-between; align-items: center; font-size: 13px; margin-bottom: 6px;">
+                            <span>Scrap Bersih Masuk Gudang:</span>
+                            <strong id="col-res-scrap-display" style="color: var(--green);">0.00 gr</strong>
+                        </div>
+                        <div style="background: var(--surface); padding: 10px; border-radius: 6px; display: flex; justify-content: space-between; align-items: center; font-size: 13px;">
+                            <span>Serbuk Kotor Masuk Antrean Pemurnian:</span>
+                            <strong id="col-res-dust-display" style="color: var(--gold);">0.00 gr</strong>
+                        </div>
+                    </div>
+
+                    <div class="form-group" style="margin-bottom: 15px;">
+                        <label for="col-res-notes">Catatan / Periode Setoran</label>
+                        <input type="text" id="col-res-notes" placeholder="Contoh: Setoran meja kerja periode Minggu 1 Nov 2026">
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button class="premium-btn btn-sec" id="btn-cancel-collective">Batal</button>
+                    <button class="premium-btn" id="btn-save-collective">
+                        <i class="fa-solid fa-floppy-disk"></i> Simpan Setoran Residu
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- 8C. REFINING JOB MODAL (SPK PEMURNIAN RESIDU DUST) -->
+        <div id="refining-job-modal" class="modal-overlay hidden">
+            <div class="modal-card modal-medium">
+                <div class="modal-header">
+                    <h2><i class="fa-solid fa-fire-burner"></i> SPK Pemurnian Residu Serbuk (Refining)</h2>
+                    <button class="modal-close-btn" id="btn-modal-refining-close">&times;</button>
+                </div>
+                <div class="modal-body" style="max-height: 70vh; overflow-y: auto;">
+                    <p style="font-size: 13px; color: var(--text-muted); margin-bottom: 15px;">
+                        Pemurnian kimiawi/peleburan serbuk kotor meja kerja (<em>bench sweeping</em>). Input seluruh jenis logam murni yang berhasil dipulihkan (multi-metal yield). Logam murni otomatis menambah stok di Gudang Bahan Mentah (Raw Material) siap lebur.
+                    </p>
+                    <input type="hidden" id="refining-residue-id" />
+
+                    <!-- Info Kantong Serbuk Kotor -->
+                    <div style="background: rgba(0, 0, 0, 0.03); border: 1px solid var(--border-color); padding: 12px 14px; border-radius: 8px; margin-bottom: 15px; font-size: 12.5px;">
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
+                            <div>Pengrajin / Workshop: <strong id="refining-workshop-display">-</strong></div>
+                            <div>Logam Asal: <strong id="refining-metal-display">-</strong></div>
+                            <div>Tanggal Setor: <span id="refining-date-display">-</span></div>
+                            <div>Berat Kotor Dust (Gross): <strong id="refining-gross-dust-display" style="color: var(--gold); font-size: 13.5px;">0.00 gr</strong></div>
+                        </div>
+                    </div>
+
+                    <!-- Dynamic Repeater: Multi-Metal Recovery Rows -->
+                    <div style="margin-bottom: 15px;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                            <h4 style="margin: 0; color: var(--text-primary); font-size: 13.5px;"><i class="fa-solid fa-layer-group"></i> Hasil Pemurnian Logam Murni (Recovered Metals)</h4>
+                            <button type="button" class="premium-btn btn-sm btn-sec" id="btn-add-yield-row" style="padding: 4px 10px; font-size: 11.5px;">
+                                <i class="fa-solid fa-plus"></i> Tambah Logam Murni
+                            </button>
+                        </div>
+                        <div id="refining-yield-rows">
+                            <!-- Injected dynamically -->
+                        </div>
+                    </div>
+
+                    <!-- Summary Real-Time Calculations -->
+                    <div class="refining-summary-box">
+                        <div style="font-size: 12.5px; font-weight: 600; color: var(--gold); display: flex; align-items: center; gap: 6px;">
+                            <i class="fa-solid fa-calculator"></i> Neraca Rendemen Pemurnian (Real-Time)
+                        </div>
+                        <div class="refining-summary-grid">
+                            <div class="refining-summary-item">
+                                <span class="label">Total Logam Murni</span>
+                                <span class="val" id="refining-total-recovered" style="color: var(--green);">0.00 gr</span>
+                            </div>
+                            <div class="refining-summary-item">
+                                <span class="label">Ampas Non-Logam (Slag)</span>
+                                <span class="val" id="refining-slag-waste" style="color: var(--text-muted);">0.00 gr</span>
+                            </div>
+                            <div class="refining-summary-item">
+                                <span class="label">Rendemen Recovery</span>
+                                <span class="val" id="refining-recovery-yield" style="color: var(--gold);">0.0%</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="form-group" style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 15px;">
+                        <div>
+                            <label for="refining-cost">Biaya Proses Pemurnian (Rp, Opsional)</label>
+                            <input type="number" id="refining-cost" placeholder="Contoh: 50000" />
+                        </div>
+                        <div>
+                            <label for="refining-notes">Catatan / Vendor Pemurnian</label>
+                            <input type="text" id="refining-notes" placeholder="Contoh: Pemurnian internal batch Nov-1" />
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button class="premium-btn btn-sec" id="btn-cancel-refining">Batal</button>
+                    <button class="premium-btn" id="btn-save-refining">
+                        <i class="fa-solid fa-check-double"></i> Konfirmasi & Akui Hasil Pemurnian
                     </button>
                 </div>
             </div>

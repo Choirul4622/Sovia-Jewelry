@@ -25,14 +25,15 @@ const State = {
         processedmetals: [],
         meltingjobs: [],
         productionjobs: [],
-        procurementtransactions: []
+        procurementtransactions: [],
+        collective_residues: []
     }
 };
 
 // --- CONFIGURATIONS ---
 const CONFIG = {
     DB_NAME: 'SoviaRepairDB',
-    DB_VERSION: 4,
+    DB_VERSION: 5,
     // Google Apps Script Deploy URL
     GAS_API_URL:
         'https://script.google.com/macros/s/AKfycbwaJsUPiuxnwVt2Rn_ALJrkUK8aaWwu7E5Z2F7cKkc8s5kuDCyiuif-PKs3dkUY1GJEvw/exec'
@@ -51,6 +52,23 @@ function resolveImageUrl(url) {
         }
     }
     return url;
+}
+
+// --- INITIAL LOADING OVERLAY GUARD CONTROLLER ---
+function showInitialLoading(message, subtext) {
+    const overlay = document.getElementById('loading-overlay');
+    const text = document.getElementById('loading-text');
+    const sub = document.getElementById('loading-subtext');
+    if (text && message) text.textContent = message;
+    if (sub && subtext) sub.textContent = subtext;
+    if (overlay) overlay.classList.remove('hidden');
+}
+
+function hideInitialLoading() {
+    const overlay = document.getElementById('loading-overlay');
+    if (overlay) {
+        overlay.classList.add('hidden');
+    }
 }
 
 // ==========================================================================
@@ -101,7 +119,8 @@ function initDatabase() {
                 { name: 'master_processedmetals', key: 'id' },
                 { name: 'master_meltingjobs', key: 'id' },
                 { name: 'master_productionjobs', key: 'id' },
-                { name: 'master_procurementtransactions', key: 'id' }
+                { name: 'master_procurementtransactions', key: 'id' },
+                { name: 'master_collective_residues', key: 'id' }
             ];
 
             masterStores.forEach((store) => {
@@ -545,6 +564,7 @@ async function loadAllMasterDataToCache() {
         State.masterData.meltingjobs = await getLocalData('master_meltingjobs');
         State.masterData.productionjobs = await getLocalData('master_productionjobs');
         State.masterData.procurementtransactions = await getLocalData('master_procurementtransactions');
+        State.masterData.collective_residues = (await getLocalData('master_collective_residues')) || [];
     } catch (e) {
         console.error('Gagal membaca master cache: ', e);
     }
@@ -3386,16 +3406,40 @@ function deleteFromQueueByTimestamp(timestamp) {
 
 function setSyncLockDisplay(status) {
     const el = document.getElementById('sync-lock-status');
+    const netInd = document.getElementById('network-indicator');
+    const syncBadge = document.getElementById('btn-sync-trigger');
     if (!el) return;
+
     if (status === 'locked') {
         el.textContent = 'Terkunci (Sedang Sinkronisasi)';
         el.className = 'locked';
+        if (netInd) {
+            netInd.innerHTML = '<span class="sync-active-indicator"><i class="fa-solid fa-rotate fa-spin"></i> Menyinkronkan...</span>';
+        }
+        if (syncBadge) {
+            const icon = syncBadge.querySelector('i');
+            if (icon) icon.className = 'fa-solid fa-rotate fa-spin';
+        }
     } else if (status === 'offline') {
         el.textContent = 'Ditunda (Offline)';
         el.className = 'offline';
+        if (netInd) {
+            netInd.innerHTML = '<span class="status-dot"></span><span class="status-label" id="network-text">Offline-mode</span>';
+        }
+        if (syncBadge) {
+            const icon = syncBadge.querySelector('i');
+            if (icon) icon.className = 'fa-solid fa-rotate';
+        }
     } else {
         el.textContent = 'Bebas (Idle)';
         el.className = 'unlocked';
+        if (netInd) {
+            netInd.innerHTML = '<span class="status-dot online"></span><span class="status-label" id="network-text">Online</span>';
+        }
+        if (syncBadge) {
+            const icon = syncBadge.querySelector('i');
+            if (icon) icon.className = 'fa-solid fa-rotate';
+        }
     }
 }
 
@@ -3493,6 +3537,28 @@ async function renderAdminPanels() {
         'status'
     ]);
 
+    // Melting History (SPK Peleburan)
+    await loadAdminTable('meltingjobs', 'master_meltingjobs', [
+        'id',
+        'date',
+        'metal_id',
+        'total_input_cost',
+        'yield_gram',
+        'shrinkage_gram',
+        'cost_per_gram',
+        'recorded_by'
+    ]);
+
+    // Refining Jobs Table (Pemurnian Residu Dust)
+    if (typeof renderRefiningJobsTable === 'function') {
+        await renderRefiningJobsTable();
+    }
+
+    // Craftsman Reconciliation Table
+    if (typeof renderCraftsmanReconciliationTable === 'function') {
+        await renderCraftsmanReconciliationTable();
+    }
+
     // Procurement History
     await loadAdminTable('procurementtransactions', 'master_procurementtransactions', [
         'id',
@@ -3536,6 +3602,17 @@ async function loadAdminTable(panelSuffix, storeName, keys) {
                 else if (val === 'WIP') val = '<span class="badge warning">WIP</span>';
             }
 
+            // Special formatters for melting jobs
+            if (storeName === 'master_meltingjobs') {
+                if (k === 'yield_gram' || k === 'shrinkage_gram') {
+                    val = `${(parseFloat(val) || 0).toFixed(2)} gr`;
+                }
+                if (k === 'metal_id') {
+                    const met = State.masterData.metals.find((m) => m.id === val);
+                    val = met ? `<strong>${met.name}</strong>` : val;
+                }
+            }
+
             if (val === undefined || val === null) val = '-';
             
             // Format price variables if they are numbers
@@ -3555,7 +3632,19 @@ async function loadAdminTable(panelSuffix, storeName, keys) {
         // Target ID for key operations
         const idVal = item[keys[0]]; // usually the primary key is first key
 
-        if (!['master_processedmetals', 'master_meltingjobs', 'master_productionjobs'].includes(storeName)) {
+        if (storeName === 'master_productionjobs') {
+            if (item.status === 'WIP') {
+                cellsHtml += `
+                    <td style="text-align:center;">
+                        <button class="premium-btn btn-sm btn-return-spk" data-repair="${item.repair_number || ''}" data-job="${idVal}" style="padding: 3px 8px; font-size: 11px;">
+                            <i class="fa-solid fa-scale-balanced"></i> Timbang
+                        </button>
+                    </td>
+                `;
+            } else {
+                cellsHtml += `<td style="text-align:center; color:var(--text-muted); font-size: 11px;"><i>Tuntas</i></td>`;
+            }
+        } else if (!['master_processedmetals', 'master_meltingjobs'].includes(storeName)) {
             cellsHtml += `
                 <td>
                     <div class="action-buttons-flex">
@@ -3569,6 +3658,18 @@ async function loadAdminTable(panelSuffix, storeName, keys) {
         }
         tr.innerHTML = cellsHtml;
         tbody.appendChild(tr);
+    });
+
+    // Attach listener for direct return button on WIP rows
+    tbody.querySelectorAll('.btn-return-spk').forEach((btn) => {
+        btn.addEventListener('click', () => {
+            const rep = btn.dataset.repair;
+            if (rep) {
+                showProductionCompleteModal(rep);
+            } else {
+                showToast('SPK ini adalah pengerjaan umum tanpa nomor repair spesifik.', 'info');
+            }
+        });
     });
 
     if (data.length === 0) {
@@ -4154,6 +4255,17 @@ async function executeProductionAssignSubmit() {
                     await saveLocalData('master_productionjobs', payload);
                     if (!State.masterData.productionjobs) State.masterData.productionjobs = [];
                     State.masterData.productionjobs.push(payload);
+
+                    // Potong stok Solid/Lempeng di Gudang Logam Olahan
+                    if (initialTotal > 0 && metalId) {
+                        const processed = (await getLocalData('master_processedmetals')) || [];
+                        const pItem = processed.find((p) => p.metal_id === metalId && p.type === 'Solid/Lempeng');
+                        if (pItem) {
+                            pItem.stock_gram = Math.max(0, (parseFloat(pItem.stock_gram) || 0) - initialTotal);
+                            await saveLocalData('master_processedmetals', pItem);
+                            await queueSyncTask('UPDATE_PROCESSED_METAL', pItem);
+                        }
+                    }
                 }
             }
         };
@@ -4387,6 +4499,9 @@ function showToast(message, type = 'info') {
 // ==========================================================================
 
 document.addEventListener('DOMContentLoaded', async () => {
+    // 0. Initial Boot Guard - show loading overlay
+    showInitialLoading('Menyiapkan Sistem Sovia Jewelry...', 'Memuat basis data lokal & memeriksa sesi...');
+
     // 1. Initialize local databases
     await initDatabase();
     await loadAllMasterDataToCache();
@@ -4397,8 +4512,21 @@ document.addEventListener('DOMContentLoaded', async () => {
     // Set connection status label
     updateConnectionIndicator(navigator.onLine);
 
-    // 3. Pull initial database from Google Sheets server
-    await pullDataFromServer();
+    // 3. Pull initial database from Google Sheets server if online
+    if (navigator.onLine) {
+        showInitialLoading('Menyinkronkan Data Cloud...', 'Mengunduh transaksi, master logam & stok gudang dari Google Sheets...');
+        try {
+            await pullDataFromServer();
+            hideInitialLoading();
+            showToast('Sistem Siap Digunakan! Data tersinkronisasi.', 'success');
+        } catch (e) {
+            hideInitialLoading();
+            showToast('Koneksi lambat, beralih ke cache lokal.', 'warning');
+        }
+    } else {
+        hideInitialLoading();
+        showToast('Mode Offline: Menggunakan data lokal perangkat.', 'info');
+    }
 
     // 4. Start periodic background sync pulling every 15 seconds
     setInterval(async () => {
@@ -6210,7 +6338,38 @@ document.getElementById('btn-save-melting')?.addEventListener('click', async () 
         recorded_by: State.currentUser.username
     };
 
-    // Push to Sync Queue
+    // 1. Simpan ke master_meltingjobs
+    await saveLocalData('master_meltingjobs', payload);
+    if (!State.masterData.meltingjobs) State.masterData.meltingjobs = [];
+    State.masterData.meltingjobs.push(payload);
+
+    // 2. Potong stok bahan mentah (master_rawmaterials)
+    const rawMaterials = (await getLocalData('master_rawmaterials')) || [];
+    for (let item of inputRawJson) {
+        const rm = rawMaterials.find((r) => r.id === item.raw_id);
+        if (rm) {
+            rm.stock_gram = Math.max(0, (parseFloat(rm.stock_gram) || 0) - item.gram);
+            await saveLocalData('master_rawmaterials', rm);
+            await queueSyncTask('UPDATE_RAW_MATERIAL', rm);
+        }
+    }
+
+    // 3. Tambah stok Solid/Lempeng di master_processedmetals & rekalkulasi HPP
+    const processed = (await getLocalData('master_processedmetals')) || [];
+    let pm = processed.find((p) => p.metal_id === mId && p.type === 'Solid/Lempeng');
+    if (pm) {
+        const prevStock = parseFloat(pm.stock_gram) || 0;
+        const prevCost = parseFloat(pm.average_cost_per_gram) || 0;
+        const newStock = prevStock + yieldWeight;
+        const newAvgCost = newStock > 0 ? (prevStock * prevCost + totalCost) / newStock : costPerGram;
+
+        pm.stock_gram = newStock;
+        pm.average_cost_per_gram = Math.round(newAvgCost);
+        await saveLocalData('master_processedmetals', pm);
+        await queueSyncTask('UPDATE_PROCESSED_METAL', pm);
+    }
+
+    // 4. Push to Sync Queue
     const syncItem = {
         action: 'SAVE_MELTING_JOB',
         payload: payload,
@@ -6220,8 +6379,9 @@ document.getElementById('btn-save-melting')?.addEventListener('click', async () 
     await saveLocalData('sync_queue', syncItem);
     document.getElementById('melting-job-modal').classList.add('hidden');
 
-    showToast('SPK Peleburan berhasil dicatat! Menunggu sinkronisasi...', 'success');
+    showToast(`SPK Peleburan berhasil! ${yieldWeight} gr Lempeng ditambahkan ke Gudang Logam Olahan.`, 'success');
     runBackgroundSync();
+    await refreshAllData();
 });
 
 // ==========================================================================
@@ -6234,6 +6394,8 @@ async function showProductionJobModal() {
     const metalSelect = document.getElementById('prod-metal-id');
     const repSelect = document.getElementById('prod-select-repair');
     const repInfo = document.getElementById('prod-repair-project-info');
+    const instantCheck = document.getElementById('prod-check-instant-return');
+    const instantSection = document.getElementById('prod-instant-return-section');
 
     // Reset Form
     wsSelect.innerHTML = '<option value="">Pilih Workshop...</option>';
@@ -6242,6 +6404,8 @@ async function showProductionJobModal() {
     document.getElementById('prod-final-weight').value = '';
     document.getElementById('prod-scrap-weight').value = '';
     document.getElementById('prod-dust-weight').value = '';
+    if (instantCheck) instantCheck.checked = false;
+    if (instantSection) instantSection.classList.add('hidden');
     document.getElementById('prod-loss-breakdown').classList.add('hidden');
     document.getElementById('btn-save-prod').disabled = true;
 
@@ -6347,6 +6511,8 @@ document.getElementById('prod-select-repair')?.addEventListener('change', async 
             }
         }
     }
+
+    calculateProductionLoss();
 });
 
 document.getElementById('btn-modal-prod-close')?.addEventListener('click', () => {
@@ -6356,23 +6522,49 @@ document.getElementById('btn-cancel-prod')?.addEventListener('click', () => {
     document.getElementById('production-job-modal').classList.add('hidden');
 });
 
+// Toggle instant return checkbox
+document.getElementById('prod-check-instant-return')?.addEventListener('change', (e) => {
+    const instantSection = document.getElementById('prod-instant-return-section');
+    if (e.target.checked) {
+        instantSection?.classList.remove('hidden');
+    } else {
+        instantSection?.classList.add('hidden');
+    }
+    calculateProductionLoss();
+});
+
 // Real-time calculation listener
 const prodInputs = ['prod-initial-weight', 'prod-final-weight', 'prod-scrap-weight', 'prod-dust-weight'];
 prodInputs.forEach((id) => {
     document.getElementById(id)?.addEventListener('input', calculateProductionLoss);
 });
+document.getElementById('prod-workshop-id')?.addEventListener('change', calculateProductionLoss);
+document.getElementById('prod-metal-id')?.addEventListener('change', calculateProductionLoss);
 
 function calculateProductionLoss() {
-    const initial = parseFloat(document.getElementById('prod-initial-weight').value) || 0;
-    const final = parseFloat(document.getElementById('prod-final-weight').value) || 0;
-    const scrap = parseFloat(document.getElementById('prod-scrap-weight').value) || 0;
-    const dust = parseFloat(document.getElementById('prod-dust-weight').value) || 0;
-
+    const isInstant = document.getElementById('prod-check-instant-return')?.checked || false;
+    const initial = parseFloat(document.getElementById('prod-initial-weight')?.value) || 0;
+    const wsId = document.getElementById('prod-workshop-id')?.value;
+    const mId = document.getElementById('prod-metal-id')?.value;
     const breakdown = document.getElementById('prod-loss-breakdown');
     const btnSave = document.getElementById('btn-save-prod');
+    if (!btnSave) return;
+
+    if (!isInstant) {
+        // Tahap 1: Serah terima modal awal lempeng saja
+        if (breakdown) breakdown.classList.add('hidden');
+        btnSave.disabled = !(initial > 0 && wsId && mId);
+        btnSave.dataset.penalty = 'false';
+        return;
+    }
+
+    // Instant Return Mode
+    const final = parseFloat(document.getElementById('prod-final-weight')?.value) || 0;
+    const scrap = parseFloat(document.getElementById('prod-scrap-weight')?.value) || 0;
+    const dust = parseFloat(document.getElementById('prod-dust-weight')?.value) || 0;
 
     if (initial <= 0 || (final === 0 && scrap === 0 && dust === 0)) {
-        breakdown.classList.add('hidden');
+        if (breakdown) breakdown.classList.add('hidden');
         btnSave.disabled = true;
         return;
     }
@@ -6381,35 +6573,37 @@ function calculateProductionLoss() {
     const loss = initial - totalReturned;
     const lossPercentage = (loss / initial) * 100;
 
-    document.getElementById('prod-total-returned').textContent = `${totalReturned.toFixed(2)} gr`;
+    const totalRetEl = document.getElementById('prod-total-returned');
+    if (totalRetEl) totalRetEl.textContent = `${totalReturned.toFixed(2)} gr`;
 
     const lossEl = document.getElementById('prod-loss-weight');
-    lossEl.textContent = `${loss.toFixed(2)} gr (${lossPercentage.toFixed(2)}%)`;
-
     const alertFraud = document.getElementById('prod-fraud-alert');
     const alertSafe = document.getElementById('prod-safe-alert');
 
     if (loss < 0) {
-        lossEl.style.color = 'var(--red)';
-        lossEl.textContent = `Error: Hasil pengembalian lebih besar dari modal awal!`;
-        alertFraud.classList.add('hidden');
-        alertSafe.classList.add('hidden');
+        if (lossEl) {
+            lossEl.style.color = 'var(--red)';
+            lossEl.textContent = `Error: Hasil pengembalian lebih besar dari modal awal!`;
+        }
+        if (alertFraud) alertFraud.classList.add('hidden');
+        if (alertSafe) alertSafe.classList.add('hidden');
         btnSave.disabled = true;
     } else {
-        breakdown.classList.remove('hidden');
-        btnSave.disabled = false;
+        if (breakdown) breakdown.classList.remove('hidden');
+        btnSave.disabled = !(wsId && mId);
+
+        if (lossEl) lossEl.textContent = `${loss.toFixed(2)} gr (${lossPercentage.toFixed(2)}%)`;
 
         // STANDARD TOLERANCE: 4%
         if (lossPercentage > 4.0) {
-            lossEl.style.color = 'var(--red)';
-            alertFraud.classList.remove('hidden');
-            alertSafe.classList.add('hidden');
-            // Attach penalty info to button state if needed
+            if (lossEl) lossEl.style.color = 'var(--red)';
+            if (alertFraud) alertFraud.classList.remove('hidden');
+            if (alertSafe) alertSafe.classList.add('hidden');
             btnSave.dataset.penalty = 'true';
         } else {
-            lossEl.style.color = 'var(--green)';
-            alertFraud.classList.add('hidden');
-            alertSafe.classList.remove('hidden');
+            if (lossEl) lossEl.style.color = 'var(--green)';
+            if (alertFraud) alertFraud.classList.add('hidden');
+            if (alertSafe) alertSafe.classList.remove('hidden');
             btnSave.dataset.penalty = 'false';
         }
     }
@@ -6420,30 +6614,46 @@ document.getElementById('btn-save-prod')?.addEventListener('click', async () => 
     const mId = document.getElementById('prod-metal-id').value;
     const repNum = document.getElementById('prod-select-repair')?.value || '';
     const initial = parseFloat(document.getElementById('prod-initial-weight').value) || 0;
-    const final = parseFloat(document.getElementById('prod-final-weight').value) || 0;
-    const scrap = parseFloat(document.getElementById('prod-scrap-weight').value) || 0;
-    const dust = parseFloat(document.getElementById('prod-dust-weight').value) || 0;
-    const penaltyApplied = document.getElementById('btn-save-prod').dataset.penalty === 'true';
+    const isInstant = document.getElementById('prod-check-instant-return')?.checked || false;
+    const final = isInstant ? (parseFloat(document.getElementById('prod-final-weight').value) || 0) : 0;
+    const scrap = isInstant ? (parseFloat(document.getElementById('prod-scrap-weight').value) || 0) : 0;
+    const dust = isInstant ? (parseFloat(document.getElementById('prod-dust-weight').value) || 0) : 0;
+    const penaltyApplied = isInstant && (document.getElementById('btn-save-prod').dataset.penalty === 'true');
 
     if (!wsId || !mId || initial <= 0) {
         showToast('Mohon lengkapi Workshop, Logam, dan Berat Awal!', 'warning');
         return;
     }
 
-    // Check if initial stock is sufficient
-    let currentStock = 0;
-    if (State.masterData.processedmetals) {
-        const pm = State.masterData.processedmetals.find((p) => p.metal_id === mId && p.type === 'Solid/Lempeng');
-        if (pm) currentStock = pm.stock_gram;
-    }
+    // Check if initial stock in master_processedmetals is sufficient
+    const processedMetals = (await getLocalData('master_processedmetals')) || [];
+    let pmSolid = processedMetals.find((p) => p.metal_id === mId && p.type === 'Solid/Lempeng');
+    let currentStock = pmSolid ? (parseFloat(pmSolid.stock_gram) || 0) : 0;
 
     if (initial > currentStock && currentStock > 0) {
         showToast(`Stok Lempeng tidak cukup! Tersedia: ${currentStock} gr`, 'error');
         return;
     }
 
-    const loss = initial - (final + scrap + dust);
-    const lossPct = (loss / initial) * 100;
+    // Deduct initial weight from master_processedmetals (Solid/Lempeng)
+    if (pmSolid) {
+        pmSolid.stock_gram = Math.max(0, currentStock - initial);
+        await saveLocalData('master_processedmetals', pmSolid);
+        await queueSyncTask('UPDATE_PROCESSED_METAL', pmSolid);
+    }
+
+    // If instant and there is scrap, add scrap to master_processedmetals (Scrap/Leburan)
+    if (isInstant && scrap > 0) {
+        let pmScrap = processedMetals.find((p) => p.metal_id === mId && p.type === 'Scrap/Leburan');
+        if (pmScrap) {
+            pmScrap.stock_gram = (parseFloat(pmScrap.stock_gram) || 0) + scrap;
+            await saveLocalData('master_processedmetals', pmScrap);
+            await queueSyncTask('UPDATE_PROCESSED_METAL', pmScrap);
+        }
+    }
+
+    const loss = isInstant ? (initial - (final + scrap + dust)) : 0;
+    const lossPct = (isInstant && initial > 0) ? (loss / initial) * 100 : 0;
     const jobId = 'PRD-' + new Date().getTime();
 
     // Check iteration if linked to repair
@@ -6465,7 +6675,7 @@ document.getElementById('btn-save-prod')?.addEventListener('click', async () => 
         dust_gram: dust,
         loss_gram: loss,
         loss_percentage: lossPct,
-        status: penaltyApplied ? 'PENALTY' : 'CLEARED',
+        status: isInstant ? (penaltyApplied ? 'PENALTY' : 'CLEARED') : 'WIP',
         iteration: iteration,
         penalty_applied: penaltyApplied,
         recorded_by: State.currentUser ? State.currentUser.username : 'system'
@@ -6484,10 +6694,14 @@ document.getElementById('btn-save-prod')?.addEventListener('click', async () => 
 
     document.getElementById('production-job-modal').classList.add('hidden');
 
-    if (penaltyApplied) {
-        showToast('SPK Tersimpan dengan peringatan! Penalti pemotongan dicatat.', 'warning');
+    if (isInstant) {
+        if (penaltyApplied) {
+            showToast('SPK Selesai dicatat dengan peringatan! Penalti pemotongan susut dicatat.', 'warning');
+        } else {
+            showToast('SPK Produksi selesai dicatat dengan aman.', 'success');
+        }
     } else {
-        showToast('Serah terima SPK Produksi berhasil.', 'success');
+        showToast(`SPK Produksi diterbitkan. Modal Awal ${initial} gr diserahkan (Lempeng terpotong).`, 'success');
     }
 
     runBackgroundSync();
@@ -6526,7 +6740,7 @@ async function showProductionCompleteModal(repairNum) {
     if (!hasRepro) {
         // If no SPK exists, it means it's just a normal repair, just complete it directly
         if (confirm(`Repair biasa (tanpa peleburan ulang). Tandai selesai produksi untuk ${repairNum}?`)) {
-            executeProductionCompleteSubmit(repairNum, 0, 0, 0, 0, 0, 0);
+            executeProductionCompleteSubmit(repairNum, 0, 0, 0, 0, false);
         }
         return;
     }
@@ -6541,6 +6755,12 @@ async function showProductionCompleteModal(repairNum) {
     document.getElementById('prod-complete-cewek-weight').value = '';
     document.getElementById('prod-complete-scrap').value = '0';
     document.getElementById('prod-complete-dust').value = '0';
+
+    // Reset scrap mode to direct by default
+    const scrapDirectRadio = document.getElementById('scrap-mode-direct');
+    if (scrapDirectRadio) scrapDirectRadio.checked = true;
+    document.getElementById('prod-scrap-direct-group')?.classList.remove('hidden');
+    document.getElementById('prod-scrap-collective-note')?.classList.add('hidden');
 
     if (String(tx.cowok_is_reproduct).toUpperCase() === 'TRUE') {
         cowokGroup.classList.remove('hidden');
@@ -6560,6 +6780,26 @@ async function showProductionCompleteModal(repairNum) {
     document.getElementById('production-complete-modal').classList.remove('hidden');
 }
 
+// Scrap mode radio listener
+document.querySelectorAll('input[name="prod-scrap-mode"]').forEach((radio) => {
+    radio.addEventListener('change', (e) => {
+        const isCollective = e.target.value === 'collective';
+        const directGroup = document.getElementById('prod-scrap-direct-group');
+        const collectiveNote = document.getElementById('prod-scrap-collective-note');
+        const scrapInput = document.getElementById('prod-complete-scrap');
+
+        if (isCollective) {
+            directGroup?.classList.add('hidden');
+            collectiveNote?.classList.remove('hidden');
+            if (scrapInput) scrapInput.value = '0';
+        } else {
+            directGroup?.classList.remove('hidden');
+            collectiveNote?.classList.add('hidden');
+        }
+        calculateCompleteLoss();
+    });
+});
+
 const completeInputs = [
     'prod-complete-cowok-weight',
     'prod-complete-cewek-weight',
@@ -6571,18 +6811,21 @@ completeInputs.forEach((id) => {
 });
 
 function calculateCompleteLoss() {
-    const cowokW = parseFloat(document.getElementById('prod-complete-cowok-weight').value) || 0;
-    const cewekW = parseFloat(document.getElementById('prod-complete-cewek-weight').value) || 0;
-    const scrap = parseFloat(document.getElementById('prod-complete-scrap').value) || 0;
-    const dust = parseFloat(document.getElementById('prod-complete-dust').value) || 0;
+    const isCollective = document.getElementById('scrap-mode-collective')?.checked || false;
+    const cowokW = parseFloat(document.getElementById('prod-complete-cowok-weight')?.value) || 0;
+    const cewekW = parseFloat(document.getElementById('prod-complete-cewek-weight')?.value) || 0;
+    const scrap = isCollective ? 0 : (parseFloat(document.getElementById('prod-complete-scrap')?.value) || 0);
+    const dust = parseFloat(document.getElementById('prod-complete-dust')?.value) || 0;
 
-    const initialTotal = parseFloat(document.getElementById('prod-complete-initial-total').dataset.initial) || 0;
+    const initialTotal = parseFloat(document.getElementById('prod-complete-initial-total')?.dataset.initial) || 0;
     const totalReturned = cowokW + cewekW + scrap + dust;
     const breakdown = document.getElementById('prod-complete-loss-breakdown');
     const btnSave = document.getElementById('btn-save-prod-complete');
 
-    if (totalReturned <= 0) {
-        breakdown.classList.add('hidden');
+    if (!btnSave) return;
+
+    if (totalReturned <= 0 && cowokW <= 0 && cewekW <= 0) {
+        if (breakdown) breakdown.classList.add('hidden');
         btnSave.disabled = true;
         return;
     }
@@ -6590,34 +6833,46 @@ function calculateCompleteLoss() {
     const loss = initialTotal - totalReturned;
     const lossPercentage = initialTotal > 0 ? (loss / initialTotal) * 100 : 0;
 
-    document.getElementById('prod-complete-returned-total').textContent = totalReturned.toFixed(2) + ' gr';
+    const retDisp = document.getElementById('prod-complete-returned-total');
+    if (retDisp) retDisp.textContent = totalReturned.toFixed(2) + ' gr';
 
     const lossEl = document.getElementById('prod-complete-loss-weight');
-    lossEl.textContent = `${loss.toFixed(2)} gr (${lossPercentage.toFixed(2)}%)`;
-
     const alertFraud = document.getElementById('prod-complete-fraud-alert');
     const alertSafe = document.getElementById('prod-complete-safe-alert');
 
-    breakdown.classList.remove('hidden');
+    if (breakdown) breakdown.classList.remove('hidden');
 
     if (loss < 0) {
-        lossEl.style.color = 'var(--red)';
-        lossEl.textContent = `Error: Pengembalian melebihi modal!`;
-        alertFraud.classList.add('hidden');
-        alertSafe.classList.add('hidden');
+        if (lossEl) {
+            lossEl.style.color = 'var(--red)';
+            lossEl.textContent = `Error: Pengembalian melebihi modal awal!`;
+        }
+        if (alertFraud) alertFraud.classList.add('hidden');
+        if (alertSafe) alertSafe.classList.add('hidden');
         btnSave.disabled = true;
     } else {
         btnSave.disabled = false;
-        if (lossPercentage > 4.0) {
-            lossEl.style.color = 'var(--red)';
-            alertFraud.classList.remove('hidden');
-            alertSafe.classList.add('hidden');
-            btnSave.dataset.penalty = 'true';
-        } else {
-            lossEl.style.color = 'var(--green)';
-            alertFraud.classList.add('hidden');
-            alertSafe.classList.remove('hidden');
+        if (isCollective) {
+            if (lossEl) {
+                lossEl.style.color = 'var(--gold)';
+                lossEl.textContent = `${loss.toFixed(2)} gr (Sisa Potongan & Serbuk Ditampung Meja Pengrajin)`;
+            }
+            if (alertFraud) alertFraud.classList.add('hidden');
+            if (alertSafe) alertSafe.classList.remove('hidden');
             btnSave.dataset.penalty = 'false';
+        } else {
+            if (lossEl) lossEl.textContent = `${loss.toFixed(2)} gr (${lossPercentage.toFixed(2)}%)`;
+            if (lossPercentage > 4.0) {
+                if (lossEl) lossEl.style.color = 'var(--red)';
+                if (alertFraud) alertFraud.classList.remove('hidden');
+                if (alertSafe) alertSafe.classList.add('hidden');
+                btnSave.dataset.penalty = 'true';
+            } else {
+                if (lossEl) lossEl.style.color = 'var(--green)';
+                if (alertFraud) alertFraud.classList.add('hidden');
+                if (alertSafe) alertSafe.classList.remove('hidden');
+                btnSave.dataset.penalty = 'false';
+            }
         }
     }
 }
@@ -6631,9 +6886,10 @@ document.getElementById('btn-cancel-prod-complete')?.addEventListener('click', (
 
 document.getElementById('btn-save-prod-complete')?.addEventListener('click', async () => {
     const repNum = document.getElementById('prod-complete-id').value;
+    const isCollective = document.getElementById('scrap-mode-collective')?.checked || false;
     const cowokW = parseFloat(document.getElementById('prod-complete-cowok-weight').value) || 0;
     const cewekW = parseFloat(document.getElementById('prod-complete-cewek-weight').value) || 0;
-    const scrap = parseFloat(document.getElementById('prod-complete-scrap').value) || 0;
+    const scrap = isCollective ? 0 : (parseFloat(document.getElementById('prod-complete-scrap').value) || 0);
     const dust = parseFloat(document.getElementById('prod-complete-dust').value) || 0;
 
     // Check if required inputs are filled based on visibility
@@ -6677,17 +6933,28 @@ async function executeProductionCompleteSubmit(repNum, cowokW, cewekW, scrap, du
         cewek_weight_final: cewekW > 0 ? cewekW : ''
     });
 
-    // We must also update the specific ProductionJobs related to this repair to calculate their actual loss individually
-    // This is a simplification: We distribute scrap and dust proportionally to the SPK's initial weights if there are two SPKs
+    // Update specific ProductionJobs related to this repair
     if (State.masterData.productionjobs) {
         const jobs = State.masterData.productionjobs.filter((j) => j.repair_number === repNum && j.status === 'WIP');
         let totalInitial = jobs.reduce((sum, j) => sum + (parseFloat(j.initial_gram) || 0), 0);
 
+        // If direct scrap > 0, credit back to master_processedmetals (Scrap/Leburan)
+        if (scrap > 0 && jobs.length > 0) {
+            const processed = (await getLocalData('master_processedmetals')) || [];
+            const mId = jobs[0].metal_id;
+            let pmScrap = processed.find((p) => p.metal_id === mId && p.type === 'Scrap/Leburan');
+            if (pmScrap) {
+                pmScrap.stock_gram = (parseFloat(pmScrap.stock_gram) || 0) + scrap;
+                await saveLocalData('master_processedmetals', pmScrap);
+                await queueSyncTask('UPDATE_PROCESSED_METAL', pmScrap);
+            }
+        }
+
         for (let j of jobs) {
-            const isCowokJob = j.id.includes('COWOK');
-            const finalW = isCowokJob ? cowokW : cewekW;
+            const isCowokJob = j.id && j.id.includes('COWOK');
+            const finalW = isCowokJob ? cowokW : (cewekW > 0 ? cewekW : (cowokW > 0 ? cowokW : 0));
             const initG = parseFloat(j.initial_gram) || 0;
-            const portion = totalInitial > 0 ? initG / totalInitial : 0;
+            const portion = totalInitial > 0 ? initG / totalInitial : 1;
 
             const jScrap = scrap * portion;
             const jDust = dust * portion;
@@ -6712,9 +6979,10 @@ async function executeProductionCompleteSubmit(repNum, cowokW, cewekW, scrap, du
     if (penaltyApplied) {
         showToast(`SPK Produksi ${repNum} selesai dengan Penalti Susut! Diteruskan ke QA.`, 'warning');
     } else {
-        showToast(`SPK Produksi ${repNum} selesai aman! Diteruskan ke QA.`, 'success');
+        showToast(`SPK Produksi ${repNum} selesai aman! Cincin diteruskan ke QA.`, 'success');
     }
 
+    runBackgroundSync();
     await refreshAllData();
 }
 
@@ -6942,3 +7210,573 @@ async function executeProcurementSubmit() {
     await refreshAllData();
     runBackgroundSync();
 }
+
+// ==========================================================================
+// 15. COLLECTIVE RESIDUE CONTROLLER
+// ==========================================================================
+
+function showCollectiveResidueModal() {
+    const modal = document.getElementById('collective-residue-modal');
+    if (!modal) return;
+
+    const wsSelect = document.getElementById('col-res-workshop');
+    const metalSelect = document.getElementById('col-res-metal');
+    const scrapInput = document.getElementById('col-res-scrap');
+    const dustInput = document.getElementById('col-res-dust');
+    const notesInput = document.getElementById('col-res-notes');
+    const scrapDisp = document.getElementById('col-res-scrap-display');
+    const dustDisp = document.getElementById('col-res-dust-display');
+
+    if (wsSelect) {
+        wsSelect.innerHTML = '<option value="">Pilih Workshop...</option>';
+        if (State.masterData.workshops) {
+            State.masterData.workshops.forEach((ws) => {
+                const opt = document.createElement('option');
+                opt.value = ws.name || ws.id;
+                opt.textContent = ws.name;
+                wsSelect.appendChild(opt);
+            });
+        }
+    }
+
+    if (metalSelect) {
+        metalSelect.innerHTML = '<option value="">Pilih Logam...</option>';
+        if (State.masterData.metals) {
+            State.masterData.metals.forEach((m) => {
+                const opt = document.createElement('option');
+                opt.value = m.id;
+                opt.textContent = m.name;
+                metalSelect.appendChild(opt);
+            });
+        }
+    }
+
+    if (scrapInput) scrapInput.value = '0';
+    if (dustInput) dustInput.value = '0';
+    if (notesInput) notesInput.value = '';
+    if (scrapDisp) scrapDisp.textContent = '0.00 gr';
+    if (dustDisp) dustDisp.textContent = '0.00 gr';
+
+    modal.classList.remove('hidden');
+}
+window.showCollectiveResidueModal = showCollectiveResidueModal;
+
+function calculateCollectiveTotal() {
+    const scrap = parseFloat(document.getElementById('col-res-scrap')?.value) || 0;
+    const dust = parseFloat(document.getElementById('col-res-dust')?.value) || 0;
+    const scrapDisp = document.getElementById('col-res-scrap-display');
+    const dustDisp = document.getElementById('col-res-dust-display');
+    if (scrapDisp) scrapDisp.textContent = `${scrap.toFixed(2)} gr`;
+    if (dustDisp) dustDisp.textContent = `${dust.toFixed(2)} gr`;
+}
+
+document.getElementById('col-res-scrap')?.addEventListener('input', calculateCollectiveTotal);
+document.getElementById('col-res-dust')?.addEventListener('input', calculateCollectiveTotal);
+document.getElementById('btn-modal-collective-close')?.addEventListener('click', () => {
+    document.getElementById('collective-residue-modal')?.classList.add('hidden');
+});
+document.getElementById('btn-cancel-collective')?.addEventListener('click', () => {
+    document.getElementById('collective-residue-modal')?.classList.add('hidden');
+});
+
+document.getElementById('btn-save-collective')?.addEventListener('click', async () => {
+    const ws = document.getElementById('col-res-workshop')?.value;
+    const metalId = document.getElementById('col-res-metal')?.value;
+    const scrap = parseFloat(document.getElementById('col-res-scrap')?.value) || 0;
+    const dust = parseFloat(document.getElementById('col-res-dust')?.value) || 0;
+    const notes = document.getElementById('col-res-notes')?.value || '';
+    const total = scrap + dust;
+
+    if (!ws || !metalId || total <= 0) {
+        showToast('Mohon lengkapi Workshop, Logam, dan Total Residu (> 0)!', 'warning');
+        return;
+    }
+
+    const resId = 'CR-' + new Date().getTime();
+    const payload = {
+        id: resId,
+        date: new Date().toISOString(),
+        workshop_id: ws,
+        metal_id: metalId,
+        scrap_gram: scrap,
+        dust_gram: dust,
+        total_gram: total,
+        dust_status: dust > 0 ? 'Pending Refining' : 'N/A',
+        refined_yield_json: '',
+        total_recovered_gram: 0,
+        slag_waste_gram: 0,
+        recovery_yield_pct: 0,
+        refining_cost: 0,
+        refined_at: '',
+        refined_by: '',
+        notes: notes,
+        recorded_by: State.currentUser ? State.currentUser.username : 'system'
+    };
+
+    // 1. Simpan ke master_collective_residues di IndexedDB
+    await saveLocalData('master_collective_residues', payload);
+    if (!State.masterData.collective_residues) State.masterData.collective_residues = [];
+    State.masterData.collective_residues.push(payload);
+
+    // 2. Tambah stok Scrap/Leburan di master_processedmetals HANYA untuk scrap padat bersih
+    if (scrap > 0) {
+        const processed = (await getLocalData('master_processedmetals')) || [];
+        let pm = processed.find((p) => p.metal_id === metalId && p.type === 'Scrap/Leburan');
+        if (pm) {
+            pm.stock_gram = (parseFloat(pm.stock_gram) || 0) + scrap;
+            await saveLocalData('master_processedmetals', pm);
+            await queueSyncTask('UPDATE_PROCESSED_METAL', pm);
+        }
+    }
+
+    // 3. Queue sync task
+    await queueSyncTask('SAVE_COLLECTIVE_RESIDUE', payload);
+
+    document.getElementById('collective-residue-modal')?.classList.add('hidden');
+    let msg = `Setoran residu dicatat.`;
+    if (scrap > 0) msg += ` ${scrap.toFixed(2)} gr Scrap masuk Gudang Logam Olahan.`;
+    if (dust > 0) msg += ` ${dust.toFixed(2)} gr Dust kotor masuk Antrean Pemurnian.`;
+    showToast(msg, 'success');
+
+    runBackgroundSync();
+    await refreshAllData();
+});
+
+// ==========================================================================
+// 16. DUST REFINING (PEMURNIAN RESIDU DUST) CONTROLLER
+// ==========================================================================
+
+async function showRefiningJobModal(resId = '') {
+    const modal = document.getElementById('refining-job-modal');
+    if (!modal) return;
+
+    const residues = (await getLocalData('master_collective_residues')) || [];
+    let target = null;
+
+    if (resId) {
+        target = residues.find((r) => r.id === resId);
+    } else {
+        target = residues.find((r) => (parseFloat(r.dust_gram) || 0) > 0 && r.dust_status !== 'Refined');
+    }
+
+    if (!target) {
+        showToast('Tidak ada antrean serbuk dust kotor yang menunggu pemurnian.', 'info');
+        return;
+    }
+
+    // Populate info
+    document.getElementById('refining-residue-id').value = target.id;
+    document.getElementById('refining-workshop-display').textContent = target.workshop_id || '-';
+
+    const metals = State.masterData.metals || [];
+    const metalMatch = metals.find((m) => m.id === target.metal_id);
+    document.getElementById('refining-metal-display').textContent = metalMatch ? metalMatch.name : (target.metal_id || '-');
+
+    document.getElementById('refining-date-display').textContent = formatSimpleDate(target.date);
+    const grossDust = parseFloat(target.dust_gram) || 0;
+    const grossEl = document.getElementById('refining-gross-dust-display');
+    if (grossEl) {
+        grossEl.textContent = `${grossDust.toFixed(2)} gr`;
+        grossEl.dataset.gross = grossDust;
+    }
+
+    document.getElementById('refining-cost').value = '';
+    document.getElementById('refining-notes').value = target.notes || '';
+
+    // Clear and build initial rows
+    const container = document.getElementById('refining-yield-rows');
+    if (container) {
+        container.innerHTML = '';
+        // If already refined, repopulate existing yield, else add 1 blank row
+        if (target.refined_yield_json) {
+            try {
+                const existing = JSON.parse(target.refined_yield_json);
+                existing.forEach((item) => addRefiningYieldRow(item.raw_id, item.gram));
+            } catch (e) {
+                addRefiningYieldRow();
+            }
+        } else {
+            addRefiningYieldRow();
+        }
+    }
+
+    calculateRefiningSummary();
+    modal.classList.remove('hidden');
+}
+window.showRefiningJobModal = showRefiningJobModal;
+
+function addRefiningYieldRow(defaultRawId = '', defaultGram = '') {
+    const container = document.getElementById('refining-yield-rows');
+    if (!container) return;
+
+    const row = document.createElement('div');
+    row.className = 'refining-yield-row';
+
+    const rawMaterials = State.masterData.rawmaterials || [];
+    let optionsHtml = '<option value="">-- Pilih Logam Murni --</option>';
+    rawMaterials.forEach((rm) => {
+        const selected = (rm.id === defaultRawId) ? 'selected' : '';
+        optionsHtml += `<option value="${rm.id}" ${selected}>[${rm.id}] ${rm.name} (Stok: ${(parseFloat(rm.stock_gram) || 0).toFixed(2)}g)</option>`;
+    });
+
+    row.innerHTML = `
+        <div>
+            <select class="refining-raw-select" style="width: 100%; padding: 7px 10px; font-size: 12.5px; border-radius: 6px; border: 1px solid var(--border-color);">
+                ${optionsHtml}
+            </select>
+        </div>
+        <div>
+            <input type="number" class="refining-gram-input" step="0.01" min="0" placeholder="Berat Murni (gr)" value="${defaultGram}" style="width: 100%; padding: 7px 10px; font-size: 12.5px; border-radius: 6px; border: 1px solid var(--border-color);">
+        </div>
+        <div>
+            <button type="button" class="action-btn-circle trash btn-remove-yield-row" title="Hapus Baris" style="width: 30px; height: 30px;">
+                <i class="fa-regular fa-trash-can"></i>
+            </button>
+        </div>
+    `;
+
+    // Event listeners
+    row.querySelector('.refining-raw-select')?.addEventListener('change', calculateRefiningSummary);
+    row.querySelector('.refining-gram-input')?.addEventListener('input', calculateRefiningSummary);
+    row.querySelector('.btn-remove-yield-row')?.addEventListener('click', () => {
+        row.remove();
+        calculateRefiningSummary();
+    });
+
+    container.appendChild(row);
+}
+
+function calculateRefiningSummary() {
+    const grossDust = parseFloat(document.getElementById('refining-gross-dust-display')?.dataset.gross) || 0;
+    const gramInputs = document.querySelectorAll('#refining-yield-rows .refining-gram-input');
+
+    let totalRecovered = 0;
+    gramInputs.forEach((inp) => {
+        totalRecovered += parseFloat(inp.value) || 0;
+    });
+
+    const slagWaste = grossDust - totalRecovered;
+    const recoveryYield = grossDust > 0 ? (totalRecovered / grossDust) * 100 : 0;
+
+    const totEl = document.getElementById('refining-total-recovered');
+    const slagEl = document.getElementById('refining-slag-waste');
+    const yieldEl = document.getElementById('refining-recovery-yield');
+    const btnSave = document.getElementById('btn-save-refining');
+
+    if (totEl) totEl.textContent = `${totalRecovered.toFixed(2)} gr`;
+    if (yieldEl) yieldEl.textContent = `${recoveryYield.toFixed(2)}%`;
+
+    if (slagEl) {
+        slagEl.textContent = `${slagWaste.toFixed(2)} gr`;
+        if (slagWaste < -0.01) {
+            slagEl.style.color = 'var(--red)';
+            slagEl.textContent = `Error: Hasil murni > debu kotor!`;
+            if (btnSave) btnSave.disabled = true;
+        } else {
+            slagEl.style.color = 'var(--text-muted)';
+            if (btnSave) btnSave.disabled = (totalRecovered <= 0);
+        }
+    }
+}
+
+document.getElementById('btn-add-yield-row')?.addEventListener('click', () => addRefiningYieldRow());
+document.getElementById('btn-modal-refining-close')?.addEventListener('click', () => {
+    document.getElementById('refining-job-modal')?.classList.add('hidden');
+});
+document.getElementById('btn-cancel-refining')?.addEventListener('click', () => {
+    document.getElementById('refining-job-modal')?.classList.add('hidden');
+});
+
+document.getElementById('btn-save-refining')?.addEventListener('click', async () => {
+    const resId = document.getElementById('refining-residue-id')?.value;
+    const grossDust = parseFloat(document.getElementById('refining-gross-dust-display')?.dataset.gross) || 0;
+    const cost = parseFloat(document.getElementById('refining-cost')?.value) || 0;
+    const notes = document.getElementById('refining-notes')?.value || '';
+
+    const rows = document.querySelectorAll('#refining-yield-rows .refining-yield-row');
+    const yieldList = [];
+    let totalRecovered = 0;
+
+    rows.forEach((r) => {
+        const rawId = r.querySelector('.refining-raw-select')?.value;
+        const gram = parseFloat(r.querySelector('.refining-gram-input')?.value) || 0;
+        if (rawId && gram > 0) {
+            const rawItem = (State.masterData.rawmaterials || []).find((rm) => rm.id === rawId);
+            yieldList.push({
+                raw_id: rawId,
+                metal_name: rawItem ? rawItem.name : rawId,
+                gram: gram
+            });
+            totalRecovered += gram;
+        }
+    });
+
+    if (yieldList.length === 0 || totalRecovered <= 0) {
+        showToast('Mohon masukkan minimal satu logam murni hasil pemurnian (> 0 gr)!', 'warning');
+        return;
+    }
+
+    if (totalRecovered > grossDust + 0.01) {
+        showToast('Hasil logam murni tidak boleh melebihi berat serbuk kotor awal!', 'error');
+        return;
+    }
+
+    const residues = (await getLocalData('master_collective_residues')) || [];
+    const target = residues.find((r) => r.id === resId);
+    if (!target) {
+        showToast('Data setoran serbuk kotor tidak ditemukan.', 'error');
+        return;
+    }
+
+    // 1. Tambah stok pada masing-masing logam murni di master_rawmaterials
+    const rawMaterials = (await getLocalData('master_rawmaterials')) || [];
+    for (let item of yieldList) {
+        const rm = rawMaterials.find((r) => r.id === item.raw_id);
+        if (rm) {
+            rm.stock_gram = (parseFloat(rm.stock_gram) || 0) + item.gram;
+            await saveLocalData('master_rawmaterials', rm);
+            await queueSyncTask('UPDATE_RAW_MATERIAL', rm);
+        }
+    }
+
+    // 2. Update record di master_collective_residues
+    const slagWaste = Math.max(0, grossDust - totalRecovered);
+    const recoveryYield = grossDust > 0 ? (totalRecovered / grossDust) * 100 : 0;
+
+    target.dust_status = 'Refined';
+    target.refined_yield_json = JSON.stringify(yieldList);
+    target.total_recovered_gram = totalRecovered;
+    target.slag_waste_gram = slagWaste;
+    target.recovery_yield_pct = recoveryYield;
+    target.refining_cost = cost;
+    target.refined_at = new Date().toISOString();
+    target.refined_by = State.currentUser ? State.currentUser.username : 'system';
+    if (notes) target.notes = (target.notes ? target.notes + ' | ' : '') + notes;
+
+    await saveLocalData('master_collective_residues', target);
+    await queueSyncTask('UPDATE_COLLECTIVE_RESIDUE', target);
+
+    document.getElementById('refining-job-modal')?.classList.add('hidden');
+    showToast(`Pemurnian berhasil! ${totalRecovered.toFixed(2)} gr logam murni ditambahkan ke Gudang Bahan Mentah.`, 'success');
+
+    runBackgroundSync();
+    await refreshAllData();
+});
+
+// Render Antrean & Riwayat Pemurnian Residu Dust
+async function renderRefiningJobsTable() {
+    const tbody = document.querySelector('#table-admin-refiningjobs tbody');
+    if (!tbody) return;
+
+    const residues = (await getLocalData('master_collective_residues')) || [];
+    const dustResidues = residues.filter((r) => (parseFloat(r.dust_gram) || 0) > 0);
+    const metals = State.masterData.metals || [];
+
+    tbody.innerHTML = '';
+
+    if (dustResidues.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="10" style="text-align: center; color: var(--text-muted); padding: 25px;">Belum ada antrean atau riwayat serbuk dust kotor yang disetorkan.</td></tr>`;
+        return;
+    }
+
+    dustResidues.forEach((r) => {
+        const metalMatch = metals.find((m) => m.id === r.metal_id);
+        const metalName = metalMatch ? metalMatch.name : (r.metal_id || '-');
+        const grossDust = (parseFloat(r.dust_gram) || 0).toFixed(2);
+        const isRefined = r.dust_status === 'Refined';
+
+        let statusBadge = isRefined
+            ? `<span class="badge refined"><i class="fa-solid fa-circle-check"></i> Tuntas Dimurnikan</span>`
+            : `<span class="badge pending-refining"><i class="fa-solid fa-clock"></i> Pending Refining</span>`;
+
+        let recoveredHtml = '-';
+        if (isRefined && r.refined_yield_json) {
+            try {
+                const yieldArr = JSON.parse(r.refined_yield_json);
+                recoveredHtml = yieldArr.map((y) => `<span class="badge" style="font-size: 11px; margin-right: 4px; background: rgba(197, 168, 92, 0.15); color: var(--gold);">${y.metal_name}: ${y.gram.toFixed(2)}g</span>`).join('');
+            } catch (e) {
+                recoveredHtml = `${(parseFloat(r.total_recovered_gram) || 0).toFixed(2)} gr`;
+            }
+        }
+
+        const slag = isRefined ? `${(parseFloat(r.slag_waste_gram) || 0).toFixed(2)} gr` : '-';
+        const yieldPct = isRefined ? `${(parseFloat(r.recovery_yield_pct) || 0).toFixed(2)}%` : '-';
+
+        let actionBtn = '';
+        if (isRefined) {
+            actionBtn = `<span style="font-size: 11px; color: var(--green);"><i class="fa-solid fa-check"></i> Masuk Raw Material</span>`;
+        } else {
+            actionBtn = `
+                <button class="premium-btn btn-sm btn-action-refine" data-id="${r.id}" style="padding: 3px 8px; font-size: 11px;">
+                    <i class="fa-solid fa-fire-burner"></i> Proses Pemurnian
+                </button>
+            `;
+        }
+
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+            <td><strong>${r.id}</strong></td>
+            <td>${formatSimpleDate(r.date)}</td>
+            <td><strong>${r.workshop_id || '-'}</strong></td>
+            <td><span class="badge secondary">${metalName}</span></td>
+            <td><strong>${grossDust} gr</strong></td>
+            <td>${statusBadge}</td>
+            <td>${recoveredHtml}</td>
+            <td>${slag}</td>
+            <td style="font-weight: 600; color: ${isRefined ? 'var(--gold)' : 'var(--text-muted)'}">${yieldPct}</td>
+            <td style="text-align: center;">${actionBtn}</td>
+        `;
+        tbody.appendChild(tr);
+    });
+
+    tbody.querySelectorAll('.btn-action-refine').forEach((btn) => {
+        btn.addEventListener('click', () => showRefiningJobModal(btn.dataset.id));
+    });
+}
+window.renderRefiningJobsTable = renderRefiningJobsTable;
+
+// ==========================================================================
+// 17. CRAFTSMAN RECONCILIATION CONTROLLER (MODEL A)
+// ==========================================================================
+
+// View switcher listeners for SPK List vs Craftsman Reconciliation
+document.getElementById('btn-view-spk-list')?.addEventListener('click', () => {
+    document.getElementById('btn-view-spk-list')?.classList.add('active');
+    document.getElementById('btn-view-reconciliation')?.classList.remove('active');
+    document.getElementById('pane-spk-list')?.classList.remove('hidden');
+    document.getElementById('pane-craftsman-reconciliation')?.classList.add('hidden');
+});
+
+document.getElementById('btn-view-reconciliation')?.addEventListener('click', () => {
+    document.getElementById('btn-view-reconciliation')?.classList.add('active');
+    document.getElementById('btn-view-spk-list')?.classList.remove('active');
+    document.getElementById('pane-craftsman-reconciliation')?.classList.remove('hidden');
+    document.getElementById('pane-spk-list')?.classList.add('hidden');
+    renderCraftsmanReconciliationTable();
+});
+
+async function renderCraftsmanReconciliationTable() {
+    const tableBody = document.querySelector('#table-craftsman-reconciliation tbody');
+    if (!tableBody) return;
+
+    const prodJobs = (await getLocalData('master_productionjobs')) || [];
+    const residues = (await getLocalData('master_collective_residues')) || [];
+    const metals = State.masterData.metals || [];
+
+    // Map metal names
+    const metalNameMap = {};
+    metals.forEach((m) => { metalNameMap[m.id] = m.name; });
+
+    // Ledger aggregation key: `${workshop_id}__${metal_id}`
+    const ledger = {};
+
+    prodJobs.forEach((job) => {
+        const ws = job.workshop_id || 'Unknown Workshop';
+        const m = job.metal_id || 'Unknown Metal';
+        const key = `${ws}__${m}`;
+
+        if (!ledger[key]) {
+            ledger[key] = {
+                workshop: ws,
+                metal_id: m,
+                initial_debit: 0,
+                final_credit: 0,
+                scrap_credit: 0,
+                dust_gross_info: 0,
+                dust_recovered_credit: 0,
+                dust_slag_info: 0,
+                pending_refining_count: 0,
+                job_count: 0
+            };
+        }
+
+        ledger[key].initial_debit += parseFloat(job.initial_gram) || 0;
+        ledger[key].final_credit += parseFloat(job.final_gram) || 0;
+        ledger[key].scrap_credit += parseFloat(job.scrap_gram) || 0;
+        ledger[key].job_count++;
+    });
+
+    // Add collective residues & refining results (Model A)
+    residues.forEach((res) => {
+        const ws = res.workshop_id || 'Unknown Workshop';
+        const m = res.metal_id || 'Unknown Metal';
+        const key = `${ws}__${m}`;
+
+        if (!ledger[key]) {
+            ledger[key] = {
+                workshop: ws,
+                metal_id: m,
+                initial_debit: 0,
+                final_credit: 0,
+                scrap_credit: 0,
+                dust_gross_info: 0,
+                dust_recovered_credit: 0,
+                dust_slag_info: 0,
+                pending_refining_count: 0,
+                job_count: 0
+            };
+        }
+
+        ledger[key].scrap_credit += parseFloat(res.scrap_gram) || 0;
+        const dGross = parseFloat(res.dust_gram) || 0;
+        ledger[key].dust_gross_info += dGross;
+
+        if (dGross > 0) {
+            if (res.dust_status === 'Refined') {
+                ledger[key].dust_recovered_credit += parseFloat(res.total_recovered_gram) || 0;
+                ledger[key].dust_slag_info += parseFloat(res.slag_waste_gram) || 0;
+            } else {
+                ledger[key].pending_refining_count++;
+            }
+        }
+    });
+
+    tableBody.innerHTML = '';
+    const keys = Object.keys(ledger);
+
+    if (keys.length === 0) {
+        tableBody.innerHTML = `<tr><td colspan="11" style="text-align: center; color: var(--text-muted); padding: 25px;">Belum ada riwayat pengerjaan logam tukang untuk direkonsiliasi.</td></tr>`;
+        return;
+    }
+
+    keys.sort().forEach((k) => {
+        const rowData = ledger[k];
+        const metalLabel = metalNameMap[rowData.metal_id] || rowData.metal_id;
+        // Total credit Model A: Cincin Jadi + Scrap Bersih + Logam Murni Hasil Pemurnian
+        const totalCredit = rowData.final_credit + rowData.scrap_credit + rowData.dust_recovered_credit;
+        const netLoss = rowData.initial_debit - totalCredit;
+        const pctLoss = rowData.initial_debit > 0 ? (netLoss / rowData.initial_debit) * 100 : 0;
+
+        let statusBadge = '';
+        if (rowData.initial_debit === 0) {
+            statusBadge = '<span class="badge info">N/A (Tanpa Modal)</span>';
+        } else if (netLoss < 0) {
+            statusBadge = `<span class="badge warning" title="Total pengembalian melebihi modal awal lempeng"><i class="fa-solid fa-scale-unbalanced"></i> Surplus (${Math.abs(netLoss).toFixed(2)} gr)</span>`;
+        } else if (pctLoss <= 4.0) {
+            statusBadge = `<span class="badge success"><i class="fa-solid fa-circle-check"></i> Aman (&le; 4.0%)</span>`;
+        } else {
+            statusBadge = `<span class="badge danger"><i class="fa-solid fa-triangle-exclamation"></i> Selisih Melebihi Toleransi (${pctLoss.toFixed(2)}%)</span>`;
+        }
+
+        if (rowData.pending_refining_count > 0) {
+            statusBadge += `<div style="font-size: 10.5px; color: var(--orange); margin-top: 4px;"><i class="fa-solid fa-clock"></i> ${rowData.pending_refining_count} Kantong Dust Pending Pemurnian</div>`;
+        }
+
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+            <td><strong>${rowData.workshop}</strong></td>
+            <td><span class="badge secondary">${metalLabel}</span></td>
+            <td><strong>${rowData.initial_debit.toFixed(2)} gr</strong></td>
+            <td>${rowData.final_credit.toFixed(2)} gr</td>
+            <td>${rowData.scrap_credit.toFixed(2)} gr</td>
+            <td style="color: var(--text-muted);">${rowData.dust_gross_info.toFixed(2)} gr</td>
+            <td style="font-weight: 600; color: var(--green);">${rowData.dust_recovered_credit.toFixed(2)} gr</td>
+            <td style="color: var(--text-muted);">${rowData.dust_slag_info.toFixed(2)} gr</td>
+            <td style="font-weight: 600; color: ${netLoss > 0 && pctLoss > 4.0 ? 'var(--red)' : 'var(--text-primary)'}">${netLoss.toFixed(2)} gr</td>
+            <td style="font-weight: 600; color: ${netLoss > 0 && pctLoss > 4.0 ? 'var(--red)' : 'var(--green)'}">${pctLoss.toFixed(2)}%</td>
+            <td>${statusBadge}</td>
+        `;
+        tableBody.appendChild(tr);
+    });
+}
+window.renderCraftsmanReconciliationTable = renderCraftsmanReconciliationTable;
