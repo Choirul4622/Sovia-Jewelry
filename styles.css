@@ -3801,3 +3801,219 @@ button {
     color: #27ae60;
     border: 1px solid rgba(46, 204, 113, 0.3);
 }
+
+/* ==========================================================================
+   M-08: MULTI-DIVISION SYSTEM (REPAIR, ORDER HANDMADE, ORDER CASTING)
+   ========================================================================== */
+
+/* Sidebar Division Box & Switcher */
+.sidebar-division-box {
+    padding: 14px 18px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+    background: rgba(255, 255, 255, 0.02);
+}
+
+.sidebar-division-top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 6px;
+}
+
+.sidebar-division-label {
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: rgba(255, 255, 255, 0.45);
+    font-weight: 700;
+}
+
+.btn-portal-return {
+    background: rgba(197, 168, 92, 0.14);
+    border: 1px solid rgba(197, 168, 92, 0.35);
+    color: var(--gold);
+    border-radius: 6px;
+    padding: 3px 8px;
+    font-size: 11px;
+    font-weight: 600;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    transition: var(--transition-smooth);
+}
+
+.btn-portal-return:hover {
+    background: var(--gold);
+    color: #12161f;
+}
+
+.sidebar-division-active {
+    font-family: Outfit, sans-serif;
+    font-size: 13px;
+    font-weight: 700;
+    color: #fff;
+    margin-bottom: 10px;
+}
+
+.division-pill-group {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 5px;
+    background: rgba(0, 0, 0, 0.25);
+    padding: 4px;
+    border-radius: var(--border-radius-sm);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.division-switch-btn {
+    border: none;
+    background: transparent;
+    color: rgba(255, 255, 255, 0.55);
+    font-size: 11px;
+    font-weight: 600;
+    padding: 6px 4px;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: var(--transition-smooth);
+}
+
+.division-switch-btn:hover {
+    color: #fff;
+    background: rgba(255, 255, 255, 0.08);
+}
+
+.division-switch-btn.active {
+    background: var(--gold-gradient);
+    color: #12161f;
+    box-shadow: 0 2px 8px rgba(197, 168, 92, 0.3);
+}
+
+/* Division Badges */
+.division-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 3px 9px;
+    border-radius: 999px;
+    font-size: 10.5px;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    white-space: nowrap;
+}
+
+.division-badge.div-repair {
+    background: rgba(197, 168, 92, 0.16);
+    color: var(--gold-hover);
+    border: 1px solid rgba(197, 168, 92, 0.45);
+}
+
+.dark-theme .division-badge.div-repair,
+#login-view .division-badge.div-repair {
+    color: var(--gold);
+}
+
+.division-badge.div-handmade {
+    background: rgba(46, 204, 113, 0.15);
+    color: #1e874b;
+    border: 1px solid rgba(46, 204, 113, 0.4);
+}
+
+.dark-theme .division-badge.div-handmade,
+#login-view .division-badge.div-handmade {
+    color: #4cd986;
+}
+
+.division-badge.div-casting {
+    background: rgba(108, 92, 231, 0.16);
+    color: #5546d6;
+    border: 1px solid rgba(108, 92, 231, 0.4);
+}
+
+.dark-theme .division-badge.div-casting,
+#login-view .division-badge.div-casting {
+    color: #9b8eff;
+}
+
+/* Form Division Selector Bar */
+.tx-division-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    padding: 14px 18px;
+    margin-bottom: 18px;
+    border-radius: var(--border-radius-sm);
+    background: rgba(197, 168, 92, 0.08);
+    border: 1px solid rgba(197, 168, 92, 0.35);
+    flex-wrap: wrap;
+}
+
+.tx-division-bar-info {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    flex: 1;
+    min-width: 240px;
+}
+
+.tx-division-bar-info strong {
+    font-size: 13.5px;
+    color: var(--text-main);
+    display: flex;
+    align-items: center;
+    gap: 7px;
+}
+
+.tx-division-bar-info strong i {
+    color: var(--gold);
+}
+
+.tx-division-bar-info span {
+    font-size: 12px;
+    color: var(--text-muted);
+}
+
+.tx-division-select-wrap {
+    min-width: 270px;
+}
+
+.tx-division-select-wrap select {
+    width: 100%;
+    padding: 10px 14px;
+    border-radius: var(--border-radius-sm);
+    border: 1px solid var(--gold);
+    background-color: var(--card-bg);
+    font-weight: 600;
+    color: var(--text-main);
+}
+
+/* Order Fields Sub-Boxes Inside Ring Cards */
+.order-fields-box {
+    background: rgba(46, 204, 113, 0.05);
+    border: 1px solid rgba(46, 204, 113, 0.25);
+    border-radius: var(--border-radius-sm);
+    padding: 12px;
+    margin-bottom: 16px;
+}
+
+.order-fields-box .form-group:last-child {
+    margin-bottom: 0;
+}
+
+.casting-sub-box {
+    margin-top: 12px;
+    padding-top: 12px;
+    border-top: 1px dashed rgba(108, 92, 231, 0.35);
+    background: rgba(108, 92, 231, 0.05);
+    border-radius: var(--border-radius-sm);
+    padding: 12px;
+}
+
+@media (width <= 640px) {
+    .tx-division-select-wrap {
+        width: 100%;
+        min-width: 0;
+    }
+}

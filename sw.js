@@ -2,7 +2,7 @@
    SERVICE WORKER - SOVIA JEWELRY OFFLINE-FIRST SYSTEM
    ========================================================================== */
 
-const CACHE_NAME = 'sovia-repair-v1';
+const CACHE_NAME = 'sovia-erp-v2';
 const ASSETS_TO_CACHE = [
     './',
     './index.html',

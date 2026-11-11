@@ -70,8 +70,8 @@
                         </div>
                     </div>
 
-                    <!-- Upcoming System 1 -->
-                    <div class="hub-card disabled">
+                    <!-- System 2: Order Handmade -->
+                    <div class="hub-card active" id="btn-enter-handmade">
                         <div class="hub-card-icon">
                             <i class="fa-solid fa-ring"></i>
                         </div>
@@ -80,19 +80,25 @@
                             <p>
                                 Pembuatan cincin custom secara manual oleh pengrajin profesional dengan detail tinggi.
                             </p>
-                            <span class="hub-status-badge pending"><i class="fa-solid fa-clock"></i> Segera Hadir</span>
+                            <span class="hub-status-badge active"><i class="fa-solid fa-circle-check"></i> Aktif</span>
+                        </div>
+                        <div class="hub-card-arrow">
+                            <i class="fa-solid fa-chevron-right"></i>
                         </div>
                     </div>
 
-                    <!-- Upcoming System 2 -->
-                    <div class="hub-card disabled">
+                    <!-- System 3: Order Casting -->
+                    <div class="hub-card active" id="btn-enter-casting">
                         <div class="hub-card-icon">
                             <i class="fa-solid fa-gem"></i>
                         </div>
                         <div class="hub-card-content">
                             <h3>Sistem Order Casting</h3>
-                            <p>Produksi cincin skala besar menggunakan metode cetak lilin presisi tinggi.</p>
-                            <span class="hub-status-badge pending"><i class="fa-solid fa-clock"></i> Segera Hadir</span>
+                            <p>Produksi cincin custom & batch menggunakan desain CAD 3D serta metode cetak lilin presisi.</p>
+                            <span class="hub-status-badge active"><i class="fa-solid fa-circle-check"></i> Aktif</span>
+                        </div>
+                        <div class="hub-card-arrow">
+                            <i class="fa-solid fa-chevron-right"></i>
                         </div>
                     </div>
                 </div>
@@ -120,8 +126,11 @@
                             alt="Sovia Logo"
                             class="login-logo"
                         />
-                        <h2>Sistem Repair Cincin</h2>
-                        <p>Masukkan kredensial Anda untuk masuk ke sistem</p>
+                        <div style="margin-bottom: 8px">
+                            <span class="division-badge div-repair" id="login-division-badge">DIVISI REPAIR</span>
+                        </div>
+                        <h2 id="login-division-title">Sistem Informasi Repair</h2>
+                        <p id="login-division-subtitle">Masukkan kredensial Anda untuk masuk ke sistem</p>
                     </div>
 
                     <form id="login-form" autocomplete="off">
@@ -185,6 +194,28 @@
                     <div class="profile-info">
                         <h4 id="user-display-name">Guest User</h4>
                         <span id="user-display-role">Sales Bekasi</span>
+                    </div>
+                </div>
+
+                <!-- Active Division & Portal Switcher -->
+                <div class="sidebar-division-box">
+                    <div class="sidebar-division-top">
+                        <span class="sidebar-division-label">Divisi Aktif</span>
+                        <button type="button" class="btn-portal-return" id="btn-back-to-portal" title="Kembali ke Portal Hub">
+                            <i class="fa-solid fa-table-cells-large"></i> Portal
+                        </button>
+                    </div>
+                    <div class="sidebar-division-active" id="sidebar-division-name">Sistem Repair</div>
+                    <div class="division-pill-group">
+                        <button type="button" class="division-switch-btn active" data-division="repair" title="Sistem Informasi Repair">
+                            Repair
+                        </button>
+                        <button type="button" class="division-switch-btn" data-division="handmade" title="Sistem Order Handmade">
+                            Handmade
+                        </button>
+                        <button type="button" class="division-switch-btn" data-division="casting" title="Sistem Order Casting">
+                            Casting
+                        </button>
                     </div>
                 </div>
 
@@ -276,7 +307,7 @@
                     <div id="dashboard-panel" class="app-panel active">
                         <div class="panel-header-section">
                             <h1>Halo, <span class="text-gradient" id="dashboard-user-greeting">User</span>!</h1>
-                            <p>Berikut ringkasan operasional sistem repair cincin hari ini.</p>
+                            <p id="dashboard-subtitle">Berikut ringkasan operasional seluruh divisi (Repair, Handmade &amp; Casting) hari ini.</p>
                         </div>
 
                         <!-- Key Stats Grid -->
@@ -286,7 +317,7 @@
                                 <div class="stat-data">
                                     <h3>Total Transaksi</h3>
                                     <h1 id="stat-total-repairs">0</h1>
-                                    <p>Transaksi repair terdaftar</p>
+                                    <p id="dashboard-stat-total-desc">Transaksi repair &amp; order terdaftar</p>
                                 </div>
                             </div>
                             <div class="stat-card">
@@ -324,7 +355,7 @@
                                     <div class="quick-actions-flex">
                                         <button class="action-card-btn" id="btn-quick-new-repair">
                                             <i class="fa-solid fa-circle-plus"></i>
-                                            <span>Buat Form Repair</span>
+                                            <span id="btn-quick-new-repair-label">Buat Form Repair</span>
                                         </button>
                                         <button class="action-card-btn" id="btn-quick-sync">
                                             <i class="fa-solid fa-sync"></i>
@@ -338,7 +369,7 @@
                                 </div>
 
                                 <div class="premium-card chart-card">
-                                    <h3>Statistik Tipe Repair Cincin</h3>
+                                    <h3 id="dashboard-chart-title">Distribusi Divisi &amp; Tipe Pengerjaan</h3>
                                     <div class="custom-chart-container">
                                         <div class="custom-progress-bars" id="dashboard-repair-types-list">
                                             <!-- Will be filled dynamically -->
@@ -389,38 +420,38 @@
                         </div>
                     </div>
 
-                    <!-- 2. SALES VIEW (HISTORI & FORMULIR REPAIR) -->
+                    <!-- 2. SALES VIEW (HISTORI & FORMULIR REPAIR / ORDER) -->
                     <div id="sales-panel" class="app-panel">
                         <div class="panel-header-section">
-                            <h1>Layanan Sales & Transaksi Repair</h1>
-                            <p>
-                                Pemantauan riwayat transaksi perbaikan cincin, pencarian data pelanggan, cetak nota, dan input formulir repair baru.
+                            <h1 id="sales-panel-title">Layanan Sales & Transaksi</h1>
+                            <p id="sales-panel-desc">
+                                Pemantauan riwayat transaksi repair & order baru, pencarian data pelanggan, cetak nota/SPK, dan input formulir transaksi.
                             </p>
                         </div>
 
                         <!-- Inner Navigation Sub-Tabs -->
                         <div class="admin-tab-bar sales-tab-bar" id="sales-tab-bar">
                             <button class="admin-tab-btn active" data-tab="tab-sales-history" id="tab-btn-sales-history">
-                                <i class="fa-solid fa-table-list"></i> Histori Transaksi & Monitoring
+                                <i class="fa-solid fa-table-list"></i> <span id="tab-sales-history-label">Histori Transaksi &amp; Monitoring</span>
                             </button>
                             <button class="admin-tab-btn" data-tab="tab-sales-form" id="tab-btn-sales-form">
-                                <i class="fa-solid fa-circle-plus"></i> Formulir Input / Edit Repair
+                                <i class="fa-solid fa-circle-plus"></i> <span id="tab-sales-form-label">Formulir Input / Edit Transaksi</span>
                             </button>
                         </div>
 
                         <div class="admin-tab-content">
-                            <!-- SUB-TAB 1: DAFTAR HISTORI & MONITORING REPAIR -->
+                            <!-- SUB-TAB 1: DAFTAR HISTORI & MONITORING -->
                             <div class="admin-tab-pane active" id="tab-sales-history">
                                 <div class="premium-card">
                                     <div class="section-card-toolbar">
                                         <div>
-                                            <h3 style="margin-bottom: 4px"><i class="fa-solid fa-clock-rotate-left"></i> Histori Transaksi Repair Cincin</h3>
-                                            <p style="font-size: 13px; color: var(--text-muted)">
+                                            <h3 id="sales-history-title" style="margin-bottom: 4px"><i class="fa-solid fa-clock-rotate-left"></i> Histori Transaksi Repair &amp; Order</h3>
+                                            <p id="sales-history-desc" style="font-size: 13px; color: var(--text-muted)">
                                                 Mencari, mencetak form SPK / nota kasir, bagikan ke WhatsApp, serta pantau progress pengerjaan.
                                             </p>
                                         </div>
                                         <button type="button" class="premium-btn" id="btn-goto-new-repair">
-                                            <i class="fa-solid fa-circle-plus"></i> Buat Form Repair Baru
+                                            <i class="fa-solid fa-circle-plus"></i> <span id="btn-goto-new-repair-label">Buat Form Baru</span>
                                         </button>
                                     </div>
 
@@ -431,8 +462,16 @@
                                             <input
                                                 type="text"
                                                 id="history-search"
-                                                placeholder="Cari berdasarkan Nomor Repair, Nama Customer, No. WA..."
+                                                placeholder="Cari Nomor Transaksi, Nama Customer, No. WA..."
                                             />
+                                        </div>
+                                        <div class="filter-select-wrap">
+                                            <select id="history-division-filter" title="Filter Divisi">
+                                                <option value="ALL">Semua Divisi</option>
+                                                <option value="REPAIR">Divisi Repair</option>
+                                                <option value="HANDMADE">Order Handmade</option>
+                                                <option value="CASTING">Order Casting</option>
+                                            </select>
                                         </div>
                                         <div class="filter-select-wrap">
                                             <select id="history-status-filter">
@@ -450,7 +489,8 @@
                                         <table class="premium-table" id="table-repair-history">
                                             <thead>
                                                 <tr>
-                                                    <th>No. Repair</th>
+                                                    <th>No. Transaksi</th>
+                                                    <th>Divisi</th>
                                                     <th>Tanggal</th>
                                                     <th>Deadline</th>
                                                     <th>Pelanggan</th>
@@ -464,7 +504,7 @@
                                             <tbody id="tbody-repair-history">
                                                 <!-- Dynamic rows loaded from IndexedDB -->
                                                 <tr class="table-empty-row">
-                                                    <td colspan="9">Tidak ada data transaksi repair ditemukan.</td>
+                                                    <td colspan="10">Tidak ada data transaksi ditemukan.</td>
                                                 </tr>
                                             </tbody>
                                         </table>
@@ -490,9 +530,9 @@
                                 <div class="premium-card">
                                     <div class="form-header-toolbar">
                                         <div>
-                                            <h3 id="sales-form-heading"><i class="fa-solid fa-file-signature"></i> Formulir Data Repair Cincin</h3>
-                                            <p style="font-size: 13px; color: var(--text-muted)">
-                                                Input data perbaikan cincin cowok/cewek, kalkulasi biaya otomatis, dan kelola histori transaksi.
+                                            <h3 id="sales-form-heading"><i class="fa-solid fa-file-signature"></i> <span id="sales-form-heading-text">Formulir Data Repair Cincin</span></h3>
+                                            <p id="sales-form-desc" style="font-size: 13px; color: var(--text-muted)">
+                                                Input data perbaikan atau order cincin baru, kalkulasi biaya otomatis, dan kelola histori transaksi.
                                             </p>
                                         </div>
                                         <button type="button" class="premium-btn btn-sec font-compact" id="btn-back-to-history">
@@ -504,13 +544,28 @@
                                 <!-- Tab header / Section Header -->
                                 <div class="form-section-title">
                                     <span class="step-num">1</span>
-                                    <h3>Informasi Transaksi & Toko</h3>
+                                    <h3>Informasi Transaksi, Divisi &amp; Toko</h3>
+                                </div>
+
+                                <!-- Division Selector Bar -->
+                                <div class="tx-division-bar" id="tx-division-bar">
+                                    <div class="tx-division-bar-info">
+                                        <strong><i class="fa-solid fa-layer-group"></i> Jenis Divisi / Alur Transaksi</strong>
+                                        <span id="tx-division-hint">Pilih Repair untuk perbaikan cincin, Handmade untuk pembuatan manual, atau Casting untuk desain CAD &amp; cetak lilin.</span>
+                                    </div>
+                                    <div class="tx-division-select-wrap">
+                                        <select id="tx-division" class="premium-input" title="Jenis Divisi Transaksi">
+                                            <option value="REPAIR">Repair Cincin (REP-)</option>
+                                            <option value="HANDMADE">Order Handmade (ORD-HM-)</option>
+                                            <option value="CASTING">Order Casting / CAD 3D (ORD-CST-)</option>
+                                        </select>
+                                    </div>
                                 </div>
 
                                 <div class="form-row-three">
                                     <div class="form-group">
                                         <label for="rep-date"
-                                            ><i class="fa-regular fa-calendar"></i> Tanggal Repair</label
+                                            ><i class="fa-regular fa-calendar"></i> <span id="lbl-rep-date-text">Tanggal Repair</span></label
                                         >
                                         <input type="date" id="rep-date" required />
                                     </div>
@@ -522,7 +577,7 @@
                                     </div>
                                     <div class="form-group">
                                         <label for="rep-number"
-                                            ><i class="fa-solid fa-hashtag"></i> Nomor Repair (Otomatis)</label
+                                            ><i class="fa-solid fa-hashtag"></i> <span id="lbl-rep-number-text">Nomor Repair (Otomatis)</span></label
                                         >
                                         <input
                                             type="text"
@@ -617,7 +672,7 @@
                                             </div>
                                             <div class="form-row-two">
                                                 <div class="form-group">
-                                                    <label for="cowok-weight">Berat Aktual Cincin (gr)</label>
+                                                    <label for="cowok-weight" id="cowok-weight-label">Berat Aktual Cincin (gr)</label>
                                                     <input
                                                         type="number"
                                                         step="0.01"
@@ -633,7 +688,7 @@
                                                     </select>
                                                 </div>
                                             </div>
-                                            <div class="form-group">
+                                            <div class="form-group" id="cowok-repair-type-group">
                                                 <label for="cowok-repair-type">Jenis Perbaikan (Repair)</label>
                                                 <select id="cowok-repair-type">
                                                     <option value="" disabled selected>Pilih Jenis Repair</option>
@@ -645,6 +700,7 @@
                                             </div>
                                             <div
                                                 class="form-group"
+                                                id="cowok-reproduct-group"
                                                 style="
                                                     background: rgba(197, 168, 92, 0.08);
                                                     border: 1px solid rgba(197, 168, 92, 0.3);
@@ -712,6 +768,59 @@
                                                     >
                                                 </div>
                                             </div>
+                                            <!-- Order Baru Fields (Handmade / Casting) -->
+                                            <div class="order-fields-box hidden" id="cowok-order-fields">
+                                                <div class="form-row-two">
+                                                    <div class="form-group">
+                                                        <label for="cowok-qty">Kuantitas (Pcs)</label>
+                                                        <input type="number" id="cowok-qty" min="1" step="1" value="1" />
+                                                    </div>
+                                                    <div class="form-group">
+                                                        <label for="cowok-finishing">Tipe Finishing</label>
+                                                        <select id="cowok-finishing">
+                                                            <option value="Glossy (Kilap)">Glossy (Kilap)</option>
+                                                            <option value="Doff / Matte">Doff / Matte</option>
+                                                            <option value="Satin / Brush">Satin / Brush</option>
+                                                            <option value="Hammered (Tempa)">Hammered (Tempa)</option>
+                                                            <option value="Kombinasi Glossy-Doff">Kombinasi Glossy-Doff</option>
+                                                        </select>
+                                                    </div>
+                                                </div>
+                                                <div class="form-row-two">
+                                                    <div class="form-group">
+                                                        <label for="cowok-stone-spec">Spesifikasi Permata</label>
+                                                        <select id="cowok-stone-spec">
+                                                            <option value="Tanpa Permata (Polos)">Tanpa Permata (Polos)</option>
+                                                            <option value="Zirconia AAA">Zirconia AAA</option>
+                                                            <option value="Berlian Lab-Grown">Berlian Lab-Grown</option>
+                                                            <option value="Berlian Natural">Berlian Natural</option>
+                                                            <option value="Moissanite">Moissanite</option>
+                                                            <option value="Custom Permata">Custom Permata</option>
+                                                        </select>
+                                                    </div>
+                                                    <div class="form-group">
+                                                        <label for="cowok-stone-fee">Biaya Permata (Rp)</label>
+                                                        <input type="number" id="cowok-stone-fee" min="0" value="0" placeholder="0" />
+                                                    </div>
+                                                </div>
+                                                <div class="form-group">
+                                                    <label for="cowok-custom-fee">Jasa Pembuatan &amp; Finishing (Rp)</label>
+                                                    <input type="number" id="cowok-custom-fee" min="0" value="0" placeholder="Otomatis dari logam" />
+                                                    <span class="form-help-text">Terisi otomatis sesuai logam, dapat disesuaikan per desain.</span>
+                                                </div>
+                                                <div class="casting-sub-box hidden" id="cowok-casting-group">
+                                                    <div class="form-row-two">
+                                                        <div class="form-group">
+                                                            <label for="cowok-cad-ref"><i class="fa-solid fa-cube"></i> Kode File CAD / .STL</label>
+                                                            <input type="text" id="cowok-cad-ref" placeholder="Misal: CAD-PLT-204M" />
+                                                        </div>
+                                                        <div class="form-group">
+                                                            <label for="cowok-casting-fee"><i class="fa-solid fa-fire"></i> Biaya Cetak Lilin &amp; Molding (Rp)</label>
+                                                            <input type="number" id="cowok-casting-fee" min="0" value="0" placeholder="0" />
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
                                             <div class="form-group">
                                                 <label for="cowok-engraving">Ukir Nama (Opsional)</label>
                                                 <input type="text" id="cowok-engraving" placeholder="Teks ukir nama" />
@@ -764,7 +873,7 @@
                                             </div>
                                             <div class="form-row-two">
                                                 <div class="form-group">
-                                                    <label for="cewek-weight">Berat Aktual Cincin (gr)</label>
+                                                    <label for="cewek-weight" id="cewek-weight-label">Berat Aktual Cincin (gr)</label>
                                                     <input
                                                         type="number"
                                                         step="0.01"
@@ -780,7 +889,7 @@
                                                     </select>
                                                 </div>
                                             </div>
-                                            <div class="form-group">
+                                            <div class="form-group" id="cewek-repair-type-group">
                                                 <label for="cewek-repair-type">Jenis Perbaikan (Repair)</label>
                                                 <select id="cewek-repair-type">
                                                     <option value="" disabled selected>Pilih Jenis Repair</option>
@@ -792,6 +901,7 @@
                                             </div>
                                             <div
                                                 class="form-group"
+                                                id="cewek-reproduct-group"
                                                 style="
                                                     background: rgba(197, 168, 92, 0.08);
                                                     border: 1px solid rgba(197, 168, 92, 0.3);
@@ -859,6 +969,59 @@
                                                     >
                                                 </div>
                                             </div>
+                                            <!-- Order Baru Fields (Handmade / Casting) -->
+                                            <div class="order-fields-box hidden" id="cewek-order-fields">
+                                                <div class="form-row-two">
+                                                    <div class="form-group">
+                                                        <label for="cewek-qty">Kuantitas (Pcs)</label>
+                                                        <input type="number" id="cewek-qty" min="1" step="1" value="1" />
+                                                    </div>
+                                                    <div class="form-group">
+                                                        <label for="cewek-finishing">Tipe Finishing</label>
+                                                        <select id="cewek-finishing">
+                                                            <option value="Glossy (Kilap)">Glossy (Kilap)</option>
+                                                            <option value="Doff / Matte">Doff / Matte</option>
+                                                            <option value="Satin / Brush">Satin / Brush</option>
+                                                            <option value="Hammered (Tempa)">Hammered (Tempa)</option>
+                                                            <option value="Kombinasi Glossy-Doff">Kombinasi Glossy-Doff</option>
+                                                        </select>
+                                                    </div>
+                                                </div>
+                                                <div class="form-row-two">
+                                                    <div class="form-group">
+                                                        <label for="cewek-stone-spec">Spesifikasi Permata</label>
+                                                        <select id="cewek-stone-spec">
+                                                            <option value="Tanpa Permata (Polos)">Tanpa Permata (Polos)</option>
+                                                            <option value="Zirconia AAA">Zirconia AAA</option>
+                                                            <option value="Berlian Lab-Grown">Berlian Lab-Grown</option>
+                                                            <option value="Berlian Natural">Berlian Natural</option>
+                                                            <option value="Moissanite">Moissanite</option>
+                                                            <option value="Custom Permata">Custom Permata</option>
+                                                        </select>
+                                                    </div>
+                                                    <div class="form-group">
+                                                        <label for="cewek-stone-fee">Biaya Permata (Rp)</label>
+                                                        <input type="number" id="cewek-stone-fee" min="0" value="0" placeholder="0" />
+                                                    </div>
+                                                </div>
+                                                <div class="form-group">
+                                                    <label for="cewek-custom-fee">Jasa Pembuatan &amp; Finishing (Rp)</label>
+                                                    <input type="number" id="cewek-custom-fee" min="0" value="0" placeholder="Otomatis dari logam" />
+                                                    <span class="form-help-text">Terisi otomatis sesuai logam, dapat disesuaikan per desain.</span>
+                                                </div>
+                                                <div class="casting-sub-box hidden" id="cewek-casting-group">
+                                                    <div class="form-row-two">
+                                                        <div class="form-group">
+                                                            <label for="cewek-cad-ref"><i class="fa-solid fa-cube"></i> Kode File CAD / .STL</label>
+                                                            <input type="text" id="cewek-cad-ref" placeholder="Misal: CAD-SOL-108W" />
+                                                        </div>
+                                                        <div class="form-group">
+                                                            <label for="cewek-casting-fee"><i class="fa-solid fa-fire"></i> Biaya Cetak Lilin &amp; Molding (Rp)</label>
+                                                            <input type="number" id="cewek-casting-fee" min="0" value="0" placeholder="0" />
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
                                             <div class="form-group">
                                                 <label for="cewek-engraving">Ukir Nama (Opsional)</label>
                                                 <input type="text" id="cewek-engraving" placeholder="Teks ukir nama" />
@@ -924,15 +1087,15 @@
                                     <div class="pricing-summary-card">
                                         <h4>Rincian Ring Cowok</h4>
                                         <div class="summary-line">
-                                            <span>Bahan Logam (Berat x Rp/gr):</span>
+                                            <span id="lbl-calc-cowok-metal">Bahan Logam (Berat x Rp/gr):</span>
                                             <span id="calc-cowok-metal-cost">Rp 0</span>
                                         </div>
                                         <div class="summary-line">
-                                            <span>Biaya Jasa Custom:</span>
+                                            <span id="lbl-calc-cowok-custom">Biaya Jasa Custom:</span>
                                             <span id="calc-cowok-custom-fee">Rp 0</span>
                                         </div>
                                         <div class="summary-line">
-                                            <span>Biaya Repair Jasa:</span>
+                                            <span id="lbl-calc-cowok-extra">Biaya Repair Jasa:</span>
                                             <span id="calc-cowok-repair-fee">Rp 0</span>
                                         </div>
                                         <div class="summary-line highlight-subtotal">
@@ -944,15 +1107,15 @@
                                     <div class="pricing-summary-card">
                                         <h4>Rincian Ring Cewek</h4>
                                         <div class="summary-line">
-                                            <span>Bahan Logam (Berat x Rp/gr):</span>
+                                            <span id="lbl-calc-cewek-metal">Bahan Logam (Berat x Rp/gr):</span>
                                             <span id="calc-cewek-metal-cost">Rp 0</span>
                                         </div>
                                         <div class="summary-line">
-                                            <span>Biaya Jasa Custom:</span>
+                                            <span id="lbl-calc-cewek-custom">Biaya Jasa Custom:</span>
                                             <span id="calc-cewek-custom-fee">Rp 0</span>
                                         </div>
                                         <div class="summary-line">
-                                            <span>Biaya Repair Jasa:</span>
+                                            <span id="lbl-calc-cewek-extra">Biaya Repair Jasa:</span>
                                             <span id="calc-cewek-repair-fee">Rp 0</span>
                                         </div>
                                         <div class="summary-line highlight-subtotal">
@@ -995,7 +1158,7 @@
                                 <div class="payment-upload-grid">
                                     <!-- Kartu Garansi Upload -->
                                     <div class="upload-box-card">
-                                        <h4><i class="fa-solid fa-id-card"></i> Kartu Garansi (Fisik)</h4>
+                                        <h4 id="lbl-warranty-title"><i class="fa-solid fa-id-card"></i> Kartu Garansi <span id="lbl-warranty-note" style="font-size: 11px; font-weight: 500; color: var(--text-muted)">(Wajib Fisik Repair)</span></h4>
                                         <div class="image-upload-wrapper">
                                             <div class="image-preview" id="warranty-image-preview">
                                                 <i class="fa-solid fa-cloud-arrow-up"></i>
@@ -1085,7 +1248,7 @@
                                         <i class="fa-regular fa-eye"></i> Preview Formulir
                                     </button>
                                     <button type="submit" class="premium-btn" id="btn-form-save">
-                                        <i class="fa-regular fa-floppy-disk"></i> Simpan Transaksi Repair
+                                        <i class="fa-regular fa-floppy-disk"></i> <span id="btn-form-save-label">Simpan Transaksi Repair</span>
                                     </button>
                                 </div>
                             </form>
@@ -1164,8 +1327,16 @@
                                     <input
                                         type="text"
                                         id="accounting-search"
-                                        placeholder="Cari transaksi berdasarkan No. Repair, Nama Customer, No. WA..."
+                                        placeholder="Cari transaksi berdasarkan No. Transaksi, Nama Customer, No. WA..."
                                     />
+                                </div>
+                                <div class="filter-select-wrap">
+                                    <select id="acc-division-filter" title="Filter Divisi">
+                                        <option value="ALL">Semua Divisi</option>
+                                        <option value="REPAIR">Divisi Repair</option>
+                                        <option value="HANDMADE">Order Handmade</option>
+                                        <option value="CASTING">Order Casting</option>
+                                    </select>
                                 </div>
                                 <div class="filter-select-wrap">
                                     <select id="accounting-status-filter">
@@ -1182,7 +1353,7 @@
                                 <table class="premium-table">
                                     <thead>
                                         <tr>
-                                            <th>Nomor Repair</th>
+                                            <th>Nomor Transaksi</th>
                                             <th>Nama Customer</th>
                                             <th>Bukti Bayar / Fisik</th>
                                             <th>Total Tagihan</th>
@@ -1206,12 +1377,21 @@
 
                     <!-- 4. PRODUCTION VIEW -->
                     <div id="production-panel" class="app-panel">
-                        <div class="panel-header-section">
-                            <h1>Panel Manajemen Produksi & Pengrajin</h1>
-                            <p>
-                                Alokasi penugasan pengerjaan repair cincin ke pihak pengrajin (workshop) serta
-                                monitoring status pengerjaan.
-                            </p>
+                        <div class="panel-header-section" style="display: flex; justify-content: space-between; align-items: flex-end; flex-wrap: wrap; gap: 12px;">
+                            <div>
+                                <h1>Panel Manajemen Produksi &amp; Pengrajin</h1>
+                                <p>
+                                    Alokasi penugasan pengerjaan repair, order handmade &amp; casting ke workshop serta monitoring status produksi.
+                                </p>
+                            </div>
+                            <div class="filter-select-wrap" style="min-width: 200px;">
+                                <select id="prod-division-filter" title="Filter Divisi Produksi">
+                                    <option value="ALL">Semua Divisi (Repair + Order)</option>
+                                    <option value="REPAIR">Divisi Repair</option>
+                                    <option value="HANDMADE">Order Handmade</option>
+                                    <option value="CASTING">Order Casting</option>
+                                </select>
+                            </div>
                         </div>
 
                         <!-- Inner Navigation Sub-Tabs -->
@@ -1244,7 +1424,7 @@
                                 <table class="premium-table" id="table-production-designers">
                                     <thead>
                                         <tr>
-                                            <th>Nomor Repair</th>
+                                            <th>Nomor Transaksi</th>
                                             <th>Customer</th>
                                             <th>Desainer Ditugaskan</th>
                                             <th>Model Render Cincin (Co / Ce)</th>
@@ -1287,7 +1467,7 @@
                                 <table class="premium-table">
                                     <thead>
                                         <tr>
-                                            <th>Nomor Repair</th>
+                                            <th>Nomor Transaksi</th>
                                             <th>Cincin Cowok</th>
                                             <th>Cincin Cewek</th>
                                             <th>Penugasan Pengrajin</th>
@@ -1342,7 +1522,7 @@
                                 <table class="premium-table">
                                     <thead>
                                         <tr>
-                                            <th>Nomor Repair</th>
+                                            <th>Nomor Transaksi</th>
                                             <th>Workshop</th>
                                             <th>Deadline</th>
                                             <th>Status QA</th>
@@ -1389,7 +1569,7 @@
                                 <table class="premium-table">
                                     <thead>
                                         <tr>
-                                            <th>Nomor Repair</th>
+                                            <th>Nomor Transaksi</th>
                                             <th>Dicek QA Oleh</th>
                                             <th>Realpict</th>
                                             <th>Deadline</th>
@@ -1541,15 +1721,24 @@
                                         "
                                     >
                                         <div>
-                                            <h3 style="margin-bottom: 5px">Daftar Pengiriman Cincin Selesai Repair</h3>
+                                            <h3 style="margin-bottom: 5px">Daftar Pengiriman Produk Selesai</h3>
                                             <p style="font-size: 13px; color: var(--text-muted)">
-                                                Kelola pengiriman cincin yang sudah selesai didelegasikan oleh bagian
-                                                produksi.
+                                                Kelola pengiriman cincin repair &amp; order baru yang sudah lolos QC dan siap dikirim.
                                             </p>
                                         </div>
-                                        <button class="premium-btn" id="btn-logistic-print-collective">
-                                            <i class="fa-solid fa-print"></i> Cetak Surat Jalan & Label Kolektif
-                                        </button>
+                                        <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
+                                            <div class="filter-select-wrap">
+                                                <select id="log-division-filter" title="Filter Divisi Logistik">
+                                                    <option value="ALL">Semua Divisi</option>
+                                                    <option value="REPAIR">Divisi Repair</option>
+                                                    <option value="HANDMADE">Order Handmade</option>
+                                                    <option value="CASTING">Order Casting</option>
+                                                </select>
+                                            </div>
+                                            <button class="premium-btn" id="btn-logistic-print-collective">
+                                                <i class="fa-solid fa-print"></i> Cetak Surat Jalan &amp; Label Kolektif
+                                            </button>
+                                        </div>
                                     </div>
                                     <div class="table-scroll-container">
                                         <table class="premium-table">
@@ -1562,9 +1751,9 @@
                                                             class="logistic-checkbox"
                                                         />
                                                     </th>
-                                                    <th>Nomor Repair</th>
+                                                    <th>Nomor Transaksi</th>
                                                     <th>Customer</th>
-                                                    <th>Alamat & Kota Tujuan</th>
+                                                    <th>Alamat &amp; Kota Tujuan</th>
                                                     <th>Ekspedisi & Ongkir</th>
                                                     <th>Status Paket</th>
                                                     <th>Nomor Resi / Aksi Retur</th>
@@ -2215,7 +2404,7 @@
         <div id="print-modal" class="modal-overlay hidden">
             <div class="modal-card modal-large print-modal-card">
                 <div class="modal-header no-print">
-                    <h2>Cetak Form / Nota Repair</h2>
+                    <h2 id="print-modal-title">Cetak Form / Nota Transaksi</h2>
                     <button class="modal-close-btn" id="btn-close-print-modal">&times;</button>
                 </div>
                 <div class="modal-body printable-area" id="print-receipt-body">
@@ -2234,7 +2423,10 @@
         <div id="sales-detail-modal" class="modal-overlay hidden">
             <div class="modal-card modal-large" style="max-height: 90vh; overflow-y: auto">
                 <div class="modal-header">
-                    <h2><i class="fa-solid fa-bars-progress"></i> Progress & Detail Pelacakan Repair</h2>
+                    <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
+                        <h2 id="sd-modal-title"><i class="fa-solid fa-bars-progress"></i> Progress &amp; Detail Pelacakan Transaksi</h2>
+                        <span class="division-badge div-repair" id="sd-division-badge">REPAIR</span>
+                    </div>
                     <button class="modal-close-btn" id="btn-close-sales-detail-modal">&times;</button>
                 </div>
                 <div class="modal-body" id="sales-detail-modal-body">
@@ -2251,7 +2443,7 @@
                         </div>
                         <div class="stepper-step" id="step-3">
                             <div class="stepper-icon"><i class="fa-solid fa-cube"></i></div>
-                            <div class="stepper-label">Desain 3D</div>
+                            <div class="stepper-label" id="stepper-label-3">Desain 3D / Wax</div>
                         </div>
                         <div class="stepper-step" id="step-4">
                             <div class="stepper-icon"><i class="fa-solid fa-hammer"></i></div>
@@ -2312,8 +2504,9 @@
                                         Material: <span id="sd-cowok-mat">-</span> | Berat:
                                         <span id="sd-cowok-weight">-</span> gr | Ukuran:
                                         <span id="sd-cowok-size">-</span><br />
-                                        Jenis: <span id="sd-cowok-type">-</span> | Gravir:
-                                        <span id="sd-cowok-engrave">-</span><br />
+                                        <span id="sd-cowok-type-row">Jenis: <span id="sd-cowok-type">-</span> | Gravir:
+                                        <span id="sd-cowok-engrave">-</span><br /></span>
+                                        <span id="sd-cowok-order-extra" class="hidden"></span>
                                         Catatan: <span id="sd-cowok-notes">-</span>
                                     </div>
                                 </div>
@@ -2324,8 +2517,9 @@
                                         Material: <span id="sd-cewek-mat">-</span> | Berat:
                                         <span id="sd-cewek-weight">-</span> gr | Ukuran:
                                         <span id="sd-cewek-size">-</span><br />
-                                        Jenis: <span id="sd-cewek-type">-</span> | Gravir:
-                                        <span id="sd-cewek-engrave">-</span><br />
+                                        <span id="sd-cewek-type-row">Jenis: <span id="sd-cewek-type">-</span> | Gravir:
+                                        <span id="sd-cewek-engrave">-</span><br /></span>
+                                        <span id="sd-cewek-order-extra" class="hidden"></span>
                                         Catatan: <span id="sd-cewek-notes">-</span>
                                     </div>
                                 </div>
@@ -3469,19 +3663,6 @@
 
         <!-- Core App Logic Script -->
         <script src="app.js" defer></script>
-        <script>
-            function printReceiptContent() {
-                const content = document.getElementById('print-receipt-body').innerHTML;
-                const w = window.open('', '_blank', 'width=800,height=600');
-                w.document.write(`<!DOCTYPE html><html><head><title>Surat Jalan Sovia Jewelry</title>
-                <style>body{font-family:Arial,sans-serif;margin:0;padding:0;}@media print{body{margin:0;}}</style>
-                </head><body>${content}</body></html>`);
-                w.document.close();
-                w.focus();
-                w.print();
-                w.close();
-            }
-        </script>
         <script>
             // Register Service Worker for Offline-First Support
             if ('serviceWorker' in navigator) {

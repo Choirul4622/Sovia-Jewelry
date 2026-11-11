@@ -5,6 +5,7 @@
 // --- GLOBAL APP STATE ---
 const State = {
     currentUser: null,
+    currentDivision: localStorage.getItem('sovia_division') || 'repair', // 'repair' | 'handmade' | 'casting'
     currentPanel: 'dashboard-panel',
     db: null,
     syncLock: false,
@@ -30,10 +31,47 @@ const State = {
     }
 };
 
+// --- DIVISION DEFINITIONS (REPAIR, HANDMADE, CASTING) ---
+const DIVISION_CONFIG = {
+    repair: {
+        key: 'repair',
+        code: 'REPAIR',
+        prefix: 'REP',
+        label: 'Sistem Informasi Repair',
+        shortLabel: 'Repair',
+        badgeText: 'DIVISI REPAIR',
+        badgeClass: 'div-repair',
+        icon: 'fa-screwdriver-wrench',
+        subtitle: 'Kelola perbaikan, resize, poles, dan reproduksi ulang cincin customer.'
+    },
+    handmade: {
+        key: 'handmade',
+        code: 'HANDMADE',
+        prefix: 'ORD-HM',
+        label: 'Sistem Order Handmade',
+        shortLabel: 'Handmade',
+        badgeText: 'ORDER HANDMADE',
+        badgeClass: 'div-handmade',
+        icon: 'fa-ring',
+        subtitle: 'Pembuatan cincin custom manual oleh pengrajin dengan estimasi berat & batu permata.'
+    },
+    casting: {
+        key: 'casting',
+        code: 'CASTING',
+        prefix: 'ORD-CST',
+        label: 'Sistem Order Casting',
+        shortLabel: 'Casting',
+        badgeText: 'ORDER CASTING',
+        badgeClass: 'div-casting',
+        icon: 'fa-gem',
+        subtitle: 'Produksi cincin custom & batch berbasis desain CAD 3D (.STL) & cetak lilin presisi.'
+    }
+};
+
 // --- CONFIGURATIONS ---
 const CONFIG = {
     DB_NAME: 'SoviaRepairDB',
-    DB_VERSION: 5,
+    DB_VERSION: 6,
     // Google Apps Script Deploy URL
     GAS_API_URL:
         'https://script.google.com/macros/s/AKfycbwaJsUPiuxnwVt2Rn_ALJrkUK8aaWwu7E5Z2F7cKkc8s5kuDCyiuif-PKs3dkUY1GJEvw/exec'
@@ -79,10 +117,10 @@ function initDatabase() {
     return new Promise((resolve, reject) => {
         const request = indexedDB.open(CONFIG.DB_NAME, CONFIG.DB_VERSION);
 
-        request.onerror = (event) => {
+        request.addEventListener('error', (event) => {
             showToast('Gagal memuat database lokal!', 'error');
             reject(event.target.error);
-        };
+        });
 
         request.onsuccess = (event) => {
             State.db = event.target.result;
@@ -91,10 +129,15 @@ function initDatabase() {
 
         request.onupgradeneeded = (event) => {
             const db = event.target.result;
+            const isFreshInstall = event.oldVersion === 0;
+            const hadOrderStore = db.objectStoreNames.contains('order_transactions');
 
-            // Create Transaction Store
+            // Create Transaction Stores (Repair + Order Baru)
             if (!db.objectStoreNames.contains('repair_transactions')) {
                 db.createObjectStore('repair_transactions', { keyPath: 'repair_number' });
+            }
+            if (!hadOrderStore) {
+                db.createObjectStore('order_transactions', { keyPath: 'repair_number' });
             }
 
             // Create Sync Queue Store
@@ -134,9 +177,14 @@ function initDatabase() {
                 db.createObjectStore('chat_messages', { keyPath: 'id' });
             }
 
-            // Seed Data immediately for demo & local robustness
+            // Seed data safely without overwriting existing records during schema upgrades
             const transaction = event.target.transaction;
-            seedDatabase(transaction);
+            if (isFreshInstall) {
+                seedDatabase(transaction);
+            }
+            if (!hadOrderStore) {
+                seedOrderTransactions(transaction);
+            }
         };
     });
 }
@@ -376,9 +424,268 @@ function seedDatabase(transaction) {
     }
 }
 
+// --- SEED ORDER HANDMADE & ORDER CASTING TRANSACTIONS (ON STORE CREATION) ---
+function seedOrderTransactions(transaction) {
+    if (!transaction.objectStoreNames.contains('order_transactions')) return;
+    const orderStore = transaction.objectStore('order_transactions');
+    const demoOrders = [
+        {
+            repair_number: 'ORD-HM-BEK-260522-091500',
+            division: 'HANDMADE',
+            date: '2026-05-22',
+            deadline: '2026-06-05',
+            store_sales_name: 'Bekasi Denisa (sales_bekasi)',
+            customer_name: 'Bima & Clara (Handmade)',
+            customer_phone: '081355667788',
+            customer_address: 'Jl. Kemang Pratama Raya No. 18, Bekasi',
+            customer_city: 'Bekasi (Jawa Barat)',
+            cowok_active: 'TRUE',
+            cowok_material: 'MET-001',
+            cowok_weight: 4.5,
+            cowok_qty: 1,
+            cowok_size: '18.5',
+            cowok_repair_type: '',
+            cowok_finishing: 'Kombinasi Glossy-Doff',
+            cowok_stone_spec: 'Tanpa Permata (Polos)',
+            cowok_stone_fee: 0,
+            cowok_custom_fee: 250000,
+            cowok_casting_fee: 0,
+            cowok_cad_ref: '',
+            cowok_is_reproduct: 'FALSE',
+            cowok_target_weight: 0,
+            cowok_engraving: 'Bima ❤️ Clara',
+            cowok_image_url: '',
+            cowok_notes: 'Model klasik lis satin tengah.',
+            cewek_active: 'TRUE',
+            cewek_material: 'MET-001',
+            cewek_weight: 3.2,
+            cewek_qty: 1,
+            cewek_size: '12.0',
+            cewek_repair_type: '',
+            cewek_finishing: 'Glossy (Kilap)',
+            cewek_stone_spec: 'Zirconia AAA',
+            cewek_stone_fee: 150000,
+            cewek_custom_fee: 250000,
+            cewek_casting_fee: 0,
+            cewek_cad_ref: '',
+            cewek_is_reproduct: 'FALSE',
+            cewek_target_weight: 0,
+            cewek_engraving: 'Clara ❤️ Bima',
+            cewek_image_url: '',
+            cewek_notes: 'Pasang 3 batu micro-pave sisi luar.',
+            additional_items_json: JSON.stringify([{ name: 'Kotak Cincin Kayu Rustic', qty: 1, price: 150000, subtotal: 150000 }]),
+            cowok_price: 5200000,
+            cewek_price: 3920000,
+            additional_total: 150000,
+            shipping_fee: 28000,
+            total_price: 9298000,
+            min_dp: 7438400,
+            warranty_image_url: '',
+            dp1_method: 'PAY-001',
+            dp1_amount: 8000000,
+            dp1_receipt_url: '',
+            dp2_method: '',
+            dp2_amount: 0,
+            dp2_receipt_url: '',
+            status: 'Synced',
+            assigned_workshop: '',
+            production_status: 'Pending',
+            logistic_status: 'Gudang HQ',
+            logistic_receipt_no: '',
+            created_by: 'sales_bekasi',
+            created_at: new Date('2026-05-22T09:15:00Z').toISOString(),
+            dp_approval: 'Approved',
+            pelunasan_approval: 'Pending',
+            render_model_url: '',
+            render_approval: 'Pending',
+            realpict_url: '',
+            realpict_approval: 'Pending',
+            refund_receipt_url: '',
+            final_pickup_status: 'Pending',
+            assigned_designer: '',
+            render_cowok_url: '',
+            render_cewek_url: '',
+            render_rejection_reason: '',
+            cowok_weight_final: '',
+            cewek_weight_final: '',
+            branch_receipt_status: 'Pending',
+            branch_receipt_comment: '',
+            is_reproduct: 'FALSE',
+            qa_status: 'Pending',
+            qa_notes: '',
+            qa_checked_by: '',
+            qa_checked_at: '',
+            qc_status: 'Pending',
+            qc_notes: '',
+            qc_checked_by: '',
+            qc_checked_at: '',
+            revision_count: 0
+        },
+        {
+            repair_number: 'ORD-CST-YOG-260522-103000',
+            division: 'CASTING',
+            date: '2026-05-22',
+            deadline: '2026-06-08',
+            store_sales_name: 'Yogyakarta HQ (sales_yogya)',
+            customer_name: 'Damar & Kinanti (Casting)',
+            customer_phone: '085611223344',
+            customer_address: 'Jl. Kaliurang KM 6, Sleman',
+            customer_city: 'Sleman (DI Yogyakarta)',
+            cowok_active: 'TRUE',
+            cowok_material: 'MET-003',
+            cowok_weight: 4.0,
+            cowok_qty: 1,
+            cowok_size: '17.0',
+            cowok_repair_type: '',
+            cowok_finishing: 'Satin / Brush',
+            cowok_stone_spec: 'Tanpa Permata (Polos)',
+            cowok_stone_fee: 0,
+            cowok_custom_fee: 400000,
+            cowok_casting_fee: 150000,
+            cowok_cad_ref: 'CAD-PLT-204M',
+            cowok_is_reproduct: 'FALSE',
+            cowok_target_weight: 0,
+            cowok_engraving: 'D & K 2026',
+            cowok_image_url: '',
+            cowok_notes: 'Cetak lilin batch CAD-PLT-204M profil comfort-fit.',
+            cewek_active: 'TRUE',
+            cewek_material: 'MET-002',
+            cewek_weight: 3.0,
+            cewek_qty: 1,
+            cewek_size: '11.5',
+            cewek_repair_type: '',
+            cewek_finishing: 'Glossy (Kilap)',
+            cewek_stone_spec: 'Berlian Lab-Grown',
+            cewek_stone_fee: 950000,
+            cewek_custom_fee: 300000,
+            cewek_casting_fee: 150000,
+            cewek_cad_ref: 'CAD-SOL-108W',
+            cewek_is_reproduct: 'FALSE',
+            cewek_target_weight: 0,
+            cewek_engraving: 'K & D 2026',
+            cewek_image_url: '',
+            cewek_notes: 'Solitaire 6-prong tinggi sedang.',
+            additional_items_json: JSON.stringify([{ name: 'Kotak Cincin Beludru Premium', qty: 1, price: 95000, subtotal: 95000 }]),
+            cowok_price: 3550000,
+            cewek_price: 4850000,
+            additional_total: 95000,
+            shipping_fee: 15000,
+            total_price: 8510000,
+            min_dp: 6808000,
+            warranty_image_url: '',
+            dp1_method: 'PAY-002',
+            dp1_amount: 7000000,
+            dp1_receipt_url: '',
+            dp2_method: '',
+            dp2_amount: 0,
+            dp2_receipt_url: '',
+            status: 'Synced',
+            assigned_workshop: '',
+            production_status: 'Pending',
+            logistic_status: 'Gudang HQ',
+            logistic_receipt_no: '',
+            created_by: 'sales_yogya',
+            created_at: new Date('2026-05-22T10:30:00Z').toISOString(),
+            dp_approval: 'Approved',
+            pelunasan_approval: 'Pending',
+            render_model_url: '',
+            render_approval: 'Pending',
+            realpict_url: '',
+            realpict_approval: 'Pending',
+            refund_receipt_url: '',
+            final_pickup_status: 'Pending',
+            assigned_designer: '',
+            render_cowok_url: '',
+            render_cewek_url: '',
+            render_rejection_reason: '',
+            cowok_weight_final: '',
+            cewek_weight_final: '',
+            branch_receipt_status: 'Pending',
+            branch_receipt_comment: '',
+            is_reproduct: 'FALSE',
+            qa_status: 'Pending',
+            qa_notes: '',
+            qa_checked_by: '',
+            qa_checked_at: '',
+            qc_status: 'Pending',
+            qc_notes: '',
+            qc_checked_by: '',
+            qc_checked_at: '',
+            revision_count: 0
+        }
+    ];
+    demoOrders.forEach((order) => orderStore.put(order));
+}
+
+// --- DIVISION & UNIFIED TRANSACTION HELPERS ---
+function normalizeDivisionKey(val) {
+    const clean = String(val || 'repair').toLowerCase().trim();
+    if (clean === 'handmade' || clean === 'ord-hm') return 'handmade';
+    if (clean === 'casting' || clean === 'ord-cst') return 'casting';
+    return 'repair';
+}
+
+function getDivisionMeta(valOrTx) {
+    if (valOrTx && typeof valOrTx === 'object') {
+        const key = normalizeDivisionKey(getTransactionDivision(valOrTx));
+        return DIVISION_CONFIG[key] || DIVISION_CONFIG.repair;
+    }
+    const key = normalizeDivisionKey(valOrTx);
+    return DIVISION_CONFIG[key] || DIVISION_CONFIG.repair;
+}
+
+function getTransactionDivision(txOrId) {
+    if (!txOrId) return 'REPAIR';
+    if (typeof txOrId === 'string') {
+        const upper = txOrId.toUpperCase();
+        if (upper.startsWith('ORD-HM-') || upper === 'HANDMADE') return 'HANDMADE';
+        if (upper.startsWith('ORD-CST-') || upper === 'CASTING') return 'CASTING';
+        return 'REPAIR';
+    }
+    if (txOrId.division) {
+        const divUp = String(txOrId.division).toUpperCase().trim();
+        if (divUp === 'HANDMADE' || divUp === 'CASTING' || divUp === 'REPAIR') return divUp;
+    }
+    const id = String(txOrId.repair_number || '').toUpperCase();
+    if (id.startsWith('ORD-HM-')) return 'HANDMADE';
+    if (id.startsWith('ORD-CST-')) return 'CASTING';
+    return 'REPAIR';
+}
+
+function isNewOrderTransaction(txOrId) {
+    const div = getTransactionDivision(txOrId);
+    return div === 'HANDMADE' || div === 'CASTING';
+}
+
+function getTransactionStoreName(txOrId) {
+    return isNewOrderTransaction(txOrId) ? 'order_transactions' : 'repair_transactions';
+}
+
+function getTxSyncAction(baseType, txOrId) {
+    const isOrder = isNewOrderTransaction(txOrId);
+    switch (baseType) {
+        case 'SAVE':
+            return isOrder ? 'SAVE_ORDER' : 'SAVE_REPAIR';
+        case 'UPDATE':
+            return isOrder ? 'UPDATE_ORDER' : 'UPDATE_REPAIR';
+        case 'UPDATE_STATUS':
+            return isOrder ? 'UPDATE_ORDER_STATUS' : 'UPDATE_REPAIR_STATUS';
+        case 'DELETE':
+            return isOrder ? 'DELETE_ORDER' : 'DELETE_REPAIR';
+        default:
+            return baseType;
+    }
+}
+
+function renderDivisionBadgeHtml(txOrDiv) {
+    const meta = getDivisionMeta(txOrDiv);
+    return `<span class="division-badge ${meta.badgeClass}"><i class="fa-solid ${meta.icon}"></i> ${meta.shortLabel}</span>`;
+}
+
 // --- UNIVERSAL INDEXEDDB READ/WRITE HELPER ---
 function normalizeTransaction(tx) {
     if (!tx) return tx;
+    tx.division = getTransactionDivision(tx);
     if (tx.cowok_active !== undefined) {
         const val = tx.cowok_active;
         tx.cowok_active = val === true || String(val).toUpperCase() === 'TRUE' ? 'TRUE' : 'FALSE';
@@ -387,6 +694,25 @@ function normalizeTransaction(tx) {
         const val = tx.cewek_active;
         tx.cewek_active = val === true || String(val).toUpperCase() === 'TRUE' ? 'TRUE' : 'FALSE';
     }
+    if (tx.cowok_is_reproduct !== undefined) {
+        const val = tx.cowok_is_reproduct;
+        tx.cowok_is_reproduct = val === true || String(val).toUpperCase() === 'TRUE' ? 'TRUE' : 'FALSE';
+    }
+    if (tx.cewek_is_reproduct !== undefined) {
+        const val = tx.cewek_is_reproduct;
+        tx.cewek_is_reproduct = val === true || String(val).toUpperCase() === 'TRUE' ? 'TRUE' : 'FALSE';
+    }
+    tx.cowok_qty = Math.max(1, parseInt(tx.cowok_qty) || 1);
+    tx.cewek_qty = Math.max(1, parseInt(tx.cewek_qty) || 1);
+    tx.cowok_stone_fee = parseFloat(tx.cowok_stone_fee) || 0;
+    tx.cewek_stone_fee = parseFloat(tx.cewek_stone_fee) || 0;
+    tx.cowok_custom_fee = parseFloat(tx.cowok_custom_fee) || 0;
+    tx.cewek_custom_fee = parseFloat(tx.cewek_custom_fee) || 0;
+    tx.cowok_casting_fee = parseFloat(tx.cowok_casting_fee) || 0;
+    tx.cewek_casting_fee = parseFloat(tx.cewek_casting_fee) || 0;
+    tx.dp1_amount = parseFloat(tx.dp1_amount) || 0;
+    tx.dp2_amount = parseFloat(tx.dp2_amount) || 0;
+    tx.total_price = parseFloat(tx.total_price) || 0;
     return tx;
 }
 
@@ -398,12 +724,12 @@ function getLocalData(storeName) {
         const req = store.getAll();
         req.onsuccess = () => {
             let res = req.result || [];
-            if (storeName === 'repair_transactions') {
+            if (storeName === 'repair_transactions' || storeName === 'order_transactions') {
                 res = res.map(normalizeTransaction);
             }
             resolve(res);
         };
-        req.onerror = () => reject(req.error);
+        req.addEventListener('error', () => reject(req.error));
     });
 }
 
@@ -415,12 +741,12 @@ function getLocalDataById(storeName, id) {
         const req = store.get(id);
         req.onsuccess = () => {
             let res = req.result || null;
-            if (storeName === 'repair_transactions' && res) {
+            if ((storeName === 'repair_transactions' || storeName === 'order_transactions') && res) {
                 res = normalizeTransaction(res);
             }
             resolve(res);
         };
-        req.onerror = () => reject(req.error);
+        req.addEventListener('error', () => reject(req.error));
     });
 }
 
@@ -430,12 +756,12 @@ function saveLocalData(storeName, dataObject) {
         const tx = State.db.transaction(storeName, 'readwrite');
         const store = tx.objectStore(storeName);
         let obj = dataObject;
-        if (storeName === 'repair_transactions' && obj) {
+        if ((storeName === 'repair_transactions' || storeName === 'order_transactions') && obj) {
             obj = normalizeTransaction(obj);
         }
         const req = store.put(obj);
         req.onsuccess = () => resolve(req.result);
-        req.onerror = () => reject(req.error);
+        req.addEventListener('error', () => reject(req.error));
     });
 }
 
@@ -446,7 +772,7 @@ function deleteLocalData(storeName, key) {
         const store = tx.objectStore(storeName);
         const req = store.delete(key);
         req.onsuccess = () => resolve();
-        req.onerror = () => reject(req.error);
+        req.addEventListener('error', () => reject(req.error));
     });
 }
 
@@ -457,7 +783,7 @@ function clearLocalData(storeName) {
         const store = tx.objectStore(storeName);
         const req = store.clear();
         req.onsuccess = () => resolve();
-        req.onerror = () => reject(req.error);
+        req.addEventListener('error', () => reject(req.error));
     });
 }
 
@@ -469,13 +795,49 @@ function getSingleLocalData(storeName, key) {
         const req = store.get(key);
         req.onsuccess = () => {
             let res = req.result || null;
-            if (storeName === 'repair_transactions' && res) {
+            if ((storeName === 'repair_transactions' || storeName === 'order_transactions') && res) {
                 res = normalizeTransaction(res);
             }
             resolve(res);
         };
-        req.onerror = () => resolve(null);
+        req.addEventListener('error', () => resolve(null));
     });
+}
+
+async function getAllTransactions() {
+    const [repairs, orders] = await Promise.all([
+        getLocalData('repair_transactions'),
+        getLocalData('order_transactions')
+    ]);
+    return [...(repairs || []), ...(orders || [])].map(normalizeTransaction);
+}
+
+async function getTransactionByNumber(repNum) {
+    if (!repNum) return null;
+    const primary = getTransactionStoreName(repNum);
+    const fallback = primary === 'order_transactions' ? 'repair_transactions' : 'order_transactions';
+    let match = await getSingleLocalData(primary, repNum);
+    if (!match) {
+        match = await getSingleLocalData(fallback, repNum);
+    }
+    return match ? normalizeTransaction(match) : null;
+}
+
+async function saveTransactionRecord(tx) {
+    if (!tx) return;
+    const targetStore = getTransactionStoreName(tx);
+    return saveLocalData(targetStore, tx);
+}
+
+async function deleteTransactionRecord(repNum) {
+    if (!repNum) return;
+    const primary = getTransactionStoreName(repNum);
+    const fallback = primary === 'order_transactions' ? 'repair_transactions' : 'order_transactions';
+    await deleteLocalData(primary, repNum);
+    const staleInAlt = await getSingleLocalData(fallback, repNum);
+    if (staleInAlt) {
+        await deleteLocalData(fallback, repNum);
+    }
 }
 
 async function pullDataFromServer() {
@@ -507,32 +869,43 @@ async function pullDataFromServer() {
                 master_collective_residues: data.collective_residues
             };
 
-            for (const storeName in masterStores) {
-                const items = masterStores[storeName];
-                if (items && Array.isArray(items)) {
-                    await clearLocalData(storeName);
-                    for (const item of items) {
-                        await saveLocalData(storeName, item);
+            await Promise.all(
+                Object.entries(masterStores).map(async ([storeName, items]) => {
+                    if (items && Array.isArray(items)) {
+                        await clearLocalData(storeName);
+                        await Promise.all(items.map((item) => saveLocalData(storeName, item)));
                     }
-                }
+                })
+            );
+
+            // Sync and merge repair transactions preserving local pending modifications
+            if (data.repair_transactions && Array.isArray(data.repair_transactions)) {
+                await Promise.all(
+                    data.repair_transactions.map(async (sTx) => {
+                        const localMatch = await getSingleLocalData('repair_transactions', sTx.repair_number);
+                        if (!localMatch || localMatch.status !== 'Pending Sync') {
+                            await saveLocalData('repair_transactions', sTx);
+                        }
+                    })
+                );
             }
 
-            // Sync and merge transactions to prevent overwriting pending modifications
-            if (data.repair_transactions && Array.isArray(data.repair_transactions)) {
-                for (const sTx of data.repair_transactions) {
-                    const localMatch = await getSingleLocalData('repair_transactions', sTx.repair_number);
-                    if (!localMatch || localMatch.status !== 'Pending Sync') {
-                        await saveLocalData('repair_transactions', sTx);
-                    }
-                }
+            // Sync and merge Order Handmade & Casting transactions preserving local pending modifications
+            if (data.order_transactions && Array.isArray(data.order_transactions)) {
+                await Promise.all(
+                    data.order_transactions.map(async (sTx) => {
+                        const localMatch = await getSingleLocalData('order_transactions', sTx.repair_number);
+                        if (!localMatch || localMatch.status !== 'Pending Sync') {
+                            await saveLocalData('order_transactions', sTx);
+                        }
+                    })
+                );
             }
 
             // Sync and save chat messages
             if (data.chat_messages && Array.isArray(data.chat_messages)) {
                 await clearLocalData('chat_messages');
-                for (const chat of data.chat_messages) {
-                    await saveLocalData('chat_messages', chat);
-                }
+                await Promise.all(data.chat_messages.map((chat) => saveLocalData('chat_messages', chat)));
             }
 
             // Reload RAM cache & refresh UI
@@ -577,10 +950,17 @@ async function loadAllMasterDataToCache() {
 // ==========================================================================
 
 function checkSession() {
+    State.currentDivision = normalizeDivisionKey(localStorage.getItem('sovia_division') || 'repair');
+    setActiveDivision(State.currentDivision, true);
     const saved = localStorage.getItem('sovia_session');
     if (saved) {
-        State.currentUser = JSON.parse(saved);
-        showMainApp();
+        try {
+            State.currentUser = JSON.parse(saved);
+            showMainApp().catch((err) => console.error('showMainApp failed:', err));
+        } catch {
+            localStorage.removeItem('sovia_session');
+            showPortalHub();
+        }
     } else {
         showPortalHub();
     }
@@ -593,7 +973,7 @@ function handleLogin(username, password) {
         localStorage.setItem('sovia_session', JSON.stringify(user));
 
         showToast('Login berhasil! Selamat bekerja.', 'success');
-        showMainApp();
+        showMainApp().catch((err) => console.error('showMainApp failed:', err));
         return true;
     } else {
         showToast('Username atau password salah!', 'error');
@@ -620,12 +1000,93 @@ function challengeAdminAccess(adminUser, adminPass) {
 // 3. UI RENDERING & CLIENT ROUTER
 // ==========================================================================
 
+function setActiveDivision(divisionKey, syncHistoryFilter = true) {
+    const key = normalizeDivisionKey(divisionKey);
+    const meta = DIVISION_CONFIG[key] || DIVISION_CONFIG.repair;
+    State.currentDivision = key;
+    localStorage.setItem('sovia_division', key);
+
+    // Update login modal/screen branding
+    const loginBadge = document.getElementById('login-division-badge');
+    if (loginBadge) {
+        loginBadge.className = `division-badge ${meta.badgeClass}`;
+        loginBadge.textContent = meta.badgeText;
+    }
+    const loginTitle = document.getElementById('login-division-title');
+    if (loginTitle) loginTitle.textContent = meta.label;
+    const loginSub = document.getElementById('login-division-subtitle');
+    if (loginSub) loginSub.textContent = meta.subtitle;
+
+    // Update sidebar switcher UI
+    const sideDivName = document.getElementById('sidebar-division-name');
+    if (sideDivName) sideDivName.textContent = meta.label;
+    document.querySelectorAll('.division-switch-btn').forEach((btn) => {
+        btn.classList.toggle('active', normalizeDivisionKey(btn.dataset.division) === key);
+    });
+
+    // Update dashboard labels
+    const dashSub = document.getElementById('dashboard-subtitle');
+    if (dashSub) {
+        dashSub.textContent = `Fokus aktif: ${meta.label} — Ringkasan operasional seluruh divisi (Repair, Handmade & Casting) hari ini.`;
+    }
+    const quickBtnLabel = document.getElementById('btn-quick-new-repair-label');
+    if (quickBtnLabel) {
+        quickBtnLabel.textContent =
+            key === 'handmade' ? 'Buat Order Handmade' : key === 'casting' ? 'Buat Order Casting' : 'Buat Form Repair';
+    }
+
+    // Update sales panel headers
+    const salesTitle = document.getElementById('sales-panel-title');
+    if (salesTitle) {
+        salesTitle.textContent =
+            key === 'handmade'
+                ? 'Layanan Sales & Order Handmade'
+                : key === 'casting'
+                  ? 'Layanan Sales & Order Casting'
+                  : 'Layanan Sales & Transaksi Repair';
+    }
+    const gotoNewBtnLabel = document.getElementById('btn-goto-new-repair-label');
+    if (gotoNewBtnLabel) {
+        gotoNewBtnLabel.textContent =
+            key === 'handmade' ? 'Buat Order Handmade' : key === 'casting' ? 'Buat Order Casting' : 'Buat Form Repair';
+    }
+
+    // Auto-sync sales history division filter when switching hub/sidebar division
+    if (syncHistoryFilter) {
+        const histDivFilter = document.getElementById('history-division-filter');
+        if (histDivFilter) {
+            histDivFilter.value = meta.code;
+        }
+    }
+
+    // Keep unlocked Sales form division synchronized when not editing an existing record
+    if (!State.activeEditId) {
+        const txDivSelect = document.getElementById('tx-division');
+        if (txDivSelect && !txDivSelect.disabled) {
+            txDivSelect.value = meta.code;
+            if (typeof applySalesFormDivisionUI === 'function') {
+                applySalesFormDivisionUI(meta.code);
+            }
+        }
+    }
+}
+
+async function enterDivision(divKey) {
+    setActiveDivision(divKey, true);
+    if (State.currentUser) {
+        await showMainApp();
+    } else {
+        showLoginScreen();
+    }
+}
+
 function showPortalHub() {
     document.querySelectorAll('.view-section').forEach((el) => el.classList.add('hidden'));
     document.getElementById('hub-view').classList.remove('hidden');
 }
 
 function showLoginScreen() {
+    setActiveDivision(State.currentDivision, true);
     document.querySelectorAll('.view-section').forEach((el) => el.classList.add('hidden'));
     document.getElementById('login-view').classList.remove('hidden');
     document.getElementById('login-username').value = '';
@@ -658,8 +1119,9 @@ async function showMainApp() {
     // Default Greeting
     document.getElementById('dashboard-user-greeting').textContent = State.currentUser.username;
 
-    // Load static selects
+    // Load static selects and apply active division branding
     populateSalesFormSelects();
+    setActiveDivision(State.currentDivision, true);
 
     // Reset view panel
     switchPanel('dashboard-panel');
@@ -689,10 +1151,12 @@ function switchPanel(panelId, subTabId = null) {
         }
     });
 
+    const activeDivMeta = getDivisionMeta(State.currentDivision);
+
     // Module definitions for Title & Breadcrumbs
     const moduleMap = {
         'dashboard-panel': { section: 'Ikhtisar', title: 'Dashboard Utama' },
-        'sales-panel': { section: 'Operasional Bisnis', title: 'Sales & Transaksi Repair' },
+        'sales-panel': { section: 'Operasional Bisnis', title: `Sales & ${activeDivMeta.shortLabel}` },
         'accounting-panel': { section: 'Operasional Bisnis', title: 'Accounting & Kasir' },
         'production-panel': { section: 'Workshop & SCM', title: 'Manajemen Produksi' },
         'logistic-panel': { section: 'Workshop & SCM', title: 'Logistik & Inventaris' },
@@ -877,21 +1341,162 @@ function recalculateRowSubtotal(row) {
     row.querySelector('.row-item-subtotal').value = formatRupiah(subtotal);
 }
 
-// Calculate full repair pricing instantly based on selections
+// Toggle division-specific fields & labels inside the Sales Form
+function syncMetalCustomFeeDefault(type, force = false) {
+    const matEl = document.getElementById(`${type}-material`);
+    const feeEl = document.getElementById(`${type}-custom-fee`);
+    if (!matEl || !feeEl) return;
+    if (!force && feeEl.dataset.userEdited === 'true') return;
+    const metal = State.masterData.metals.find((m) => m.id === matEl.value);
+    feeEl.value = metal ? parseFloat(metal.custom_fee) || 0 : 0;
+}
+
+function applySalesFormDivisionUI(divOverride = null) {
+    const txDivEl = document.getElementById('tx-division');
+    const divCode = getTransactionDivision(divOverride || txDivEl?.value || getDivisionMeta(State.currentDivision).code);
+    if (txDivEl && divOverride) {
+        txDivEl.value = divCode;
+    }
+    const isOrder = divCode === 'HANDMADE' || divCode === 'CASTING';
+    const isCasting = divCode === 'CASTING';
+
+    ['cowok', 'cewek'].forEach((type) => {
+        const repGroup = document.getElementById(`${type}-repair-type-group`);
+        const reproGroup = document.getElementById(`${type}-reproduct-group`);
+        const orderFields = document.getElementById(`${type}-order-fields`);
+        const castingGroup = document.getElementById(`${type}-casting-group`);
+        const weightLabel = document.getElementById(`${type}-weight-label`);
+
+        if (repGroup) repGroup.classList.toggle('hidden', isOrder);
+        if (reproGroup) reproGroup.classList.toggle('hidden', isOrder);
+        if (orderFields) orderFields.classList.toggle('hidden', !isOrder);
+        if (castingGroup) castingGroup.classList.toggle('hidden', !isCasting);
+        if (weightLabel) {
+            weightLabel.textContent = isOrder ? 'Estimasi Berat Bahan (gr)' : 'Berat Aktual Cincin (gr)';
+        }
+
+        const lblMetal = document.getElementById(`lbl-calc-${type}-metal`);
+        const lblCustom = document.getElementById(`lbl-calc-${type}-custom`);
+        const lblExtra = document.getElementById(`lbl-calc-${type}-extra`);
+        if (lblMetal) {
+            lblMetal.textContent = isOrder ? 'Bahan Logam (Estimasi x Qty):' : 'Bahan Logam (Berat x Rp/gr):';
+        }
+        if (lblCustom) {
+            lblCustom.textContent = isCasting
+                ? 'Jasa Casting & Finishing:'
+                : divCode === 'HANDMADE'
+                  ? 'Jasa Handmade & Finishing:'
+                  : 'Biaya Jasa Custom:';
+        }
+        if (lblExtra) {
+            lblExtra.textContent = isCasting
+                ? 'Permata + Molding Wax:'
+                : divCode === 'HANDMADE'
+                  ? 'Biaya Permata:'
+                  : 'Biaya Repair Jasa:';
+        }
+
+        if (isOrder && !State.activeEditId) {
+            syncMetalCustomFeeDefault(type, false);
+        }
+    });
+
+    const lblDate = document.getElementById('lbl-rep-date-text');
+    const lblNum = document.getElementById('lbl-rep-number-text');
+    const lblWarrantyNote = document.getElementById('lbl-warranty-note');
+    const saveBtnLabel = document.getElementById('btn-form-save-label');
+    const headingText = document.getElementById('sales-form-heading-text');
+
+    if (lblDate) {
+        lblDate.textContent = isOrder ? 'Tanggal Order' : 'Tanggal Repair';
+    }
+    if (lblNum) {
+        lblNum.textContent = isOrder ? 'Nomor Order (Otomatis)' : 'Nomor Repair (Otomatis)';
+    }
+    if (lblWarrantyNote) {
+        lblWarrantyNote.textContent = isOrder ? '(Opsional untuk Order Baru)' : '(Wajib Fisik Repair)';
+    }
+    if (!State.activeEditId) {
+        if (headingText) {
+            headingText.textContent =
+                divCode === 'CASTING'
+                    ? 'Formulir Order Cincin Casting / CAD 3D'
+                    : divCode === 'HANDMADE'
+                      ? 'Formulir Order Cincin Handmade'
+                      : 'Formulir Data Repair Cincin';
+        }
+        if (saveBtnLabel) {
+            saveBtnLabel.textContent =
+                divCode === 'CASTING'
+                    ? 'Simpan Order Casting'
+                    : divCode === 'HANDMADE'
+                      ? 'Simpan Order Handmade'
+                      : 'Simpan Transaksi Repair';
+        }
+        if (State.currentUser) {
+            const branchCode = State.currentUser.store_code === 'ALL' ? 'HQ' : State.currentUser.store_code;
+            const numInput = document.getElementById('rep-number');
+            if (numInput) {
+                numInput.value = generateTransactionID(branchCode, divCode);
+            }
+        }
+    } else if (saveBtnLabel) {
+        saveBtnLabel.textContent = isOrder ? 'Simpan Perubahan Order' : 'Simpan Perubahan Repair';
+    }
+
+    calculateFormPricing();
+}
+
+// Calculate full repair & order pricing instantly based on selections
 function calculateRingPricing(type) {
     const active = document.getElementById(`ring-${type}-active`).checked;
-    const isReproduct = document.getElementById(`${type}-is-reproduct`)?.checked || false;
+    const divCode = getTransactionDivision(document.getElementById('tx-division')?.value || State.currentDivision);
+    const isOrder = divCode === 'HANDMADE' || divCode === 'CASTING';
+    const isReproduct = !isOrder && (document.getElementById(`${type}-is-reproduct`)?.checked || false);
     let price = 0;
 
     if (active) {
         const materialId = document.getElementById(`${type}-material`).value;
-        const weight = parseFloat(document.getElementById(`${type}-weight`).value) || 0; // Ini sekarang adalah berat cincin lama/aktual
+        const weight = parseFloat(document.getElementById(`${type}-weight`).value) || 0;
         const targetWeightNode = document.getElementById(`${type}-target-weight`);
         const targetWeight = targetWeightNode ? parseFloat(targetWeightNode.value) || 0 : 0;
         const repairId = document.getElementById(`${type}-repair-type`).value;
 
         const metal = State.masterData.metals.find((m) => m.id === materialId);
         const repair = State.masterData.repairs.find((r) => r.id === repairId);
+
+        if (isOrder) {
+            const qty = Math.max(1, parseInt(document.getElementById(`${type}-qty`)?.value) || 1);
+            const customFeeInput = document.getElementById(`${type}-custom-fee`);
+            if (metal && customFeeInput && customFeeInput.dataset.userEdited !== 'true' && !State.activeEditId) {
+                customFeeInput.value = parseFloat(metal.custom_fee) || 0;
+            }
+            const craftFee = parseFloat(customFeeInput?.value) || (metal ? parseFloat(metal.custom_fee) || 0 : 0);
+            const stoneFee = parseFloat(document.getElementById(`${type}-stone-fee`)?.value) || 0;
+            const castingFee = divCode === 'CASTING' ? parseFloat(document.getElementById(`${type}-casting-fee`)?.value) || 0 : 0;
+
+            const metalPerGram = metal ? parseFloat(metal.price_per_gram) || 0 : 0;
+            const metalTotal = metalPerGram * weight * qty;
+            const craftTotal = craftFee * qty;
+            const extraTotal = (stoneFee + castingFee) * qty;
+
+            price = metalTotal + craftTotal + extraTotal;
+
+            const previewEl = document.getElementById(`${type}-material-price-preview`);
+            if (previewEl) {
+                if (metal) {
+                    previewEl.textContent = `[Order ${divCode === 'CASTING' ? 'Casting' : 'Handmade'}] ${weight.toFixed(2)} gr x ${qty} pcs (${formatRupiah(metalPerGram)}/gr) | Jasa Std: ${formatRupiah(metal.custom_fee)}`;
+                } else {
+                    previewEl.textContent = 'Harga: Rp 0/gr | Jasa: Rp 0';
+                }
+            }
+
+            document.getElementById(`calc-${type}-metal-cost`).textContent = formatRupiah(metalTotal);
+            document.getElementById(`calc-${type}-custom-fee`).textContent = formatRupiah(craftTotal);
+            document.getElementById(`calc-${type}-repair-fee`).textContent = formatRupiah(extraTotal);
+            document.getElementById(`calc-${type}-subtotal`).textContent = formatRupiah(price);
+            return price;
+        }
 
         let metalPrice = 0;
         let customFee = 0;
@@ -992,8 +1597,9 @@ function calculateFormPricing() {
     document.getElementById('calc-min-dp').textContent = formatRupiah(minDp);
 }
 
-// Generate unique Repair Number combo REP-STORECODE-YYMMDD-HHMMSS
-function generateRepairID(storeCode) {
+// Generate unique Transaction Number (REP-/ORD-HM-/ORD-CST-) + STORECODE-YYMMDD-HHMMSS
+function generateTransactionID(storeCode, divisionOverride = null) {
+    const meta = getDivisionMeta(divisionOverride || document.getElementById('tx-division')?.value || State.currentDivision);
     const d = new Date();
     const yy = String(d.getFullYear()).slice(-2);
     const mm = String(d.getMonth() + 1).padStart(2, '0');
@@ -1001,13 +1607,16 @@ function generateRepairID(storeCode) {
     const hh = String(d.getHours()).padStart(2, '0');
     const min = String(d.getMinutes()).padStart(2, '0');
     const ss = String(d.getSeconds()).padStart(2, '0');
-    return `REP-${storeCode.toUpperCase()}-${yy}${mm}${dd}-${hh}${min}${ss}`;
+    return `${meta.prefix}-${storeCode.toUpperCase()}-${yy}${mm}${dd}-${hh}${min}${ss}`;
 }
 
 // Captures inputs into a JSON transaction object
 async function getTransactionFromForm() {
     const date = document.getElementById('rep-date').value || new Date().toISOString().slice(0, 10);
     const deadline = document.getElementById('rep-deadline').value;
+    const division = getTransactionDivision(document.getElementById('tx-division')?.value || State.currentDivision);
+    const isOrder = division === 'HANDMADE' || division === 'CASTING';
+    const existingTx = State.activeEditId ? await getTransactionByNumber(State.activeEditId) : null;
 
     // Retrieve base64 image values
     const cowokImg = await getImageBase64(document.getElementById('cowok-image').files[0], 'cowok-image-preview');
@@ -1033,18 +1642,32 @@ async function getTransactionFromForm() {
 
     const extractRingData = async (type, imgVar) => {
         const active = document.getElementById(`ring-${type}-active`).checked;
-        const isRepro = document.getElementById(`${type}-is-reproduct`)?.checked;
+        const isRepro = !isOrder && (document.getElementById(`${type}-is-reproduct`)?.checked || false);
+        const metalId = active ? document.getElementById(`${type}-material`).value : '';
+        const metal = metalId ? State.masterData.metals.find((m) => m.id === metalId) : null;
+        const customFeeVal = active && isOrder ? parseFloat(document.getElementById(`${type}-custom-fee`)?.value) || 0 : 0;
+        const finalCustomFee = active && isOrder && customFeeVal <= 0 && metal ? parseFloat(metal.custom_fee) || 0 : customFeeVal;
+
         return {
             [`${type}_active`]: active ? 'TRUE' : 'FALSE',
-            [`${type}_material`]: active ? document.getElementById(`${type}-material`).value : '',
+            [`${type}_material`]: metalId,
             [`${type}_weight`]: active ? parseFloat(document.getElementById(`${type}-weight`).value) || 0 : 0,
+            [`${type}_qty`]: active && isOrder ? Math.max(1, parseInt(document.getElementById(`${type}-qty`)?.value) || 1) : 1,
             [`${type}_is_reproduct`]: active && isRepro ? 'TRUE' : 'FALSE',
             [`${type}_target_weight`]:
                 active && isRepro ? parseFloat(document.getElementById(`${type}-target-weight`).value) || 0 : 0,
             [`${type}_size`]: active ? document.getElementById(`${type}-size`).value : '',
-            [`${type}_repair_type`]: active ? document.getElementById(`${type}-repair-type`).value : '',
+            [`${type}_repair_type`]: active && !isOrder ? document.getElementById(`${type}-repair-type`).value : '',
+            [`${type}_finishing`]: active && isOrder ? document.getElementById(`${type}-finishing`)?.value || '' : '',
+            [`${type}_stone_spec`]: active && isOrder ? document.getElementById(`${type}-stone-spec`)?.value || '' : '',
+            [`${type}_stone_fee`]: active && isOrder ? parseFloat(document.getElementById(`${type}-stone-fee`)?.value) || 0 : 0,
+            [`${type}_custom_fee`]: active && isOrder ? finalCustomFee : 0,
+            [`${type}_casting_fee`]:
+                active && division === 'CASTING' ? parseFloat(document.getElementById(`${type}-casting-fee`)?.value) || 0 : 0,
+            [`${type}_cad_ref`]:
+                active && division === 'CASTING' ? (document.getElementById(`${type}-cad-ref`)?.value || '').trim() : '',
             [`${type}_engraving`]: active ? document.getElementById(`${type}-engraving`).value : '',
-            [`${type}_image_url`]: imgVar || (State.activeEditId ? await getEditImage(`${type}_image_url`) : ''),
+            [`${type}_image_url`]: imgVar || (existingTx ? existingTx[`${type}_image_url`] || '' : ''),
             [`${type}_notes`]: active ? document.getElementById(`${type}-notes`).value : ''
         };
     };
@@ -1052,9 +1675,10 @@ async function getTransactionFromForm() {
     const cowokData = await extractRingData('cowok', cowokImg);
     const cewekData = await extractRingData('cewek', cewekImg);
 
-    // Formulate object
+    // Formulate object (preserving operational workflow fields if in edit mode)
     const tx = {
         repair_number: document.getElementById('rep-number').value,
+        division: division,
         date: date,
         deadline: deadline,
         store_sales_name: document.getElementById('rep-sales-store').value,
@@ -1078,61 +1702,63 @@ async function getTransactionFromForm() {
         total_price: parseFloat(document.getElementById('calc-grand-total').textContent.replace(/[^0-9]/g, '')) || 0,
         min_dp: parseFloat(document.getElementById('calc-min-dp').textContent.replace(/[^0-9]/g, '')) || 0,
 
-        warranty_image_url: warrantyImg || (State.activeEditId ? await getEditImage('warranty_image_url') : ''),
+        warranty_image_url: warrantyImg || (existingTx ? existingTx.warranty_image_url || '' : ''),
 
         // DP 1 details
         dp1_method: document.getElementById('dp1-method').value || '',
         dp1_amount: parseFloat(document.getElementById('dp1-amount').value) || 0,
-        dp1_receipt_url: dp1ReceiptImg || (State.activeEditId ? await getEditImage('dp1_receipt_url') : ''),
+        dp1_receipt_url: dp1ReceiptImg || (existingTx ? existingTx.dp1_receipt_url || '' : ''),
 
         // DP 2 details
         dp2_method: document.getElementById('dp2-method').value || '',
         dp2_amount: parseFloat(document.getElementById('dp2-amount').value) || 0,
-        dp2_receipt_url: dp2ReceiptImg || (State.activeEditId ? await getEditImage('dp2_receipt_url') : ''),
+        dp2_receipt_url: dp2ReceiptImg || (existingTx ? existingTx.dp2_receipt_url || '' : ''),
 
-        dp_approval: State.activeEditId ? (await getEditImage('dp_approval')) || 'Pending' : 'Pending',
-        pelunasan_approval: State.activeEditId ? (await getEditImage('pelunasan_approval')) || 'Pending' : 'Pending',
-        render_model_url: State.activeEditId ? await getEditImage('render_model_url') : '',
-        render_approval: State.activeEditId ? (await getEditImage('render_approval')) || 'Pending' : 'Pending',
-        realpict_url: State.activeEditId ? await getEditImage('realpict_url') : '',
-        realpict_approval: State.activeEditId ? (await getEditImage('realpict_approval')) || 'Pending' : 'Pending',
-        refund_receipt_url: State.activeEditId ? await getEditImage('refund_receipt_url') : '',
-        final_pickup_status: State.activeEditId ? (await getEditImage('final_pickup_status')) || 'Pending' : 'Pending',
+        dp_approval: existingTx?.dp_approval || 'Pending',
+        pelunasan_approval: existingTx?.pelunasan_approval || 'Pending',
+        render_model_url: existingTx?.render_model_url || '',
+        render_approval: existingTx?.render_approval || 'Pending',
+        realpict_url: existingTx?.realpict_url || '',
+        realpict_approval: existingTx?.realpict_approval || 'Pending',
+        refund_receipt_url: existingTx?.refund_receipt_url || '',
+        final_pickup_status: existingTx?.final_pickup_status || 'Pending',
+        assigned_workshop: existingTx?.assigned_workshop || '',
+        production_status: existingTx?.production_status || 'Pending',
+        logistic_status: existingTx?.logistic_status || 'Gudang HQ',
+        logistic_receipt_no: existingTx?.logistic_receipt_no || '',
+        assigned_designer: existingTx?.assigned_designer || '',
+        render_cowok_url: existingTx?.render_cowok_url || '',
+        render_cewek_url: existingTx?.render_cewek_url || '',
+        render_rejection_reason: existingTx?.render_rejection_reason || '',
+        cowok_weight_final: existingTx?.cowok_weight_final || '',
+        cewek_weight_final: existingTx?.cewek_weight_final || '',
+        branch_receipt_status: existingTx?.branch_receipt_status || 'Pending',
+        branch_receipt_comment: existingTx?.branch_receipt_comment || '',
+        revision_count: existingTx?.revision_count || 0,
 
-        // Produksi ulang flag (true jika salah satu cincin dicentang produksi ulang)
+        // Produksi ulang flag (berlaku khusus Divisi Repair)
         is_reproduct:
-            document.getElementById('cowok-is-reproduct')?.checked ||
-            document.getElementById('cewek-is-reproduct')?.checked
+            !isOrder &&
+            (document.getElementById('cowok-is-reproduct')?.checked ||
+                document.getElementById('cewek-is-reproduct')?.checked)
                 ? 'TRUE'
                 : 'FALSE',
 
         // QA/QC fields
-        qa_status: State.activeEditId ? (await getEditImage('qa_status')) || 'Pending' : 'Pending',
-        qa_notes: State.activeEditId ? (await getEditImage('qa_notes')) || '' : '',
-        qa_checked_by: State.activeEditId ? (await getEditImage('qa_checked_by')) || '' : '',
-        qa_checked_at: State.activeEditId ? (await getEditImage('qa_checked_at')) || '' : '',
-        qc_status: State.activeEditId ? (await getEditImage('qc_status')) || 'Pending' : 'Pending',
-        qc_notes: State.activeEditId ? (await getEditImage('qc_notes')) || '' : '',
-        qc_checked_by: State.activeEditId ? (await getEditImage('qc_checked_by')) || '' : '',
-        qc_checked_at: State.activeEditId ? (await getEditImage('qc_checked_at')) || '' : '',
+        qa_status: existingTx?.qa_status || 'Pending',
+        qa_notes: existingTx?.qa_notes || '',
+        qa_checked_by: existingTx?.qa_checked_by || '',
+        qa_checked_at: existingTx?.qa_checked_at || '',
+        qc_status: existingTx?.qc_status || 'Pending',
+        qc_notes: existingTx?.qc_notes || '',
+        qc_checked_by: existingTx?.qc_checked_by || '',
+        qc_checked_at: existingTx?.qc_checked_at || '',
 
         status: 'Pending Sync',
-        created_by: State.currentUser.username,
-        created_at: new Date().toISOString()
+        created_by: existingTx?.created_by || State.currentUser.username,
+        created_at: existingTx?.created_at || new Date().toISOString()
     };
     return tx;
-}
-
-// Utility to preserve base64 if user doesn't re-upload image while editing
-async function getEditImage(field) {
-    if (!State.activeEditId) return '';
-    try {
-        const txs = await getLocalData('repair_transactions');
-        const match = txs.find((t) => t.repair_number === State.activeEditId);
-        return match ? match[field] || '' : '';
-    } catch (e) {
-        return '';
-    }
 }
 
 // Utility to convert file inputs to Base64 async strings
@@ -1146,88 +1772,124 @@ function getImageBase64(file, previewId) {
             return resolve('');
         }
         const reader = new FileReader();
-        reader.onload = () => resolve(reader.result);
-        reader.onerror = () => resolve('');
+        reader.addEventListener('load', () => resolve(reader.result));
+        reader.addEventListener('error', () => resolve(''));
         reader.readAsDataURL(file);
     });
 }
 
 // Populates form inputs for edit operations
 async function populateFormForEdit(tx) {
-    State.activeEditId = tx.repair_number;
+    const normTx = normalizeTransaction(tx);
+    const divCode = getTransactionDivision(normTx);
+    const divMeta = getDivisionMeta(divCode);
+
+    State.activeEditId = normTx.repair_number;
     switchPanel('sales-panel');
     switchSubTab('sales-panel', 'tab-sales-form');
+
+    const txDivEl = document.getElementById('tx-division');
+    if (txDivEl) {
+        txDivEl.value = divCode;
+        txDivEl.disabled = true; // Protect ID prefix & Google Sheet target
+    }
+    applySalesFormDivisionUI(divCode);
 
     const banner = document.getElementById('sales-form-mode-banner');
     if (banner) {
         banner.classList.remove('hidden');
-        document.getElementById('banner-mode-title').textContent = `Mode Edit Transaksi (${tx.repair_number})`;
-        document.getElementById('banner-mode-desc').textContent = `Sedang mengedit data ${tx.customer_name}. Simpan untuk memperbarui transaksi.`;
+        document.getElementById('banner-mode-title').textContent = `Mode Edit ${divMeta.shortLabel} (${normTx.repair_number})`;
+        document.getElementById('banner-mode-desc').textContent = `Sedang mengedit data ${normTx.customer_name}. Simpan untuk memperbarui transaksi.`;
     }
     const heading = document.getElementById('sales-form-heading');
-    if (heading) heading.innerHTML = `<i class="fa-solid fa-pen-to-square"></i> Edit Formulir Repair: ${tx.repair_number}`;
+    if (heading) {
+        heading.innerHTML = `<i class="fa-solid fa-pen-to-square"></i> <span id="sales-form-heading-text">Edit ${divMeta.shortLabel}: ${normTx.repair_number}</span>`;
+    }
 
-    document.getElementById('rep-number').value = tx.repair_number;
-    document.getElementById('rep-date').value = tx.date;
-    document.getElementById('rep-deadline').value = tx.deadline;
-    document.getElementById('rep-sales-store').value = tx.store_sales_name;
-    document.getElementById('cust-name').value = tx.customer_name;
-    document.getElementById('cust-phone').value = tx.customer_phone;
-    document.getElementById('cust-address').value = tx.customer_address;
-    document.getElementById('cust-city').value = tx.customer_city;
+    document.getElementById('rep-number').value = normTx.repair_number;
+    document.getElementById('rep-date').value = normTx.date;
+    document.getElementById('rep-deadline').value = normTx.deadline;
+    document.getElementById('rep-sales-store').value = normTx.store_sales_name;
+    document.getElementById('cust-name').value = normTx.customer_name;
+    document.getElementById('cust-phone').value = normTx.customer_phone;
+    document.getElementById('cust-address').value = normTx.customer_address;
+    document.getElementById('cust-city').value = normTx.customer_city;
+
+    const isOrder = divCode === 'HANDMADE' || divCode === 'CASTING';
 
     const populateRingEdit = (type, active) => {
         document.getElementById(`ring-${type}-active`).checked = active;
         toggleRingCardActive(type, active);
         if (active) {
-            document.getElementById(`${type}-material`).value = tx[`${type}_material`];
-            document.getElementById(`${type}-weight`).value = tx[`${type}_weight`];
-            document.getElementById(`${type}-size`).value = tx[`${type}_size`];
-            document.getElementById(`${type}-repair-type`).value = tx[`${type}_repair_type`];
-            document.getElementById(`${type}-engraving`).value = tx[`${type}_engraving`];
-            document.getElementById(`${type}-notes`).value = tx[`${type}_notes`];
+            document.getElementById(`${type}-material`).value = normTx[`${type}_material`] || '';
+            document.getElementById(`${type}-weight`).value = normTx[`${type}_weight`] || '';
+            document.getElementById(`${type}-size`).value = normTx[`${type}_size`] || '';
+            document.getElementById(`${type}-repair-type`).value = normTx[`${type}_repair_type`] || '';
+            document.getElementById(`${type}-engraving`).value = normTx[`${type}_engraving`] || '';
+            document.getElementById(`${type}-notes`).value = normTx[`${type}_notes`] || '';
 
-            const isRepro = String(tx[`${type}_is_reproduct`]).toUpperCase() === 'TRUE';
-            const cb = document.getElementById(`${type}-is-reproduct`);
-            if (cb) {
-                cb.checked = isRepro;
-                const oldWeightGrp = document.getElementById(`${type}-old-weight-group`);
-                const repairTypeSelect = document.getElementById(`${type}-repair-type`);
-                if (isRepro) {
-                    oldWeightGrp.classList.remove('hidden');
-                    repairTypeSelect.disabled = true;
-                    document.getElementById(`${type}-target-weight`).value = tx[`${type}_target_weight`] || '';
-                } else {
-                    oldWeightGrp.classList.add('hidden');
-                    repairTypeSelect.disabled = false;
+            if (isOrder) {
+                const qtyEl = document.getElementById(`${type}-qty`);
+                const finEl = document.getElementById(`${type}-finishing`);
+                const stoneSpecEl = document.getElementById(`${type}-stone-spec`);
+                const stoneFeeEl = document.getElementById(`${type}-stone-fee`);
+                const customFeeEl = document.getElementById(`${type}-custom-fee`);
+                const cadRefEl = document.getElementById(`${type}-cad-ref`);
+                const castingFeeEl = document.getElementById(`${type}-casting-fee`);
+
+                if (qtyEl) qtyEl.value = Math.max(1, parseInt(normTx[`${type}_qty`]) || 1);
+                if (finEl) finEl.value = normTx[`${type}_finishing`] || 'Glossy (Kilap)';
+                if (stoneSpecEl) stoneSpecEl.value = normTx[`${type}_stone_spec`] || 'Tanpa Permata (Polos)';
+                if (stoneFeeEl) stoneFeeEl.value = parseFloat(normTx[`${type}_stone_fee`]) || 0;
+                if (customFeeEl) {
+                    customFeeEl.value = parseFloat(normTx[`${type}_custom_fee`]) || 0;
+                    customFeeEl.dataset.userEdited = 'true';
+                }
+                if (cadRefEl) cadRefEl.value = normTx[`${type}_cad_ref`] || '';
+                if (castingFeeEl) castingFeeEl.value = parseFloat(normTx[`${type}_casting_fee`]) || 0;
+            } else {
+                const isRepro = String(normTx[`${type}_is_reproduct`]).toUpperCase() === 'TRUE';
+                const cb = document.getElementById(`${type}-is-reproduct`);
+                if (cb) {
+                    cb.checked = isRepro;
+                    const oldWeightGrp = document.getElementById(`${type}-old-weight-group`);
+                    const repairTypeSelect = document.getElementById(`${type}-repair-type`);
+                    if (isRepro) {
+                        oldWeightGrp.classList.remove('hidden');
+                        repairTypeSelect.disabled = true;
+                        document.getElementById(`${type}-target-weight`).value = normTx[`${type}_target_weight`] || '';
+                    } else {
+                        oldWeightGrp.classList.add('hidden');
+                        repairTypeSelect.disabled = false;
+                    }
                 }
             }
 
-            setUploadPreview(`${type}-image-preview`, tx[`${type}_image_url`], `cincin ${type}`);
+            setUploadPreview(`${type}-image-preview`, normTx[`${type}_image_url`], `cincin ${type}`);
         } else {
             resetRingCardFields(type);
         }
     };
 
-    populateRingEdit('cowok', String(tx.cowok_active).toUpperCase() === 'TRUE');
-    populateRingEdit('cewek', String(tx.cewek_active).toUpperCase() === 'TRUE');
+    populateRingEdit('cowok', String(normTx.cowok_active).toUpperCase() === 'TRUE');
+    populateRingEdit('cewek', String(normTx.cewek_active).toUpperCase() === 'TRUE');
 
     // Additional items
     document.getElementById('tbody-additional-items').innerHTML = '';
-    const addItems = JSON.parse(tx.additional_items_json || '[]');
+    const addItems = JSON.parse(normTx.additional_items_json || '[]');
     addItems.forEach((item) => addAdditionalItemRow(item));
 
     // Warranty card
-    setUploadPreview('warranty-image-preview', tx.warranty_image_url, 'kartu garansi');
+    setUploadPreview('warranty-image-preview', normTx.warranty_image_url, 'kartu garansi');
 
     // Payments
-    document.getElementById('dp1-method').value = tx.dp1_method;
-    document.getElementById('dp1-amount').value = tx.dp1_amount;
-    setUploadPreview('dp1-image-preview', tx.dp1_receipt_url, 'resi DP 1');
+    document.getElementById('dp1-method').value = normTx.dp1_method || '';
+    document.getElementById('dp1-amount').value = normTx.dp1_amount || 0;
+    setUploadPreview('dp1-image-preview', normTx.dp1_receipt_url, 'resi DP 1');
 
-    document.getElementById('dp2-method').value = tx.dp2_method;
-    document.getElementById('dp2-amount').value = tx.dp2_amount;
-    setUploadPreview('dp2-image-preview', tx.dp2_receipt_url, 'resi DP 2');
+    document.getElementById('dp2-method').value = normTx.dp2_method || '';
+    document.getElementById('dp2-amount').value = normTx.dp2_amount || 0;
+    setUploadPreview('dp2-image-preview', normTx.dp2_receipt_url, 'resi DP 2');
 
     calculateFormPricing();
 
@@ -1248,15 +1910,25 @@ function resetForm() {
     State.activeEditId = null;
     document.getElementById('repair-entry-form').reset();
 
+    const activeDivCode = getDivisionMeta(State.currentDivision).code;
+    const txDivEl = document.getElementById('tx-division');
+    if (txDivEl) {
+        txDivEl.disabled = false;
+        txDivEl.value = activeDivCode;
+    }
+
     const banner = document.getElementById('sales-form-mode-banner');
     if (banner) banner.classList.add('hidden');
     const heading = document.getElementById('sales-form-heading');
-    if (heading) heading.innerHTML = '<i class="fa-solid fa-file-signature"></i> Formulir Data Repair Cincin';
+    if (heading) {
+        heading.innerHTML =
+            '<i class="fa-solid fa-file-signature"></i> <span id="sales-form-heading-text">Formulir Data Repair Cincin</span>';
+    }
 
     if (State.currentUser) {
         // Regenerate unique number
         let branchCode = State.currentUser.store_code === 'ALL' ? 'HQ' : State.currentUser.store_code;
-        document.getElementById('rep-number').value = generateRepairID(branchCode);
+        document.getElementById('rep-number').value = generateTransactionID(branchCode, activeDivCode);
 
         // Auto populate sales/store
         const activeStore = State.masterData.stores.find((s) => s.code === State.currentUser.store_code);
@@ -1279,6 +1951,11 @@ function resetForm() {
     // Clear additional items table
     document.getElementById('tbody-additional-items').innerHTML = '';
 
+    // Reset warranty/receipt previews
+    setUploadPreview('warranty-image-preview', '', 'kartu garansi');
+    setUploadPreview('dp1-image-preview', '', 'resi DP 1');
+    setUploadPreview('dp2-image-preview', '', 'resi DP 2');
+
     // Reset dates
     const today = new Date().toISOString().slice(0, 10);
     document.getElementById('rep-date').value = today;
@@ -1288,7 +1965,7 @@ function resetForm() {
     d.setDate(d.getDate() + 7);
     document.getElementById('rep-deadline').value = d.toISOString().slice(0, 10);
 
-    calculateFormPricing();
+    applySalesFormDivisionUI(activeDivCode);
 }
 
 function resetRingCardFields(prefix) {
@@ -1299,6 +1976,25 @@ function resetRingCardFields(prefix) {
     document.getElementById(`${prefix}-engraving`).value = '';
     document.getElementById(`${prefix}-notes`).value = '';
     document.getElementById(`${prefix}-image`).value = '';
+
+    const qtyEl = document.getElementById(`${prefix}-qty`);
+    const finEl = document.getElementById(`${prefix}-finishing`);
+    const stoneSpecEl = document.getElementById(`${prefix}-stone-spec`);
+    const stoneFeeEl = document.getElementById(`${prefix}-stone-fee`);
+    const customFeeEl = document.getElementById(`${prefix}-custom-fee`);
+    const cadRefEl = document.getElementById(`${prefix}-cad-ref`);
+    const castingFeeEl = document.getElementById(`${prefix}-casting-fee`);
+
+    if (qtyEl) qtyEl.value = '1';
+    if (finEl) finEl.value = 'Glossy (Kilap)';
+    if (stoneSpecEl) stoneSpecEl.value = 'Tanpa Permata (Polos)';
+    if (stoneFeeEl) stoneFeeEl.value = '0';
+    if (customFeeEl) {
+        customFeeEl.value = '0';
+        customFeeEl.dataset.userEdited = 'false';
+    }
+    if (cadRefEl) cadRefEl.value = '';
+    if (castingFeeEl) castingFeeEl.value = '0';
 
     const cb = document.getElementById(`${prefix}-is-reproduct`);
     if (cb) {
@@ -1326,9 +2022,11 @@ function validateRepairForm() {
     const address = document.getElementById('cust-address').value.trim();
     const city = document.getElementById('cust-city').value;
     const deadline = document.getElementById('rep-deadline').value;
+    const divCode = getTransactionDivision(document.getElementById('tx-division')?.value || State.currentDivision);
+    const isOrder = divCode === 'HANDMADE' || divCode === 'CASTING';
 
     if (!deadline) {
-        showToast('Mohon tentukan tanggal deadline perbaikan!', 'warning');
+        showToast(`Mohon tentukan tanggal deadline ${isOrder ? 'order' : 'perbaikan'}!`, 'warning');
         return false;
     }
     if (!name || !phone || !address || !city) {
@@ -1344,39 +2042,37 @@ function validateRepairForm() {
         return false;
     }
 
-    if (cowokActive) {
-        const material = document.getElementById('cowok-material').value;
-        const weight = parseFloat(document.getElementById('cowok-weight').value) || 0;
-        const size = document.getElementById('cowok-size').value;
-        const repType = document.getElementById('cowok-repair-type').value;
-        const isReproduct = document.getElementById('cowok-is-reproduct').checked;
-        const targetWeight = parseFloat(document.getElementById('cowok-target-weight').value) || 0;
+    const validateSide = (side, label) => {
+        const material = document.getElementById(`${side}-material`).value;
+        const weight = parseFloat(document.getElementById(`${side}-weight`).value) || 0;
+        const size = document.getElementById(`${side}-size`).value;
 
-        if (!material || weight <= 0 || !size || (!isReproduct && !repType) || (isReproduct && targetWeight <= 0)) {
-            showToast(
-                'Informasi cincin cowok belum diisi lengkap (Bahan, Berat, Ukuran, Repair/Target Baru)!',
-                'warning'
-            );
-            return false;
+        if (isOrder) {
+            const qty = parseInt(document.getElementById(`${side}-qty`)?.value) || 0;
+            if (!material || weight <= 0 || !size || qty <= 0) {
+                showToast(
+                    `Informasi ${label} belum diisi lengkap (Bahan, Estimasi Berat, Ukuran, Qty)!`,
+                    'warning'
+                );
+                return false;
+            }
+        } else {
+            const repType = document.getElementById(`${side}-repair-type`).value;
+            const isReproduct = document.getElementById(`${side}-is-reproduct`).checked;
+            const targetWeight = parseFloat(document.getElementById(`${side}-target-weight`).value) || 0;
+            if (!material || weight <= 0 || !size || (!isReproduct && !repType) || (isReproduct && targetWeight <= 0)) {
+                showToast(
+                    `Informasi ${label} belum diisi lengkap (Bahan, Berat, Ukuran, Repair/Target Baru)!`,
+                    'warning'
+                );
+                return false;
+            }
         }
-    }
+        return true;
+    };
 
-    if (cewekActive) {
-        const material = document.getElementById('cewek-material').value;
-        const weight = parseFloat(document.getElementById('cewek-weight').value) || 0;
-        const size = document.getElementById('cewek-size').value;
-        const repType = document.getElementById('cewek-repair-type').value;
-        const isReproduct = document.getElementById('cewek-is-reproduct').checked;
-        const targetWeight = parseFloat(document.getElementById('cewek-target-weight').value) || 0;
-
-        if (!material || weight <= 0 || !size || (!isReproduct && !repType) || (isReproduct && targetWeight <= 0)) {
-            showToast(
-                'Informasi cincin cewek belum diisi lengkap (Bahan, Berat, Ukuran, Repair/Target Baru)!',
-                'warning'
-            );
-            return false;
-        }
-    }
+    if (cowokActive && !validateSide('cowok', 'cincin cowok')) return false;
+    if (cewekActive && !validateSide('cewek', 'cincin cewek')) return false;
 
     const dp1 = parseFloat(document.getElementById('dp1-amount').value) || 0;
     const dp1Method = document.getElementById('dp1-method').value;
@@ -1394,9 +2090,10 @@ function validateRepairForm() {
 // ==========================================================================
 
 async function renderRepairHistory() {
-    const list = await getLocalData('repair_transactions');
+    const list = await getAllTransactions();
     const searchQuery = document.getElementById('history-search').value.toLowerCase();
     const statusFilter = document.getElementById('history-status-filter').value;
+    const divFilter = document.getElementById('history-division-filter')?.value || 'ALL';
 
     // Sort transactions reverse-chronologically (newest first)
     list.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
@@ -1407,16 +2104,21 @@ async function renderRepairHistory() {
     let matchCount = 0;
 
     list.forEach((tx) => {
+        const txDiv = getTransactionDivision(tx);
+
         // Apply text filter
         const matchesSearch =
             tx.repair_number.toLowerCase().includes(searchQuery) ||
             tx.customer_name.toLowerCase().includes(searchQuery) ||
             tx.customer_phone.includes(searchQuery);
 
+        // Apply division filter
+        const matchesDiv = divFilter === 'ALL' || txDiv === divFilter;
+
         // Apply status filter
         const matchesStatus = statusFilter === 'ALL' || tx.status === statusFilter;
 
-        if (matchesSearch && matchesStatus) {
+        if (matchesSearch && matchesDiv && matchesStatus) {
             matchCount++;
 
             // Format status badge
@@ -1436,20 +2138,21 @@ async function renderRepairHistory() {
             const tr = document.createElement('tr');
             tr.innerHTML = `
                 <td><strong>${tx.repair_number}</strong></td>
+                <td>${renderDivisionBadgeHtml(tx)}</td>
                 <td>${formatSimpleDate(tx.date)}</td>
                 <td>${formatSimpleDate(tx.deadline)}</td>
                 <td>
                     <div><strong>${tx.customer_name}</strong></div>
                     <div style="font-size:11px; color:var(--text-muted);">${tx.customer_phone}</div>
                 </td>
-                <td>${tx.store_sales_name.split(' (')[0]}</td>
+                <td>${(tx.store_sales_name || '').split(' (')[0]}</td>
                 <td><strong>${formatRupiah(tx.total_price)}</strong></td>
-                <td>${formatRupiah(tx.dp1_amount + tx.dp2_amount)}</td>
+                <td>${formatRupiah((parseFloat(tx.dp1_amount) || 0) + (parseFloat(tx.dp2_amount) || 0))}</td>
                 <td><span class="${badgeClass}">${statusLabel}</span></td>
                 <td>
                     <div class="action-buttons-flex">
                         <button class="action-btn-circle btn-h-progress" data-id="${tx.repair_number}" title="Detail & Progress Pelacakan" style="background: rgba(197, 168, 92, 0.15); color: var(--gold); border-color: var(--gold);"><i class="fa-solid fa-bars-progress"></i></button>
-                        <button class="action-btn-circle btn-h-print-form" data-id="${tx.repair_number}" title="Cetak Form Pengerjaan"><i class="fa-solid fa-file-invoice"></i></button>
+                        <button class="action-btn-circle btn-h-print-form" data-id="${tx.repair_number}" title="Cetak Form Pengerjaan / SPK"><i class="fa-solid fa-file-invoice"></i></button>
                         <button class="action-btn-circle btn-h-print-receipt" data-id="${tx.repair_number}" title="Cetak Nota"><i class="fa-solid fa-receipt"></i></button>
                         <button class="action-btn-circle btn-h-whatsapp" data-id="${tx.repair_number}" title="Kirim Resi via WhatsApp"><i class="fa-brands fa-whatsapp"></i></button>
                         <button class="action-btn-circle btn-h-edit" data-id="${tx.repair_number}" title="Edit Data"><i class="fa-solid fa-pen-to-square"></i></button>
@@ -1462,7 +2165,7 @@ async function renderRepairHistory() {
     });
 
     if (matchCount === 0) {
-        tbody.innerHTML = `<tr class="table-empty-row"><td colspan="9">Tidak ada riwayat transaksi repair ditemukan.</td></tr>`;
+        tbody.innerHTML = `<tr class="table-empty-row"><td colspan="10">Tidak ada riwayat transaksi ditemukan.</td></tr>`;
     }
 
     // Bind item actions click listeners
@@ -1505,21 +2208,20 @@ function triggerProtectedAction(repairNum, actionType) {
 }
 
 async function executeProtectedAction(repairNum, actionType) {
-    const txs = await getLocalData('repair_transactions');
-    const match = txs.find((t) => t.repair_number === repairNum);
+    const match = await getTransactionByNumber(repairNum);
     if (!match) return;
 
     if (actionType === 'EDIT') {
-        populateFormForEdit(match);
-        showToast(`Form repair ${repairNum} berhasil dimuat untuk pengeditan!`, 'info');
+        await populateFormForEdit(match);
+        showToast(`Form transaksi ${repairNum} berhasil dimuat untuk pengeditan!`, 'info');
     } else if (actionType === 'DELETE') {
-        if (confirm(`Apakah Anda yakin ingin menghapus data repair ${repairNum}?`)) {
-            await deleteLocalData('repair_transactions', repairNum);
+        if (confirm(`Apakah Anda yakin ingin menghapus data transaksi ${repairNum}?`)) {
+            await deleteTransactionRecord(repairNum);
 
-            // Queue sync deletion task to sheets
-            await queueSyncTask('DELETE_REPAIR', { repair_number: repairNum });
+            // Queue sync deletion task to sheets (Repair vs Order)
+            await queueSyncTask(getTxSyncAction('DELETE', match), { repair_number: repairNum });
 
-            showToast(`Repair ${repairNum} berhasil dihapus dari perangkat!`, 'success');
+            showToast(`Transaksi ${repairNum} berhasil dihapus dari perangkat!`, 'success');
             await refreshAllData();
         }
     }
@@ -1527,10 +2229,30 @@ async function executeProtectedAction(repairNum, actionType) {
 
 // --- RENDERING SUBSIDIARY OPERATIONAL BOARDS ---
 
-async function renderAccountingBoard() {
-    const list = await getLocalData('repair_transactions');
+function getAccountingPriorityScore(tx) {
+    if (tx.dp_approval === 'Pending') {
+        return 1;
+    }
+    if (tx.pelunasan_approval === 'Pending' && ((parseFloat(tx.dp2_amount) || 0) > 0 || tx.dp2_method)) {
+        return 2;
+    }
+    const dp1 = parseFloat(tx.dp1_amount) || 0;
+    const totalPrice = parseFloat(tx.total_price) || 0;
+    if (
+        dp1 > totalPrice &&
+        (!tx.refund_receipt_url || tx.refund_receipt_url === '' || tx.refund_receipt_url === '[Gagal Upload]')
+    ) {
+        return 3;
+    }
+    return 4;
+}
 
-    // 1. Calculate P&L global stats
+async function renderAccountingBoard() {
+    const allTx = await getAllTransactions();
+    const divFilter = document.getElementById('acc-division-filter')?.value || 'ALL';
+    const list = divFilter === 'ALL' ? allTx : allTx.filter((tx) => getTransactionDivision(tx) === divFilter);
+
+    // 1. Calculate P&L stats (respecting selected division filter)
     let totalOmset = 0;
     let totalPiutang = 0;
     let totalHpp = 0;
@@ -1558,24 +2280,6 @@ async function renderAccountingBoard() {
     document.getElementById('acc-stat-total-laba').textContent = formatRupiah(totalLaba);
 
     // 2. Multi-priority Sorting
-    function getAccountingPriorityScore(tx) {
-        if (tx.dp_approval === 'Pending') {
-            return 1;
-        }
-        if (tx.pelunasan_approval === 'Pending' && ((parseFloat(tx.dp2_amount) || 0) > 0 || tx.dp2_method)) {
-            return 2;
-        }
-        const dp1 = parseFloat(tx.dp1_amount) || 0;
-        const totalPrice = parseFloat(tx.total_price) || 0;
-        if (
-            dp1 > totalPrice &&
-            (!tx.refund_receipt_url || tx.refund_receipt_url === '' || tx.refund_receipt_url === '[Gagal Upload]')
-        ) {
-            return 3;
-        }
-        return 4;
-    }
-
     list.sort((a, b) => {
         const scoreA = getAccountingPriorityScore(a);
         const scoreB = getAccountingPriorityScore(b);
@@ -1683,7 +2387,10 @@ async function renderAccountingBoard() {
 
         const tr = document.createElement('tr');
         tr.innerHTML = `
-            <td><strong>${tx.repair_number}</strong></td>
+            <td>
+                <strong>${tx.repair_number}</strong>
+                <div style="margin-top:4px;">${renderDivisionBadgeHtml(tx)}</div>
+            </td>
             <td>${tx.customer_name}</td>
             <td>${mediaHtml}</td>
             <td>${formatRupiah(totalPrice)}</td>
@@ -1703,10 +2410,9 @@ async function renderAccountingBoard() {
     // Attach listener to update payment DP 2 / Edit Payment
     document.querySelectorAll('.btn-acc-update').forEach((btn) => {
         btn.addEventListener('click', async () => {
-            const txs = await getLocalData('repair_transactions');
-            const match = txs.find((t) => t.repair_number === btn.dataset.id);
+            const match = await getTransactionByNumber(btn.dataset.id);
             if (match) {
-                populateFormForEdit(match);
+                await populateFormForEdit(match);
                 showToast(`Formulir pembayaran ${match.repair_number} siap disesuaikan di Sales Tab!`, 'info');
                 switchPanel('sales-panel');
             }
@@ -1719,18 +2425,20 @@ async function renderAccountingBoard() {
             const id = btn.dataset.id;
             showToast('Memproses approval DP...', 'info');
             try {
-                const txs = await getLocalData('repair_transactions');
-                const match = txs.find((t) => t.repair_number === id);
+                const match = await getTransactionByNumber(id);
                 if (match) {
                     match.dp_approval = 'Approved';
                     match.status = 'Pending Sync';
-                    await saveLocalData('repair_transactions', match);
+                    await saveTransactionRecord(match);
                 }
 
-                await queueSyncTask('UPDATE_REPAIR_STATUS', { repair_number: id, dp_approval: 'Approved' });
+                await queueSyncTask(getTxSyncAction('UPDATE_STATUS', match || id), {
+                    repair_number: id,
+                    dp_approval: 'Approved'
+                });
                 runBackgroundSync();
 
-                showToast(`DP untuk perbaikan ${id} berhasil disetujui!`, 'success');
+                showToast(`DP untuk transaksi ${id} berhasil disetujui!`, 'success');
                 await renderAccountingBoard();
             } catch (err) {
                 console.error(err);
@@ -1745,18 +2453,20 @@ async function renderAccountingBoard() {
             const id = btn.dataset.id;
             showToast('Memproses approval pelunasan...', 'info');
             try {
-                const txs = await getLocalData('repair_transactions');
-                const match = txs.find((t) => t.repair_number === id);
+                const match = await getTransactionByNumber(id);
                 if (match) {
                     match.pelunasan_approval = 'Approved';
                     match.status = 'Pending Sync';
-                    await saveLocalData('repair_transactions', match);
+                    await saveTransactionRecord(match);
                 }
 
-                await queueSyncTask('UPDATE_REPAIR_STATUS', { repair_number: id, pelunasan_approval: 'Approved' });
+                await queueSyncTask(getTxSyncAction('UPDATE_STATUS', match || id), {
+                    repair_number: id,
+                    pelunasan_approval: 'Approved'
+                });
                 runBackgroundSync();
 
-                showToast(`Pelunasan untuk perbaikan ${id} berhasil disetujui!`, 'success');
+                showToast(`Pelunasan untuk transaksi ${id} berhasil disetujui!`, 'success');
                 await renderAccountingBoard();
             } catch (err) {
                 console.error(err);
@@ -1775,18 +2485,20 @@ async function renderAccountingBoard() {
             showToast('Membaca file & mengunggah bukti refund...', 'info');
             try {
                 const base64Data = await getFileBase64(file);
-                const txs = await getLocalData('repair_transactions');
-                const match = txs.find((t) => t.repair_number === id);
+                const match = await getTransactionByNumber(id);
                 if (match) {
                     match.refund_receipt_url = base64Data;
                     match.status = 'Pending Sync';
-                    await saveLocalData('repair_transactions', match);
+                    await saveTransactionRecord(match);
                 }
 
-                await queueSyncTask('UPDATE_REPAIR_STATUS', { repair_number: id, refund_receipt_url: base64Data });
+                await queueSyncTask(getTxSyncAction('UPDATE_STATUS', match || id), {
+                    repair_number: id,
+                    refund_receipt_url: base64Data
+                });
                 runBackgroundSync();
 
-                showToast(`Bukti refund perbaikan ${id} berhasil diunggah!`, 'success');
+                showToast(`Bukti refund transaksi ${id} berhasil diunggah!`, 'success');
                 await renderAccountingBoard();
             } catch (err) {
                 console.error(err);
@@ -1797,30 +2509,49 @@ async function renderAccountingBoard() {
 }
 
 async function renderProductionBoard() {
-    const list = await getLocalData('repair_transactions');
-    list.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+    const allTx = await getAllTransactions();
+    const divFilter = document.getElementById('prod-division-filter')?.value || 'ALL';
+    allTx.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
 
     const tbody = document.getElementById('tbody-production-list');
     tbody.innerHTML = '';
     let count = 0;
 
-    list.forEach((tx) => {
-        // Filter out transactions that do not have dp_approval === 'Approved'
-        if (tx.dp_approval !== 'Approved') {
-            return;
-        }
+    allTx.forEach((tx) => {
+        // Filter out transactions without dp_approval === 'Approved' or outside selected division
+        if (tx.dp_approval !== 'Approved') return;
+        if (divFilter !== 'ALL' && getTransactionDivision(tx) !== divFilter) return;
 
         count++;
+        const isOrderTx = isNewOrderTransaction(tx);
+        const divCode = getTransactionDivision(tx);
+
         // Fetch metals & repair names
         const cowokMetal = State.masterData.metals.find((m) => m.id === tx.cowok_material);
         const cowokRep = State.masterData.repairs.find((r) => r.id === tx.cowok_repair_type);
         const cewekMetal = State.masterData.metals.find((m) => m.id === tx.cewek_material);
         const cewekRep = State.masterData.repairs.find((r) => r.id === tx.cewek_repair_type);
 
+        const buildSideSpec = (side, metal, rep) => {
+            if (String(tx[`${side}_active`]).toUpperCase() !== 'TRUE') return '<em>Nonaktif</em>';
+            if (isOrderTx) {
+                const qty = tx[`${side}_qty`] || 1;
+                const fin = tx[`${side}_finishing`] || 'Standard';
+                const stone = tx[`${side}_stone_spec`] || '';
+                const cad = divCode === 'CASTING' && tx[`${side}_cad_ref`]
+                    ? `<div><span class="badge primary" style="font-size:10px; margin-top:2px;"><i class="fa-solid fa-cube"></i> ${tx[`${side}_cad_ref`]}</span></div>`
+                    : '';
+                return `<div><strong>${metal?.name || '-'}</strong> (Sz: ${tx[`${side}_size`]}, ${qty} pcs)</div>
+                        <div style="font-size:10.5px; color:var(--text-muted);">${fin}${stone && stone !== 'Tanpa Permata (Polos)' ? ' • ' + stone : ''}</div>
+                        ${cad}`;
+            }
+            return `<div>${metal?.name || ''} (Sz: ${tx[`${side}_size`]}) - ${rep?.name || ''}</div>`;
+        };
+
         const cowokDesc =
             String(tx.cowok_active).toUpperCase() === 'TRUE'
                 ? `
-            <div>${cowokMetal?.name || ''} (Sz: ${tx.cowok_size}) - ${cowokRep?.name || ''}</div>
+            ${buildSideSpec('cowok', cowokMetal, cowokRep)}
             <div style="display:flex; gap:6px; margin-top:4px; flex-wrap:wrap;">
                 ${tx.cowok_image_url && tx.cowok_image_url !== '[Gagal Upload Gambar]' ? `<img src="${resolveImageUrl(tx.cowok_image_url)}" class="img-thumbnail-link" data-url="${tx.cowok_image_url}" data-caption="Foto Model Cowok - ${tx.repair_number}" title="Foto Model Cowok" style="width:30px; height:30px; border-radius:4px; object-fit:cover; border:1px solid var(--border-color); cursor:pointer;">` : ''}
                 ${tx.render_cowok_url && tx.render_cowok_url !== '[Gagal Upload]' ? `<img src="${resolveImageUrl(tx.render_cowok_url)}" class="img-thumbnail-link" data-url="${tx.render_cowok_url}" data-caption="Render 3D Cowok - ${tx.repair_number}" title="Render 3D Cowok" style="width:30px; height:30px; border-radius:4px; object-fit:cover; border:1px solid var(--border-color); cursor:pointer;">` : ''}
@@ -1829,10 +2560,10 @@ async function renderProductionBoard() {
         `
                 : '<em>Nonaktif</em>';
 
-        let cewekDesc =
+        const cewekDesc =
             String(tx.cewek_active).toUpperCase() === 'TRUE'
                 ? `
-            <div>${cewekMetal?.name || ''} (Sz: ${tx.cewek_size}) - ${cewekRep?.name || ''}</div>
+            ${buildSideSpec('cewek', cewekMetal, cewekRep)}
             <div style="display:flex; gap:6px; margin-top:4px; flex-wrap:wrap;">
                 ${tx.cewek_image_url && tx.cewek_image_url !== '[Gagal Upload Gambar]' ? `<img src="${resolveImageUrl(tx.cewek_image_url)}" class="img-thumbnail-link" data-url="${tx.cewek_image_url}" data-caption="Foto Model Cewek - ${tx.repair_number}" title="Foto Model Cewek" style="width:30px; height:30px; border-radius:4px; object-fit:cover; border:1px solid var(--border-color); cursor:pointer;">` : ''}
                 ${tx.render_cewek_url && tx.render_cewek_url !== '[Gagal Upload]' ? `<img src="${resolveImageUrl(tx.render_cewek_url)}" class="img-thumbnail-link" data-url="${tx.render_cewek_url}" data-caption="Render 3D Cewek - ${tx.repair_number}" title="Render 3D Cewek" style="width:30px; height:30px; border-radius:4px; object-fit:cover; border:1px solid var(--border-color); cursor:pointer;">` : ''}
@@ -1872,7 +2603,10 @@ async function renderProductionBoard() {
 
         const tr = document.createElement('tr');
         tr.innerHTML = `
-            <td><strong>${tx.repair_number}</strong></td>
+            <td>
+                <strong>${tx.repair_number}</strong>
+                <div style="margin-top:4px;">${renderDivisionBadgeHtml(tx)}</div>
+            </td>
             <td><div style="font-size:11px;">${cowokDesc}</div></td>
             <td><div style="font-size:11px;">${cewekDesc}</div></td>
             <td><strong>${currentWorkshop}</strong></td>
@@ -1930,23 +2664,22 @@ async function renderProductionBoard() {
             showToast('Membaca file & mengunggah render model...', 'info');
             try {
                 const base64Data = await getFileBase64(file);
-                const txs = await getLocalData('repair_transactions');
-                const match = txs.find((t) => t.repair_number === id);
+                const match = await getTransactionByNumber(id);
                 if (match) {
                     match.render_model_url = base64Data;
                     match.render_approval = 'Pending';
                     match.status = 'Pending Sync';
-                    await saveLocalData('repair_transactions', match);
+                    await saveTransactionRecord(match);
                 }
 
-                await queueSyncTask('UPDATE_REPAIR_STATUS', {
+                await queueSyncTask(getTxSyncAction('UPDATE_STATUS', match || id), {
                     repair_number: id,
                     render_model_url: base64Data,
                     render_approval: 'Pending'
                 });
                 runBackgroundSync();
 
-                showToast(`Gambar Render Model perbaikan ${id} berhasil diunggah!`, 'success');
+                showToast(`Gambar Render Model ${id} berhasil diunggah!`, 'success');
                 await refreshAllData();
             } catch (err) {
                 console.error(err);
@@ -1965,23 +2698,22 @@ async function renderProductionBoard() {
             showToast('Membaca file & mengunggah realpict...', 'info');
             try {
                 const base64Data = await getFileBase64(file);
-                const txs = await getLocalData('repair_transactions');
-                const match = txs.find((t) => t.repair_number === id);
+                const match = await getTransactionByNumber(id);
                 if (match) {
                     match.realpict_url = base64Data;
                     match.realpict_approval = 'Pending';
                     match.status = 'Pending Sync';
-                    await saveLocalData('repair_transactions', match);
+                    await saveTransactionRecord(match);
                 }
 
-                await queueSyncTask('UPDATE_REPAIR_STATUS', {
+                await queueSyncTask(getTxSyncAction('UPDATE_STATUS', match || id), {
                     repair_number: id,
                     realpict_url: base64Data,
                     realpict_approval: 'Pending'
                 });
                 runBackgroundSync();
 
-                showToast(`Foto Realpict cincin perbaikan ${id} berhasil diunggah!`, 'success');
+                showToast(`Foto Realpict cincin ${id} berhasil diunggah!`, 'success');
                 await refreshAllData();
             } catch (err) {
                 console.error(err);
@@ -1995,8 +2727,9 @@ async function renderProductionBoard() {
 // DESIGNER BOARD — Tabel Penugasan & Upload Render per Desainer
 // ==========================================================================
 async function renderDesignerBoard() {
-    const list = await getLocalData('repair_transactions');
-    list.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+    const allTx = await getAllTransactions();
+    const divFilter = document.getElementById('prod-division-filter')?.value || 'ALL';
+    allTx.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
 
     const tbody = document.getElementById('tbody-production-designers');
     if (!tbody) return;
@@ -2011,8 +2744,9 @@ async function renderDesignerBoard() {
             designerOptions += `<option value="${u.username}">${u.username}</option>`;
         });
 
-    list.forEach((tx) => {
+    allTx.forEach((tx) => {
         if (tx.dp_approval !== 'Approved') return;
+        if (divFilter !== 'ALL' && getTransactionDivision(tx) !== divFilter) return;
         count++;
 
         const renderApprovalBadge =
@@ -2032,13 +2766,23 @@ async function renderDesignerBoard() {
                 ? `<img src="${resolveImageUrl(tx.render_cewek_url)}" class="img-thumbnail-link" data-url="${tx.render_cewek_url}" data-caption="Render Cewek - ${tx.repair_number}" style="width:36px;height:36px;border-radius:4px;object-fit:cover;border:1px solid var(--border-color);cursor:pointer;">`
                 : `<span style="color:var(--text-muted);font-size:11px;">Belum</span>`;
 
+        const cadHint =
+            getTransactionDivision(tx) === 'CASTING' && (tx.cowok_cad_ref || tx.cewek_cad_ref)
+                ? `<div style="margin-top:4px;font-size:10.5px;color:var(--gold);"><i class="fa-solid fa-cube"></i> ${[tx.cowok_cad_ref, tx.cewek_cad_ref].filter(Boolean).join(' / ')}</div>`
+                : '';
+
         const rejectionNote = tx.render_rejection_reason
             ? `<div class="revision-note"><i class="fa-solid fa-comment-dots"></i> <strong>Komentar Sales:</strong> ${tx.render_rejection_reason}</div>`
             : '';
 
         const tr = document.createElement('tr');
         tr.innerHTML = `
-            <td><strong>${tx.repair_number}</strong><br><small style="color:var(--text-muted)">${tx.customer_name}</small></td>
+            <td>
+                <strong>${tx.repair_number}</strong>
+                <div style="margin-top:4px;">${renderDivisionBadgeHtml(tx)}</div>
+                ${cadHint}
+            </td>
+            <td>${tx.customer_name}</td>
             <td>
                 <select class="designer-select" data-id="${tx.repair_number}" style="font-size:12px; padding:4px 6px; border-radius:var(--border-radius-sm); border:1px solid var(--border-color); background:var(--surface); color:var(--text-primary);">
                     ${designerOptions}
@@ -2068,7 +2812,7 @@ async function renderDesignerBoard() {
             </td>
             <td>${renderApprovalBadge}</td>
             <td>${tx.render_rejection_reason ? `<div class="revision-note" style="font-size:11px;">${tx.render_rejection_reason}</div>` : '<span style="color:var(--text-muted);font-size:11px;">-</span>'}</td>
-            <td>
+            <td style="text-align:center;">
                 <button class="action-btn-circle btn-save-designer" data-id="${tx.repair_number}" title="Simpan Penugasan Desainer"><i class="fa-solid fa-floppy-disk"></i></button>
             </td>
         `;
@@ -2076,7 +2820,7 @@ async function renderDesignerBoard() {
     });
 
     if (count === 0) {
-        tbody.innerHTML = `<tr class="table-empty-row"><td colspan="6">Belum ada data untuk penugasan desainer.</td></tr>`;
+        tbody.innerHTML = `<tr class="table-empty-row"><td colspan="7">Belum ada data untuk penugasan desainer.</td></tr>`;
     }
 
     // Listener: Simpan penugasan desainer
@@ -2090,13 +2834,15 @@ async function renderDesignerBoard() {
                 showToast('Pilih desainer terlebih dahulu!', 'warning');
                 return;
             }
-            const txs = await getLocalData('repair_transactions');
-            const match = txs.find((t) => t.repair_number === id);
+            const match = await getTransactionByNumber(id);
             if (match) {
                 match.assigned_designer = designerName;
                 match.status = 'Pending Sync';
-                await saveLocalData('repair_transactions', match);
-                await queueSyncTask('UPDATE_REPAIR_STATUS', { repair_number: id, assigned_designer: designerName });
+                await saveTransactionRecord(match);
+                await queueSyncTask(getTxSyncAction('UPDATE_STATUS', match), {
+                    repair_number: id,
+                    assigned_designer: designerName
+                });
                 runBackgroundSync();
                 showToast(`Desainer ${designerName} ditugaskan ke ${id}`, 'success');
                 await renderDesignerBoard();
@@ -2113,15 +2859,14 @@ async function renderDesignerBoard() {
             showToast('Mengunggah render cowok...', 'info');
             try {
                 const base64Data = await getFileBase64(file);
-                const txs = await getLocalData('repair_transactions');
-                const match = txs.find((t) => t.repair_number === id);
+                const match = await getTransactionByNumber(id);
                 if (match) {
                     match.render_cowok_url = base64Data;
                     match.render_approval = 'Pending';
                     match.status = 'Pending Sync';
-                    await saveLocalData('repair_transactions', match);
+                    await saveTransactionRecord(match);
                 }
-                await queueSyncTask('UPDATE_REPAIR_STATUS', {
+                await queueSyncTask(getTxSyncAction('UPDATE_STATUS', match || id), {
                     repair_number: id,
                     render_cowok_url: base64Data,
                     render_approval: 'Pending'
@@ -2129,7 +2874,7 @@ async function renderDesignerBoard() {
                 runBackgroundSync();
                 showToast(`Render Cowok ${id} berhasil diunggah!`, 'success');
                 await renderDesignerBoard();
-            } catch (err) {
+            } catch {
                 showToast('Gagal upload render cowok.', 'error');
             }
         });
@@ -2144,15 +2889,14 @@ async function renderDesignerBoard() {
             showToast('Mengunggah render cewek...', 'info');
             try {
                 const base64Data = await getFileBase64(file);
-                const txs = await getLocalData('repair_transactions');
-                const match = txs.find((t) => t.repair_number === id);
+                const match = await getTransactionByNumber(id);
                 if (match) {
                     match.render_cewek_url = base64Data;
                     match.render_approval = 'Pending';
                     match.status = 'Pending Sync';
-                    await saveLocalData('repair_transactions', match);
+                    await saveTransactionRecord(match);
                 }
-                await queueSyncTask('UPDATE_REPAIR_STATUS', {
+                await queueSyncTask(getTxSyncAction('UPDATE_STATUS', match || id), {
                     repair_number: id,
                     render_cewek_url: base64Data,
                     render_approval: 'Pending'
@@ -2160,7 +2904,7 @@ async function renderDesignerBoard() {
                 runBackgroundSync();
                 showToast(`Render Cewek ${id} berhasil diunggah!`, 'success');
                 await renderDesignerBoard();
-            } catch (err) {
+            } catch {
                 showToast('Gagal upload render cewek.', 'error');
             }
         });
@@ -2171,17 +2915,19 @@ async function renderDesignerBoard() {
 // QA BOARD — Quality Assurance Panel
 // ==========================================================================
 async function renderQABoard() {
-    const list = await getLocalData('repair_transactions');
+    const allTx = await getAllTransactions();
+    const divFilter = document.getElementById('prod-division-filter')?.value || 'ALL';
     const tbody = document.getElementById('tbody-qa-list');
     if (!tbody) return;
     tbody.innerHTML = '';
     let count = 0;
 
-    list.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
-    list.forEach((tx) => {
+    allTx.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+    allTx.forEach((tx) => {
         // Tampilkan yang production selesai dan QA belum Passed
         if (tx.production_status !== 'Completed') return;
         if (tx.qa_status === 'Passed') return;
+        if (divFilter !== 'ALL' && getTransactionDivision(tx) !== divFilter) return;
         count++;
 
         const qaBadge =
@@ -2191,7 +2937,11 @@ async function renderQABoard() {
 
         const tr = document.createElement('tr');
         tr.innerHTML = `
-            <td><strong>${tx.repair_number}</strong><br><small style="color:var(--text-muted)">${tx.customer_name}</small></td>
+            <td>
+                <strong>${tx.repair_number}</strong>
+                <div style="margin-top:4px;">${renderDivisionBadgeHtml(tx)}</div>
+                <small style="color:var(--text-muted)">${tx.customer_name}</small>
+            </td>
             <td>${tx.assigned_workshop || '-'}</td>
             <td>${formatSimpleDate(tx.deadline)}</td>
             <td>${qaBadge}</td>
@@ -2220,8 +2970,7 @@ async function renderQABoard() {
             const checkedBy = State.currentUser?.username || 'system';
             const checkedAt = new Date().toISOString();
 
-            const txs = await getLocalData('repair_transactions');
-            const match = txs.find((t) => t.repair_number === id);
+            const match = await getTransactionByNumber(id);
             if (!match) return;
 
             match.qa_notes = notes;
@@ -2232,8 +2981,8 @@ async function renderQABoard() {
                 match.qa_status = 'Passed';
                 match.qc_status = 'Pending';
                 match.status = 'Pending Sync';
-                await saveLocalData('repair_transactions', match);
-                await queueSyncTask('UPDATE_REPAIR_STATUS', {
+                await saveTransactionRecord(match);
+                await queueSyncTask(getTxSyncAction('UPDATE_STATUS', match), {
                     repair_number: id,
                     qa_status: 'Passed',
                     qa_notes: notes,
@@ -2263,38 +3012,51 @@ async function renderQABoard() {
 
                     // 1. Recover cincin reject ke master_processedmetals tipe Scrap/Leburan
                     const metals = (await getLocalData('master_processedmetals')) || [];
-                    const cowokFinal = parseFloat(match.cowok_weight_final) || 0;
-                    if (cowokFinal > 0 && match.cowok_material) {
-                        let scrapItem = metals.find((m) => m.metal_id === match.cowok_material && m.type === 'Scrap/Leburan');
+                    const upsertScrap = async (metalId, addedGram) => {
+                        if (addedGram <= 0 || !metalId) return;
+                        let scrapItem = metals.find((m) => m.metal_id === metalId && m.type === 'Scrap/Leburan');
+                        const masterMetal = (State.masterData.metals || []).find((m) => m.id === metalId);
+                        const defaultCost = masterMetal ? (parseFloat(masterMetal.modal_per_gram) || parseFloat(masterMetal.price_per_gram) || 0) : 0;
                         if (scrapItem) {
-                            scrapItem.stock_gram = (parseFloat(scrapItem.stock_gram) || 0) + cowokFinal;
-                            await saveLocalData('master_processedmetals', scrapItem);
-                            await queueSyncTask('UPDATE_PROCESSED_METAL', scrapItem);
+                            scrapItem.stock_gram = (parseFloat(scrapItem.stock_gram) || 0) + addedGram;
+                            scrapItem.last_updated = new Date().toISOString();
+                        } else {
+                            scrapItem = {
+                                id: 'PRC-S-' + Date.now() + '-' + Math.floor(Math.random() * 1000),
+                                metal_id: metalId,
+                                type: 'Scrap/Leburan',
+                                stock_gram: addedGram,
+                                average_cost_per_gram: defaultCost,
+                                last_updated: new Date().toISOString()
+                            };
+                            metals.push(scrapItem);
                         }
-                    }
-                    const cewekFinal = parseFloat(match.cewek_weight_final) || 0;
-                    if (cewekFinal > 0 && match.cewek_material) {
-                        let scrapItem = metals.find((m) => m.metal_id === match.cewek_material && m.type === 'Scrap/Leburan');
-                        if (scrapItem) {
-                            scrapItem.stock_gram = (parseFloat(scrapItem.stock_gram) || 0) + cewekFinal;
-                            await saveLocalData('master_processedmetals', scrapItem);
-                            await queueSyncTask('UPDATE_PROCESSED_METAL', scrapItem);
-                        }
-                    }
+                        await saveLocalData('master_processedmetals', scrapItem);
+                        await queueSyncTask('UPDATE_PROCESSED_METAL', scrapItem);
+                    };
 
-                    // 2. Tandai SPK pengerjaan sebelumnya sebagai REJECTED (QA FAILED) agar residu & susut tercatat terpisah
+                    const cowokFinal = parseFloat(match.cowok_weight_final) || 0;
+                    await upsertScrap(match.cowok_material, cowokFinal);
+
+                    const cewekFinal = parseFloat(match.cewek_weight_final) || 0;
+                    await upsertScrap(match.cewek_material, cewekFinal);
+
+                    // 2. Tandai SPK pengerjaan sebelumnya sebagai REJECTED (QA FAILED)
                     const prodJobs = (await getLocalData('master_productionjobs')) || [];
-                    for (let j of prodJobs) {
-                        if (j.repair_number === id && (j.status === 'WIP' || j.status === 'CLEARED' || j.status === 'PENALTY')) {
+                    const affectedJobs = prodJobs.filter(
+                        (j) => j.repair_number === id && (j.status === 'WIP' || j.status === 'CLEARED' || j.status === 'PENALTY')
+                    );
+                    await Promise.all(
+                        affectedJobs.map(async (j) => {
                             j.status = 'REJECTED (QA FAILED)';
                             await saveLocalData('master_productionjobs', j);
                             await queueSyncTask('UPDATE_PRODUCTION_JOB', j);
-                        }
-                    }
+                        })
+                    );
 
                     match.status = 'Pending Sync';
-                    await saveLocalData('repair_transactions', match);
-                    await queueSyncTask('UPDATE_REPAIR_STATUS', {
+                    await saveTransactionRecord(match);
+                    await queueSyncTask(getTxSyncAction('UPDATE_STATUS', match), {
                         repair_number: id,
                         qa_status: 'Failed (Remake)',
                         qa_notes: notes,
@@ -2310,8 +3072,8 @@ async function renderQABoard() {
                     match.qa_status = 'Failed (Minor Fix)';
                     match.production_status = 'Active';
                     match.status = 'Pending Sync';
-                    await saveLocalData('repair_transactions', match);
-                    await queueSyncTask('UPDATE_REPAIR_STATUS', {
+                    await saveTransactionRecord(match);
+                    await queueSyncTask(getTxSyncAction('UPDATE_STATUS', match), {
                         repair_number: id,
                         qa_status: 'Failed (Minor Fix)',
                         qa_notes: notes,
@@ -2332,17 +3094,19 @@ async function renderQABoard() {
 // QC BOARD — Quality Control Panel
 // ==========================================================================
 async function renderQCBoard() {
-    const list = await getLocalData('repair_transactions');
+    const allTx = await getAllTransactions();
+    const divFilter = document.getElementById('prod-division-filter')?.value || 'ALL';
     const tbody = document.getElementById('tbody-qc-list');
     if (!tbody) return;
     tbody.innerHTML = '';
     let count = 0;
 
-    list.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
-    list.forEach((tx) => {
+    allTx.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+    allTx.forEach((tx) => {
         // Tampilkan yang QA sudah Passed dan QC belum Passed
         if (tx.qa_status !== 'Passed') return;
         if (tx.qc_status === 'Passed') return;
+        if (divFilter !== 'ALL' && getTransactionDivision(tx) !== divFilter) return;
         count++;
 
         const qcBadge =
@@ -2357,7 +3121,11 @@ async function renderQCBoard() {
 
         const tr = document.createElement('tr');
         tr.innerHTML = `
-            <td><strong>${tx.repair_number}</strong><br><small style="color:var(--text-muted)">${tx.customer_name}</small></td>
+            <td>
+                <strong>${tx.repair_number}</strong>
+                <div style="margin-top:4px;">${renderDivisionBadgeHtml(tx)}</div>
+                <small style="color:var(--text-muted)">${tx.customer_name}</small>
+            </td>
             <td>${tx.qa_checked_by || '-'}</td>
             <td>${realpictPreview}</td>
             <td>${formatSimpleDate(tx.deadline)}</td>
@@ -2387,8 +3155,7 @@ async function renderQCBoard() {
             const checkedBy = State.currentUser?.username || 'system';
             const checkedAt = new Date().toISOString();
 
-            const txs = await getLocalData('repair_transactions');
-            const match = txs.find((t) => t.repair_number === id);
+            const match = await getTransactionByNumber(id);
             if (match) {
                 match.qc_status = result;
                 match.qc_notes = notes;
@@ -2399,8 +3166,8 @@ async function renderQCBoard() {
                     match.qa_status = 'Pending';
                 }
                 match.status = 'Pending Sync';
-                await saveLocalData('repair_transactions', match);
-                await queueSyncTask('UPDATE_REPAIR_STATUS', {
+                await saveTransactionRecord(match);
+                await queueSyncTask(getTxSyncAction('UPDATE_STATUS', match), {
                     repair_number: id,
                     qc_status: result,
                     qc_notes: notes,
@@ -2420,21 +3187,24 @@ async function renderQCBoard() {
 }
 
 // ==========================================================================
-// PRINT INDIVIDUAL LOGISTIC — Cetak Surat Jalan per Order
+// PRINT INDIVIDUAL LOGISTIC — Cetak Surat Jalan per Transaksi
 // ==========================================================================
 async function printIndividualLogistic(repairNum) {
-    const txs = await getLocalData('repair_transactions');
-    const tx = txs.find((t) => t.repair_number === repairNum);
+    const tx = await getTransactionByNumber(repairNum);
     if (!tx) {
         showToast('Data transaksi tidak ditemukan!', 'error');
         return;
     }
 
+    const divMeta = getDivisionMeta(tx);
+    const isOrderTx = isNewOrderTransaction(tx);
+
     const html = `
         <div style="font-family:Arial,sans-serif;padding:20px;">
-            <h2 style="text-align:center;border-bottom:2px solid #c5a85c;padding-bottom:8px;margin-bottom:16px;">SURAT JALAN PENGIRIMAN</h2>
+            <h2 style="text-align:center;border-bottom:2px solid #c5a85c;padding-bottom:8px;margin-bottom:16px;">SURAT JALAN PENGIRIMAN (${divMeta.shortLabel.toUpperCase()})</h2>
             <table style="width:100%;border-collapse:collapse;margin-bottom:16px;">
-                <tr><td style="width:40%;font-weight:bold;padding:4px 0;">No. Repair</td><td>: ${tx.repair_number}</td></tr>
+                <tr><td style="width:40%;font-weight:bold;padding:4px 0;">No. Transaksi</td><td>: ${tx.repair_number}</td></tr>
+                <tr><td style="font-weight:bold;padding:4px 0;">Divisi</td><td>: ${divMeta.label}</td></tr>
                 <tr><td style="font-weight:bold;padding:4px 0;">Tanggal Kirim</td><td>: ${new Date().toLocaleDateString('id-ID', { day: '2-digit', month: 'long', year: 'numeric' })}</td></tr>
                 <tr><td style="font-weight:bold;padding:4px 0;">Nama Penerima</td><td>: ${tx.customer_name}</td></tr>
                 <tr><td style="font-weight:bold;padding:4px 0;">Alamat Tujuan</td><td>: ${tx.customer_address}</td></tr>
@@ -2444,10 +3214,10 @@ async function printIndividualLogistic(repairNum) {
             </table>
             <h3 style="margin-bottom:8px;">Isi Paket</h3>
             <table style="width:100%;border-collapse:collapse;border:1px solid #ddd;">
-                <thead><tr style="background:#f5f5f5;"><th style="border:1px solid #ddd;padding:6px;">No</th><th style="border:1px solid #ddd;padding:6px;">Deskripsi</th><th style="border:1px solid #ddd;padding:6px;">Berat Awal</th><th style="border:1px solid #ddd;padding:6px;">Berat Akhir</th></tr></thead>
+                <thead><tr style="background:#f5f5f5;"><th style="border:1px solid #ddd;padding:6px;">No</th><th style="border:1px solid #ddd;padding:6px;">Deskripsi</th><th style="border:1px solid #ddd;padding:6px;">${isOrderTx ? 'Est. Berat' : 'Berat Awal'}</th><th style="border:1px solid #ddd;padding:6px;">Berat Akhir</th></tr></thead>
                 <tbody>
-                    ${String(tx.cowok_active).toUpperCase() === 'TRUE' ? `<tr><td style="border:1px solid #ddd;padding:6px;text-align:center;">1</td><td style="border:1px solid #ddd;padding:6px;">Cincin Pria (${tx.cowok_size})</td><td style="border:1px solid #ddd;padding:6px;text-align:center;">${tx.cowok_weight}g</td><td style="border:1px solid #ddd;padding:6px;text-align:center;">${tx.cowok_weight_final || '-'}g</td></tr>` : ''}
-                    ${String(tx.cewek_active).toUpperCase() === 'TRUE' ? `<tr><td style="border:1px solid #ddd;padding:6px;text-align:center;">${String(tx.cowok_active).toUpperCase() === 'TRUE' ? '2' : '1'}</td><td style="border:1px solid #ddd;padding:6px;">Cincin Wanita (${tx.cewek_size})</td><td style="border:1px solid #ddd;padding:6px;text-align:center;">${tx.cewek_weight}g</td><td style="border:1px solid #ddd;padding:6px;text-align:center;">${tx.cewek_weight_final || '-'}g</td></tr>` : ''}
+                    ${String(tx.cowok_active).toUpperCase() === 'TRUE' ? `<tr><td style="border:1px solid #ddd;padding:6px;text-align:center;">1</td><td style="border:1px solid #ddd;padding:6px;">Cincin Pria (Sz ${tx.cowok_size}${isOrderTx ? `, Qty: ${tx.cowok_qty || 1}` : ''})</td><td style="border:1px solid #ddd;padding:6px;text-align:center;">${tx.cowok_weight}g</td><td style="border:1px solid #ddd;padding:6px;text-align:center;">${tx.cowok_weight_final || '-'}g</td></tr>` : ''}
+                    ${String(tx.cewek_active).toUpperCase() === 'TRUE' ? `<tr><td style="border:1px solid #ddd;padding:6px;text-align:center;">${String(tx.cowok_active).toUpperCase() === 'TRUE' ? '2' : '1'}</td><td style="border:1px solid #ddd;padding:6px;">Cincin Wanita (Sz ${tx.cewek_size}${isOrderTx ? `, Qty: ${tx.cewek_qty || 1}` : ''})</td><td style="border:1px solid #ddd;padding:6px;text-align:center;">${tx.cewek_weight}g</td><td style="border:1px solid #ddd;padding:6px;text-align:center;">${tx.cewek_weight_final || '-'}g</td></tr>` : ''}
                 </tbody>
             </table>
             <div style="margin-top:24px;border:1px solid #000;padding:12px;display:inline-block;min-width:220px;">
@@ -2479,9 +3249,11 @@ async function printIndividualLogistic(repairNum) {
 }
 
 async function showProductionAssignModal(repairNum) {
-    const txs = await getLocalData('repair_transactions');
-    const tx = txs.find((t) => t.repair_number === repairNum);
+    const tx = await getTransactionByNumber(repairNum);
     if (!tx) return;
+
+    const isOrderTx = isNewOrderTransaction(tx);
+    const divMeta = getDivisionMeta(tx);
 
     let wksOptions = '<option value="" disabled>Pilih Pengrajin</option>';
     State.masterData.workshops.forEach((w) => {
@@ -2505,31 +3277,50 @@ async function showProductionAssignModal(repairNum) {
         `;
     }
 
+    const cowokActive = String(tx.cowok_active).toUpperCase() === 'TRUE';
+    const cewekActive = String(tx.cewek_active).toUpperCase() === 'TRUE';
+    const cowokNeedsMetal = cowokActive && (isOrderTx || String(tx.cowok_is_reproduct).toUpperCase() === 'TRUE' || isQAFailed);
+    const cewekNeedsMetal = cewekActive && (isOrderTx || String(tx.cewek_is_reproduct).toUpperCase() === 'TRUE' || isQAFailed);
+
     let cowokReproFields = '';
-    if (String(tx.cowok_is_reproduct).toUpperCase() === 'TRUE' || isQAFailed) {
+    if (cowokNeedsMetal) {
+        const defaultCowokGram = isOrderTx
+            ? ((parseFloat(tx.cowok_weight) || 0) * (parseInt(tx.cowok_qty) || 1)).toFixed(2)
+            : '0';
+        const subHint = isOrderTx
+            ? `Order ${divMeta.shortLabel}: ${tx.cowok_qty || 1} pcs • Est. ${(parseFloat(tx.cowok_weight) || 0).toFixed(2)} gr/pcs • Finishing: ${tx.cowok_finishing || '-'}${tx.cowok_cad_ref ? ' • CAD: ' + tx.cowok_cad_ref : ''}`
+            : `Berat Bekas (Gudang HQ): <span id="spk-c-old">${tx.cowok_weight || 0}</span> gr | Target Baru: ${tx.cowok_target_weight || '-'} gr`;
+
         cowokReproFields = `
             <div style="background:var(--bg-light); padding:12px; border-radius:8px; margin-bottom:12px; border:1px solid rgba(197, 168, 92, 0.3);">
                 <strong><i class="fa-solid fa-mars"></i> SPK Cincin Pria (${tx.cowok_material || '-'})</strong><br/>
-                <small>Berat Bekas (Gudang HQ): <span id="spk-c-old">${tx.cowok_weight || 0}</span> gr | Target Baru: ${tx.cowok_target_weight || '-'} gr</small>
+                <small>${subHint}</small>
                 <div class="form-group" style="margin-top:10px; margin-bottom:4px;">
                     <label>Bahan Logam Baru dari Gudang (Gram Diserahkan)</label>
-                    <input type="number" id="crud-p-cowok-add" step="0.01" value="0" placeholder="0.00" oninput="document.getElementById('spk-c-total').textContent = parseFloat(this.value||0).toFixed(2)">
-                    <small>Total Modal Berat Awal Tukang: <strong id="spk-c-total" style="color:var(--gold);">0.00</strong> gr</small>
+                    <input type="number" id="crud-p-cowok-add" step="0.01" value="${defaultCowokGram}" placeholder="0.00" oninput="document.getElementById('spk-c-total').textContent = parseFloat(this.value||0).toFixed(2)">
+                    <small>Total Modal Berat Awal Tukang: <strong id="spk-c-total" style="color:var(--gold);">${parseFloat(defaultCowokGram).toFixed(2)}</strong> gr</small>
                 </div>
             </div>
         `;
     }
 
     let cewekReproFields = '';
-    if (String(tx.cewek_is_reproduct).toUpperCase() === 'TRUE' || isQAFailed) {
+    if (cewekNeedsMetal) {
+        const defaultCewekGram = isOrderTx
+            ? ((parseFloat(tx.cewek_weight) || 0) * (parseInt(tx.cewek_qty) || 1)).toFixed(2)
+            : '0';
+        const subHint = isOrderTx
+            ? `Order ${divMeta.shortLabel}: ${tx.cewek_qty || 1} pcs • Est. ${(parseFloat(tx.cewek_weight) || 0).toFixed(2)} gr/pcs • Finishing: ${tx.cewek_finishing || '-'}${tx.cewek_cad_ref ? ' • CAD: ' + tx.cewek_cad_ref : ''}`
+            : `Berat Bekas (Gudang HQ): <span id="spk-cw-old">${tx.cewek_weight || 0}</span> gr | Target Baru: ${tx.cewek_target_weight || '-'} gr`;
+
         cewekReproFields = `
             <div style="background:var(--bg-light); padding:12px; border-radius:8px; margin-bottom:12px; border:1px solid rgba(197, 168, 92, 0.3);">
                 <strong><i class="fa-solid fa-venus"></i> SPK Cincin Wanita (${tx.cewek_material || '-'})</strong><br/>
-                <small>Berat Bekas (Gudang HQ): <span id="spk-cw-old">${tx.cewek_weight || 0}</span> gr | Target Baru: ${tx.cewek_target_weight || '-'} gr</small>
+                <small>${subHint}</small>
                 <div class="form-group" style="margin-top:10px; margin-bottom:4px;">
                     <label>Bahan Logam Baru dari Gudang (Gram Diserahkan)</label>
-                    <input type="number" id="crud-p-cewek-add" step="0.01" value="0" placeholder="0.00" oninput="document.getElementById('spk-cw-total').textContent = parseFloat(this.value||0).toFixed(2)">
-                    <small>Total Modal Berat Awal Tukang: <strong id="spk-cw-total" style="color:var(--gold);">0.00</strong> gr</small>
+                    <input type="number" id="crud-p-cewek-add" step="0.01" value="${defaultCewekGram}" placeholder="0.00" oninput="document.getElementById('spk-cw-total').textContent = parseFloat(this.value||0).toFixed(2)">
+                    <small>Total Modal Berat Awal Tukang: <strong id="spk-cw-total" style="color:var(--gold);">${parseFloat(defaultCewekGram).toFixed(2)}</strong> gr</small>
                 </div>
             </div>
         `;
@@ -2538,6 +3329,7 @@ async function showProductionAssignModal(repairNum) {
     const fields = `
         <input type="hidden" id="crud-p-repnum" value="${repairNum}">
         ${qaFailedBanner}
+        <div style="margin-bottom:10px;">${renderDivisionBadgeHtml(tx)}</div>
         <div class="form-group">
             <label for="crud-p-wks">Pilih Bengkel Pengrajin (Workshop)</label>
             <select id="crud-p-wks" required>
@@ -2546,7 +3338,7 @@ async function showProductionAssignModal(repairNum) {
         </div>
         ${cowokReproFields}
         ${cewekReproFields}
-        ${String(tx.cowok_is_reproduct).toUpperCase() !== 'TRUE' && String(tx.cewek_is_reproduct).toUpperCase() !== 'TRUE' && !isQAFailed ? '<small style="color:var(--text-muted);"><i class="fa-solid fa-info-circle"></i> Repair biasa (bukan reproduksi), tidak membutuhkan input modal logam awal.</small>' : ''}
+        ${!cowokNeedsMetal && !cewekNeedsMetal ? '<small style="color:var(--text-muted);"><i class="fa-solid fa-info-circle"></i> Repair biasa (bukan reproduksi), tidak membutuhkan input modal logam awal.</small>' : ''}
     `;
 
     document.getElementById('crud-modal-title').textContent = `Delegasi Pengrajin & SPK (${repairNum})${isQAFailed ? ' [REVISI]' : ''}`;
@@ -2557,8 +3349,85 @@ async function showProductionAssignModal(repairNum) {
     crudModal.dataset.crudType = 'PRODUCTION_ASSIGN';
 }
 
+function updateCollectivePrintState() {
+    const anyChecked = Array.from(document.querySelectorAll('.logistic-checkbox'))
+        .filter((cb) => cb.id !== 'chk-logistic-select-all')
+        .some((cb) => cb.checked);
+    const btn = document.getElementById('btn-logistic-print-collective');
+    if (btn) btn.disabled = !anyChecked;
+}
+
+function toggleSelectAllLogistic(e) {
+    const checked = e.target.checked;
+    document.querySelectorAll('.logistic-checkbox').forEach((cb) => (cb.checked = checked));
+    updateCollectivePrintState();
+}
+
+async function printCollectiveLogistic() {
+    const selected = Array.from(document.querySelectorAll('.logistic-checkbox'))
+        .filter((cb) => cb.id !== 'chk-logistic-select-all' && cb.checked && cb.dataset.id)
+        .map((cb) => cb.dataset.id);
+    const txs = (await getAllTransactions()) || [];
+    const targetIds = selected.length > 0 ? selected : txs.map((t) => t.repair_number);
+    if (targetIds.length === 0) {
+        showToast('Tidak ada data pengiriman untuk dicetak.', 'warning');
+        return;
+    }
+    const groups = {};
+    targetIds.forEach((id) => {
+        const tx = txs.find((t) => t.repair_number === id);
+        if (!tx) return;
+        const branch = tx.store_sales_name || 'Cabang Lain';
+        if (!groups[branch]) groups[branch] = [];
+        groups[branch].push(tx);
+    });
+    let html = '';
+    for (const branch in groups) {
+        const orders = groups[branch];
+        html += `<h2>Surat Jalan Kolektif - ${branch}</h2>`;
+        html +=
+            '<table class="print-table" style="width:100%; border-collapse:collapse; margin-bottom:20px;">' +
+            '<thead><tr><th>No</th><th>No. Transaksi</th><th>Divisi</th><th>Customer</th><th>Alamat</th><th>Berat Awal</th><th>Berat Akhir</th><th>Residu</th></tr></thead><tbody>';
+        orders.forEach((tx, idx) => {
+            const divMeta = getDivisionMeta(tx);
+            const beratAwal =
+                String(tx.cowok_active).toUpperCase() === 'TRUE'
+                    ? tx.cowok_weight
+                    : String(tx.cewek_active).toUpperCase() === 'TRUE'
+                      ? tx.cewek_weight
+                      : '-';
+            const beratAkhir = tx.cowok_weight_final || tx.cewek_weight_final || '-';
+            const residu =
+                tx.cowok_weight && tx.cowok_weight_final
+                    ? (tx.cowok_weight - tx.cowok_weight_final - 0.2).toFixed(2)
+                    : tx.cewek_weight && tx.cewek_weight_final
+                      ? (tx.cewek_weight - tx.cewek_weight_final - 0.2).toFixed(2)
+                      : '-';
+            html += `<tr><td>${idx + 1}</td><td>${tx.repair_number}</td><td>${divMeta.shortLabel}</td><td>${tx.customer_name}</td><td>${tx.customer_address}, ${tx.customer_city}</td><td>${beratAwal}g</td><td>${beratAkhir}g</td><td>${residu}g</td></tr>`;
+        });
+        html += '</tbody></table>';
+        html += '<div class="label-section">';
+        orders.forEach((tx) => {
+            html += `<div class="label" style="border:1px solid #000; padding:8px; margin:5px; width:250px;">
+            <strong>${branch} (${getDivisionMeta(tx).shortLabel})</strong><br/>
+            ${tx.customer_name}<br/>
+            ${tx.customer_address}<br/>
+            ${tx.customer_city}<br/>
+            Resi: ${tx.logistic_receipt_no || '---'}
+        </div>`;
+        });
+        html += '</div>';
+    }
+    const modalBody = document.getElementById('print-receipt-body');
+    if (modalBody) modalBody.innerHTML = html;
+    const printModal = document.getElementById('print-modal');
+    if (printModal) printModal.classList.remove('hidden');
+}
+
 async function renderLogisticBoard() {
-    const list = await getLocalData('repair_transactions');
+    const allTx = await getAllTransactions();
+    const divFilter = document.getElementById('log-division-filter')?.value || 'ALL';
+    const list = divFilter === 'ALL' ? allTx : allTx.filter((tx) => getTransactionDivision(tx) === divFilter);
     list.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
 
     const tbody = document.getElementById('tbody-logistic-list');
@@ -2576,7 +3445,10 @@ async function renderLogisticBoard() {
         const tr = document.createElement('tr');
         tr.innerHTML = `
             <td class="logistic-checkbox-col" style="text-align:center;"><input type="checkbox" class="logistic-checkbox" data-id="${tx.repair_number}"></td>
-            <td><strong>${tx.repair_number}</strong></td>
+            <td>
+                <strong>${tx.repair_number}</strong>
+                <div style="margin-top:4px;">${renderDivisionBadgeHtml(tx)}</div>
+            </td>
             <td>${tx.customer_name}</td>
             <td>
                 <div style="font-size:11.5px;">${tx.customer_address}</div>
@@ -2588,24 +3460,18 @@ async function renderLogisticBoard() {
             </td>
             <td><span class="${badgeClass}">${statusLabel}</span></td>
             <td><strong>${trackingNum}</strong></td>
-            <td>
+            <td style="text-align:center;">
                 <div class="action-buttons-flex">
                     <button class="action-btn-circle btn-log-ship" data-id="${tx.repair_number}" title="Input Nomor Resi Kurir"><i class="fa-solid fa-truck-fast"></i></button>
                     <button class="action-btn-circle" style="background:linear-gradient(135deg,#c5a85c,#e0c97a);color:#1a1a1a;" onclick="printIndividualLogistic('${tx.repair_number}')" title="Cetak Surat Jalan Individual"><i class="fa-solid fa-file-invoice"></i></button>
                 </div>
             </td>
-            <td>${String(tx.cowok_active).toUpperCase() === 'TRUE' ? `${tx.cowok_weight}g` : ''}</td>
-            <td>${tx.cowok_weight_final ? `${tx.cowok_weight_final}g` : ''}</td>
-            <td>${tx.cowok_weight && tx.cowok_weight_final ? (tx.cowok_weight - tx.cowok_weight_final - 0.2).toFixed(2) + 'g' : ''}</td>
-            <td>${String(tx.cewek_active).toUpperCase() === 'TRUE' ? `${tx.cewek_weight}g` : ''}</td>
-            <td>${tx.cewek_weight_final ? `${tx.cewek_weight_final}g` : ''}</td>
-            <td>${tx.cewek_weight && tx.cewek_weight_final ? (tx.cewek_weight - tx.cewek_weight_final - 0.2).toFixed(2) + 'g' : ''}</td>
         `;
         tbody.appendChild(tr);
     });
 
     if (count === 0) {
-        tbody.innerHTML = `<tr class="table-empty-row"><td colspan="7">Belum ada pengiriman paket.</td></tr>`;
+        tbody.innerHTML = `<tr class="table-empty-row"><td colspan="8">Belum ada pengiriman paket.</td></tr>`;
     }
 
     // Attach listeners
@@ -2614,83 +3480,20 @@ async function renderLogisticBoard() {
     });
     // Collective print and checkbox listeners
     const collectivePrintBtn = document.getElementById('btn-logistic-print-collective');
-    if (collectivePrintBtn) collectivePrintBtn.addEventListener('click', printCollectiveLogistic);
+    if (collectivePrintBtn && !collectivePrintBtn.dataset.bound) {
+        collectivePrintBtn.dataset.bound = 'true';
+        collectivePrintBtn.addEventListener('click', printCollectiveLogistic);
+    }
     const selectAllChk = document.getElementById('chk-logistic-select-all');
-    if (selectAllChk) selectAllChk.addEventListener('change', toggleSelectAllLogistic);
+    if (selectAllChk && !selectAllChk.dataset.bound) {
+        selectAllChk.dataset.bound = 'true';
+        selectAllChk.addEventListener('change', toggleSelectAllLogistic);
+    }
     document.querySelectorAll('.logistic-checkbox').forEach((cb) => {
-        cb.addEventListener('change', updateCollectivePrintState);
-    });
-
-    // --------------------------------------------------------------------------
-    // Helper functions for Logistic checkbox selection and collective printing
-    // --------------------------------------------------------------------------
-    function toggleSelectAllLogistic(e) {
-        const checked = e.target.checked;
-        document.querySelectorAll('.logistic-checkbox').forEach((cb) => (cb.checked = checked));
-        updateCollectivePrintState();
-    }
-
-    function updateCollectivePrintState() {
-        const anyChecked = Array.from(document.querySelectorAll('.logistic-checkbox')).some((cb) => cb.checked);
-        const btn = document.getElementById('btn-logistic-print-collective');
-        if (btn) btn.disabled = !anyChecked;
-    }
-
-    function printCollectiveLogistic() {
-        const selected = Array.from(document.querySelectorAll('.logistic-checkbox'))
-            .filter((cb) => cb.checked)
-            .map((cb) => cb.dataset.id);
-        if (selected.length === 0) return;
-        const txs = State.masterData.repair_transactions || [];
-        const groups = {};
-        selected.forEach((id) => {
-            const tx = txs.find((t) => t.repair_number === id);
-            if (!tx) return;
-            const branch = tx.store_sales_name || 'Cabang Lain';
-            if (!groups[branch]) groups[branch] = [];
-            groups[branch].push(tx);
-        });
-        let html = '';
-        for (const branch in groups) {
-            const orders = groups[branch];
-            html += `<h2>Surat Jalan Kolektif - ${branch}</h2>`;
-            html +=
-                '<table class="print-table" style="width:100%; border-collapse:collapse; margin-bottom:20px;">' +
-                '<thead><tr><th>No</th><th>Repair #</th><th>Customer</th><th>Alamat</th><th>Berat Awal</th><th>Berat Akhir</th><th>Residu</th></tr></thead><tbody>';
-            orders.forEach((tx, idx) => {
-                const beratAwal =
-                    String(tx.cowok_active).toUpperCase() === 'TRUE'
-                        ? tx.cowok_weight
-                        : String(tx.cewek_active).toUpperCase() === 'TRUE'
-                          ? tx.cewek_weight
-                          : '-';
-                const beratAkhir = tx.cowok_weight_final || tx.cewek_weight_final || '-';
-                const residu =
-                    tx.cowok_weight && tx.cowok_weight_final
-                        ? (tx.cowok_weight - tx.cowok_weight_final - 0.2).toFixed(2)
-                        : tx.cewek_weight && tx.cewek_weight_final
-                          ? (tx.cewek_weight - tx.cewek_weight_final - 0.2).toFixed(2)
-                          : '-';
-                html += `<tr><td>${idx + 1}</td><td>${tx.repair_number}</td><td>${tx.customer_name}</td><td>${tx.customer_address}, ${tx.customer_city}</td><td>${beratAwal}g</td><td>${beratAkhir}g</td><td>${residu}g</td></tr>`;
-            });
-            html += '</tbody></table>';
-            html += '<div class="label-section">';
-            orders.forEach((tx) => {
-                html += `<div class="label" style="border:1px solid #000; padding:8px; margin:5px; width:250px;">
-                <strong>${branch}</strong><br/>
-                ${tx.customer_name}<br/>
-                ${tx.customer_address}<br/>
-                ${tx.customer_city}<br/>
-                Resi: ${tx.logistic_receipt_no || '---'}
-            </div>`;
-            });
-            html += '</div>';
+        if (cb.id !== 'chk-logistic-select-all') {
+            cb.addEventListener('change', updateCollectivePrintState);
         }
-        const modalBody = document.getElementById('print-receipt-body');
-        if (modalBody) modalBody.innerHTML = html;
-        const printModal = document.getElementById('print-modal');
-        if (printModal) printModal.classList.remove('hidden');
-    }
+    });
 }
 
 function showLogisticShipModal(repairNum) {
@@ -2718,20 +3521,23 @@ function showLogisticShipModal(repairNum) {
 async function showReceiptPrintModal(repairNum, type = 'RECEIPT', mockTx = null) {
     let tx = mockTx;
     if (!tx) {
-        const txs = await getLocalData('repair_transactions');
-        tx = txs.find((t) => t.repair_number === repairNum);
+        tx = await getTransactionByNumber(repairNum);
     }
     if (!tx) return;
+
+    const txDiv = getTransactionDivision(tx);
+    const isOrderTx = isNewOrderTransaction(tx);
+    const divMeta = getDivisionMeta(txDiv);
 
     // Fetch related production jobs to show verified modal awal / SPK history
     const allProdJobs = (await getLocalData('master_productionjobs')) || [];
     const repairJobs = allProdJobs.filter((j) => j.repair_number === tx.repair_number);
     const cowokJob = repairJobs
         .filter((j) => j.id.includes('COWOK') || (tx.cowok_material && j.metal_id === tx.cowok_material))
-        .sort((a, b) => new Date(b.date || 0) - new Date(a.date || 0))[0];
+        .toSorted((a, b) => new Date(b.date || 0) - new Date(a.date || 0))[0];
     const cewekJob = repairJobs
         .filter((j) => j.id.includes('CEWEK') || (tx.cewek_material && j.metal_id === tx.cewek_material))
-        .sort((a, b) => new Date(b.date || 0) - new Date(a.date || 0))[0];
+        .toSorted((a, b) => new Date(b.date || 0) - new Date(a.date || 0))[0];
 
     const isRevision = (parseInt(tx.revision_count) || 0) > 0 || (tx.qa_status && tx.qa_status.includes('Failed'));
 
@@ -2747,6 +3553,10 @@ async function showReceiptPrintModal(repairNum, type = 'RECEIPT', mockTx = null)
     const isCewek = String(tx.cewek_active).toUpperCase() === 'TRUE';
     const isCowokRepro = String(tx.cowok_is_reproduct).toUpperCase() === 'TRUE';
     const isCewekRepro = String(tx.cewek_is_reproduct).toUpperCase() === 'TRUE';
+    const cowokQty = Math.max(1, parseInt(tx.cowok_qty) || 1);
+    const cewekQty = Math.max(1, parseInt(tx.cewek_qty) || 1);
+    const dpTotal = (parseFloat(tx.dp1_amount) || 0) + (parseFloat(tx.dp2_amount) || 0);
+    const totalPrice = parseFloat(tx.total_price) || 0;
 
     // Build extra items rows html
     const addItems = JSON.parse(tx.additional_items_json || '[]');
@@ -2766,7 +3576,18 @@ async function showReceiptPrintModal(repairNum, type = 'RECEIPT', mockTx = null)
         itemsRowsHtml = `<tr><td colspan="4" style="text-align:center; color:#777;">Tidak ada barang/jasa tambahan</td></tr>`;
     }
 
-    const receiptTitle = type === 'FORM' ? 'SURAT PENGERJAAN REPAIR & SPK WORKSHOP' : 'BUKTI TANDA TERIMA REPAIR';
+    const receiptTitle =
+        type === 'FORM'
+            ? txDiv === 'HANDMADE'
+                ? 'SPK PENGERJAAN ORDER HANDMADE'
+                : txDiv === 'CASTING'
+                  ? 'SPK PENGERJAAN ORDER CASTING'
+                  : 'SURAT PENGERJAAN REPAIR & SPK WORKSHOP'
+            : txDiv === 'HANDMADE'
+              ? 'BUKTI TANDA TERIMA ORDER HANDMADE'
+              : txDiv === 'CASTING'
+                ? 'BUKTI TANDA TERIMA ORDER CASTING'
+                : 'BUKTI TANDA TERIMA REPAIR';
 
     const revisionBannerHtml = isRevision && type === 'FORM' ? `
         <div style="background: rgba(220, 53, 69, 0.08); border: 2px dashed #dc3545; border-radius: 6px; padding: 10px 14px; margin-bottom: 14px; text-align: center;">
@@ -2790,8 +3611,9 @@ async function showReceiptPrintModal(repairNum, type = 'RECEIPT', mockTx = null)
                 </div>
                 <div class="preview-tx-meta">
                     <h3 style="text-transform:uppercase;">${receiptTitle}</h3>
+                    <p><strong>Divisi:</strong> ${divMeta.label}</p>
                     <p><strong>Nomor:</strong> ${tx.repair_number}</p>
-                    <p><strong>Tanggal Repair:</strong> ${formatSimpleDate(tx.date)}</p>
+                    <p><strong>${isOrderTx ? 'Tanggal Order' : 'Tanggal Repair'}:</strong> ${formatSimpleDate(tx.date)}</p>
                     <p><strong>Target Deadline:</strong> <span style="color:#e67e22; font-weight:700;">${formatSimpleDate(tx.deadline)}</span></p>
                     ${workshopAssignMeta}
                 </div>
@@ -2826,14 +3648,50 @@ async function showReceiptPrintModal(repairNum, type = 'RECEIPT', mockTx = null)
                             <span>Bahan Logam:</span>
                             <strong>${cowokMetal ? cowokMetal.name : '-'}</strong>
                         </div>
-                        ${type === 'FORM' ? `
+                        ${
+                            isOrderTx
+                                ? type === 'FORM'
+                                    ? `
+                        <div class="preview-details-row">
+                            <span>Sifat Pengerjaan:</span>
+                            <strong><span style="color:var(--gold);">${txDiv === 'CASTING' ? 'ORDER CASTING / CETAK' : 'ORDER HANDMADE'}</span></strong>
+                        </div>
+                        <div class="preview-details-row">
+                            <span>Jumlah (Qty):</span>
+                            <strong>${cowokQty} pcs</strong>
+                        </div>
+                        <div class="preview-details-row">
+                            <span>Modal Logam Awal (Tukang):</span>
+                            <strong style="color:var(--gold); font-size:12.5px;">${cowokJob ? cowokJob.initial_gram + ' gram' : 'Menunggu penyerahan bahan'}</strong>
+                        </div>
+                        <div class="preview-details-row">
+                            <span>Est. Berat Pesanan:</span>
+                            <strong>${tx.cowok_weight || 0} gr/pcs (${((parseFloat(tx.cowok_weight) || 0) * cowokQty).toFixed(2).replace(/\.00$/, '')} gr total)</strong>
+                        </div>
+                        <div class="preview-details-row">
+                            <span>Target Berat Jadi:</span>
+                            <strong>${tx.cowok_target_weight ? tx.cowok_target_weight + ' gram' : (tx.cowok_weight || 0) + ' gr/pcs'}</strong>
+                        </div>
+                        `
+                                    : `
+                        <div class="preview-details-row">
+                            <span>Jumlah (Qty):</span>
+                            <strong>${cowokQty} pcs</strong>
+                        </div>
+                        <div class="preview-details-row">
+                            <span>Estimasi Berat:</span>
+                            <strong>${tx.cowok_weight || 0} gram</strong>
+                        </div>
+                        `
+                                : type === 'FORM'
+                                  ? `
                         <div class="preview-details-row">
                             <span>Sifat Pengerjaan:</span>
                             <strong>${isCowokRepro ? '<span style="color:#e67e22;">PRODUKSI ULANG (REMAKE)</span>' : 'REPAIR REGULER'}</strong>
                         </div>
                         <div class="preview-details-row">
                             <span>Modal Logam Awal (Tukang):</span>
-                            <strong style="color:var(--gold); font-size:12.5px;">${cowokJob ? cowokJob.initial_gram + ' gram' : (isCowokRepro ? 'Menunggu penyerahan bahan' : (tx.cowok_weight || 0) + ' gram')}</strong>
+                            <strong style="color:var(--gold); font-size:12.5px;">${cowokJob ? cowokJob.initial_gram + ' gram' : isCowokRepro ? 'Menunggu penyerahan bahan' : (tx.cowok_weight || 0) + ' gram'}</strong>
                         </div>
                         <div class="preview-details-row">
                             <span>Berat Cincin Lama (HQ):</span>
@@ -2843,20 +3701,47 @@ async function showReceiptPrintModal(repairNum, type = 'RECEIPT', mockTx = null)
                             <span>Target Berat Jadi:</span>
                             <strong>${tx.cowok_target_weight ? tx.cowok_target_weight + ' gram' : '-'}</strong>
                         </div>
-                        ` : `
+                        `
+                                  : `
                         <div class="preview-details-row">
                             <span>Berat Cincin:</span>
                             <strong>${tx.cowok_weight} gram</strong>
                         </div>
-                        `}
+                        `
+                        }
                         <div class="preview-details-row">
                             <span>Ukuran Cincin:</span>
                             <strong>${tx.cowok_size}</strong>
                         </div>
+                        ${
+                            isOrderTx
+                                ? `
+                        <div class="preview-details-row">
+                            <span>Finishing:</span>
+                            <strong>${tx.cowok_finishing || 'Polished'}</strong>
+                        </div>
+                        <div class="preview-details-row">
+                            <span>Permata / Batu:</span>
+                            <strong>${tx.cowok_stone_spec || 'Tanpa Permata'}${parseFloat(tx.cowok_stone_fee) > 0 ? ' (' + formatRupiah(tx.cowok_stone_fee) + ')' : ''}</strong>
+                        </div>
+                        ${
+                            txDiv === 'CASTING'
+                                ? `
+                        <div class="preview-details-row">
+                            <span>Kode Desain CAD:</span>
+                            <strong>${tx.cowok_cad_ref || '-'}</strong>
+                        </div>
+                        `
+                                : ''
+                        }
+                        `
+                                : `
                         <div class="preview-details-row">
                             <span>Jenis Repair:</span>
                             <strong>${cowokRep ? cowokRep.name : '-'}</strong>
                         </div>
+                        `
+                        }
                         <div class="preview-details-row">
                             <span>Grafir Ukir Nama:</span>
                             <strong>${tx.cowok_engraving || 'Tidak ada'}</strong>
@@ -2871,7 +3756,7 @@ async function showReceiptPrintModal(repairNum, type = 'RECEIPT', mockTx = null)
                             tx.cowok_image_url && type === 'FORM'
                                 ? `
                         <div style="margin-top:10px;">
-                            <span><strong>Model Model Cincin:</strong></span>
+                            <span><strong>Model Cincin:</strong></span>
                             <div class="preview-ring-model-img">
                                 <img src="${resolveImageUrl(tx.cowok_image_url)}" alt="Model Cowok">
                             </div>
@@ -2890,14 +3775,50 @@ async function showReceiptPrintModal(repairNum, type = 'RECEIPT', mockTx = null)
                             <span>Bahan Logam:</span>
                             <strong>${cewekMetal ? cewekMetal.name : '-'}</strong>
                         </div>
-                        ${type === 'FORM' ? `
+                        ${
+                            isOrderTx
+                                ? type === 'FORM'
+                                    ? `
+                        <div class="preview-details-row">
+                            <span>Sifat Pengerjaan:</span>
+                            <strong><span style="color:var(--gold);">${txDiv === 'CASTING' ? 'ORDER CASTING / CETAK' : 'ORDER HANDMADE'}</span></strong>
+                        </div>
+                        <div class="preview-details-row">
+                            <span>Jumlah (Qty):</span>
+                            <strong>${cewekQty} pcs</strong>
+                        </div>
+                        <div class="preview-details-row">
+                            <span>Modal Logam Awal (Tukang):</span>
+                            <strong style="color:var(--gold); font-size:12.5px;">${cewekJob ? cewekJob.initial_gram + ' gram' : 'Menunggu penyerahan bahan'}</strong>
+                        </div>
+                        <div class="preview-details-row">
+                            <span>Est. Berat Pesanan:</span>
+                            <strong>${tx.cewek_weight || 0} gr/pcs (${((parseFloat(tx.cewek_weight) || 0) * cewekQty).toFixed(2).replace(/\.00$/, '')} gr total)</strong>
+                        </div>
+                        <div class="preview-details-row">
+                            <span>Target Berat Jadi:</span>
+                            <strong>${tx.cewek_target_weight ? tx.cewek_target_weight + ' gram' : (tx.cewek_weight || 0) + ' gr/pcs'}</strong>
+                        </div>
+                        `
+                                    : `
+                        <div class="preview-details-row">
+                            <span>Jumlah (Qty):</span>
+                            <strong>${cewekQty} pcs</strong>
+                        </div>
+                        <div class="preview-details-row">
+                            <span>Estimasi Berat:</span>
+                            <strong>${tx.cewek_weight || 0} gram</strong>
+                        </div>
+                        `
+                                : type === 'FORM'
+                                  ? `
                         <div class="preview-details-row">
                             <span>Sifat Pengerjaan:</span>
                             <strong>${isCewekRepro ? '<span style="color:#e67e22;">PRODUKSI ULANG (REMAKE)</span>' : 'REPAIR REGULER'}</strong>
                         </div>
                         <div class="preview-details-row">
                             <span>Modal Logam Awal (Tukang):</span>
-                            <strong style="color:var(--gold); font-size:12.5px;">${cewekJob ? cewekJob.initial_gram + ' gram' : (isCewekRepro ? 'Menunggu penyerahan bahan' : (tx.cewek_weight || 0) + ' gram')}</strong>
+                            <strong style="color:var(--gold); font-size:12.5px;">${cewekJob ? cewekJob.initial_gram + ' gram' : isCewekRepro ? 'Menunggu penyerahan bahan' : (tx.cewek_weight || 0) + ' gram'}</strong>
                         </div>
                         <div class="preview-details-row">
                             <span>Berat Cincin Lama (HQ):</span>
@@ -2907,20 +3828,47 @@ async function showReceiptPrintModal(repairNum, type = 'RECEIPT', mockTx = null)
                             <span>Target Berat Jadi:</span>
                             <strong>${tx.cewek_target_weight ? tx.cewek_target_weight + ' gram' : '-'}</strong>
                         </div>
-                        ` : `
+                        `
+                                  : `
                         <div class="preview-details-row">
                             <span>Berat Cincin:</span>
                             <strong>${tx.cewek_weight} gram</strong>
                         </div>
-                        `}
+                        `
+                        }
                         <div class="preview-details-row">
                             <span>Ukuran Cincin:</span>
                             <strong>${tx.cewek_size}</strong>
                         </div>
+                        ${
+                            isOrderTx
+                                ? `
+                        <div class="preview-details-row">
+                            <span>Finishing:</span>
+                            <strong>${tx.cewek_finishing || 'Polished'}</strong>
+                        </div>
+                        <div class="preview-details-row">
+                            <span>Permata / Batu:</span>
+                            <strong>${tx.cewek_stone_spec || 'Tanpa Permata'}${parseFloat(tx.cewek_stone_fee) > 0 ? ' (' + formatRupiah(tx.cewek_stone_fee) + ')' : ''}</strong>
+                        </div>
+                        ${
+                            txDiv === 'CASTING'
+                                ? `
+                        <div class="preview-details-row">
+                            <span>Kode Desain CAD:</span>
+                            <strong>${tx.cewek_cad_ref || '-'}</strong>
+                        </div>
+                        `
+                                : ''
+                        }
+                        `
+                                : `
                         <div class="preview-details-row">
                             <span>Jenis Repair:</span>
                             <strong>${cewekRep ? cewekRep.name : '-'}</strong>
                         </div>
+                        `
+                        }
                         <div class="preview-details-row">
                             <span>Grafir Ukir Nama:</span>
                             <strong>${tx.cewek_engraving || 'Tidak ada'}</strong>
@@ -2935,7 +3883,7 @@ async function showReceiptPrintModal(repairNum, type = 'RECEIPT', mockTx = null)
                             tx.cewek_image_url && type === 'FORM'
                                 ? `
                         <div style="margin-top:10px;">
-                            <span><strong>Model Model Cincin:</strong></span>
+                            <span><strong>Model Cincin:</strong></span>
                             <div class="preview-ring-model-img">
                                 <img src="${resolveImageUrl(tx.cewek_image_url)}" alt="Model Cewek">
                             </div>
@@ -2988,10 +3936,10 @@ async function showReceiptPrintModal(repairNum, type = 'RECEIPT', mockTx = null)
                     <tbody>
                         ${isCowok ? `
                         <tr>
-                            <td style="padding:6px; font-weight:600;">Cincin Cowok</td>
+                            <td style="padding:6px; font-weight:600;">Cincin Cowok${isOrderTx && cowokQty > 1 ? ` (${cowokQty} pcs)` : ''}</td>
                             <td style="padding:6px;">${cowokMetal ? cowokMetal.name : '-'}</td>
-                            <td style="padding:6px; text-align:center; font-weight:bold; color:#2c3e50;">${cowokJob ? cowokJob.initial_gram + ' gr' : (isCowokRepro ? '-' : (tx.cowok_weight || 0) + ' gr')}</td>
-                            <td style="padding:6px; text-align:center;">${tx.cowok_target_weight ? tx.cowok_target_weight + ' gr' : '-'}</td>
+                            <td style="padding:6px; text-align:center; font-weight:bold; color:#2c3e50;">${cowokJob ? cowokJob.initial_gram + ' gr' : isOrderTx || isCowokRepro ? '-' : (tx.cowok_weight || 0) + ' gr'}</td>
+                            <td style="padding:6px; text-align:center;">${tx.cowok_target_weight ? tx.cowok_target_weight + ' gr' : isOrderTx && tx.cowok_weight ? tx.cowok_weight + ' gr/pcs' : '-'}</td>
                             <td style="padding:6px; text-align:center; color:#777;">[Diisi saat selesai]</td>
                             <td style="padding:6px; text-align:center; color:#777;">[Diisi saat selesai]</td>
                             <td style="padding:6px; text-align:center; color:#777;">[Diisi saat selesai]</td>
@@ -3000,10 +3948,10 @@ async function showReceiptPrintModal(repairNum, type = 'RECEIPT', mockTx = null)
                         ` : ''}
                         ${isCewek ? `
                         <tr>
-                            <td style="padding:6px; font-weight:600;">Cincin Cewek</td>
+                            <td style="padding:6px; font-weight:600;">Cincin Cewek${isOrderTx && cewekQty > 1 ? ` (${cewekQty} pcs)` : ''}</td>
                             <td style="padding:6px;">${cewekMetal ? cewekMetal.name : '-'}</td>
-                            <td style="padding:6px; text-align:center; font-weight:bold; color:#2c3e50;">${cewekJob ? cewekJob.initial_gram + ' gr' : (isCewekRepro ? '-' : (tx.cewek_weight || 0) + ' gr')}</td>
-                            <td style="padding:6px; text-align:center;">${tx.cewek_target_weight ? tx.cewek_target_weight + ' gr' : '-'}</td>
+                            <td style="padding:6px; text-align:center; font-weight:bold; color:#2c3e50;">${cewekJob ? cewekJob.initial_gram + ' gr' : isOrderTx || isCewekRepro ? '-' : (tx.cewek_weight || 0) + ' gr'}</td>
+                            <td style="padding:6px; text-align:center;">${tx.cewek_target_weight ? tx.cewek_target_weight + ' gr' : isOrderTx && tx.cewek_weight ? tx.cewek_weight + ' gr/pcs' : '-'}</td>
                             <td style="padding:6px; text-align:center; color:#777;">[Diisi saat selesai]</td>
                             <td style="padding:6px; text-align:center; color:#777;">[Diisi saat selesai]</td>
                             <td style="padding:6px; text-align:center; color:#777;">[Diisi saat selesai]</td>
@@ -3041,7 +3989,7 @@ async function showReceiptPrintModal(repairNum, type = 'RECEIPT', mockTx = null)
             <div class="preview-pricing-grid">
                 <div>
                     <p style="font-size: 11px; line-height: 1.5; color:#555;">
-                        * **Syarat & Ketentuan Repair Cincin SOVIA JEWELRY:**<br>
+                        * <strong>Syarat & Ketentuan ${isOrderTx ? divMeta.label : 'Repair Cincin'} SOVIA JEWELRY:</strong><br>
                         1. Periksa kembali ukuran cincin, ukir nama, dan logam saat penerimaan resi ini.<br>
                         2. Pekerjaan disesuaikan dengan instruksi tertulis di form ini.<br>
                         3. Pengambilan barang wajib melampirkan resi fisik / digital ini.
@@ -3067,15 +4015,15 @@ async function showReceiptPrintModal(repairNum, type = 'RECEIPT', mockTx = null)
                     </div>
                     <div class="preview-cost-line total">
                         <span>Total Tagihan:</span>
-                        <h3>${formatRupiah(tx.total_price)}</h3>
+                        <h3>${formatRupiah(totalPrice)}</h3>
                     </div>
                     <div class="preview-cost-line" style="color:var(--green); font-weight:700;">
                         <span>Jumlah DP Dibayarkan:</span>
-                        <strong>${formatRupiah(tx.dp1_amount + tx.dp2_amount)}</strong>
+                        <strong>${formatRupiah(dpTotal)}</strong>
                     </div>
                     <div class="preview-cost-line" style="border-top:1px dashed rgba(0,0,0,0.1); padding-top:6px; font-weight:700;">
                         <span>Sisa Pembayaran:</span>
-                        <strong>${formatRupiah(tx.total_price - (tx.dp1_amount + tx.dp2_amount))}</strong>
+                        <strong>${formatRupiah(totalPrice - dpTotal)}</strong>
                     </div>
                 </div>
             </div>
@@ -3103,9 +4051,17 @@ async function showReceiptPrintModal(repairNum, type = 'RECEIPT', mockTx = null)
 
 // Builds formatted WhatsApp templates and calls WA direct linking protocol
 async function triggerWhatsAppNotification(repairNum) {
-    const txs = await getLocalData('repair_transactions');
-    const tx = txs.find((t) => t.repair_number === repairNum);
+    const tx = await getTransactionByNumber(repairNum);
     if (!tx) return;
+
+    const txDiv = getTransactionDivision(tx);
+    const isOrderTx = isNewOrderTransaction(tx);
+    const divHeader =
+        txDiv === 'HANDMADE'
+            ? 'NOTA TRANSAKSI ORDER HANDMADE'
+            : txDiv === 'CASTING'
+              ? 'NOTA TRANSAKSI ORDER CASTING'
+              : 'NOTA TRANSAKSI REPAIR CINCIN';
 
     // Clean phone number (replace starting '0' with country code '62')
     let rawPhone = tx.customer_phone.trim().replace(/[^0-9]/g, '');
@@ -3113,31 +4069,46 @@ async function triggerWhatsAppNotification(repairNum) {
         rawPhone = '62' + rawPhone.substring(1);
     }
 
-    const dpTotal = tx.dp1_amount + tx.dp2_amount;
-    const remaining = tx.total_price - dpTotal;
+    const dpTotal = (parseFloat(tx.dp1_amount) || 0) + (parseFloat(tx.dp2_amount) || 0);
+    const totalPrice = parseFloat(tx.total_price) || 0;
+    const remaining = totalPrice - dpTotal;
 
     // Build message body
-    let msg = `*NOTA TRANSAKSI REPAIR CINCIN - SOVIA JEWELRY*\n`;
+    let msg = `*${divHeader} - SOVIA JEWELRY*\n`;
     msg += `------------------------------------------------------------\n`;
     msg += `Halo Kak *${tx.customer_name}*,\n`;
-    msg += `Terima kasih telah mempercayakan perbaikan cincin Anda di SOVIA JEWELRY. Berikut adalah rincian data transaksi repair Anda:\n\n`;
-    msg += `*Nomor Repair:* ${tx.repair_number}\n`;
+    msg += isOrderTx
+        ? `Terima kasih telah mempercayakan pembuatan cincin Anda di SOVIA JEWELRY. Berikut adalah rincian data pesanan Anda:\n\n`
+        : `Terima kasih telah mempercayakan perbaikan cincin Anda di SOVIA JEWELRY. Berikut adalah rincian data transaksi repair Anda:\n\n`;
+    msg += `*${isOrderTx ? 'Nomor Order' : 'Nomor Repair'}:* ${tx.repair_number}\n`;
     msg += `*Tanggal Masuk:* ${formatSimpleDate(tx.date)}\n`;
     msg += `*Target Selesai:* ${formatSimpleDate(tx.deadline)}\n`;
-    msg += `*Sales Terkait:* ${tx.store_sales_name.split(' (')[0]}\n\n`;
+    msg += `*Sales Terkait:* ${(tx.store_sales_name || '').split(' (')[0]}\n\n`;
 
     if (String(tx.cowok_active).toUpperCase() === 'TRUE') {
         const metal = State.masterData.metals.find((m) => m.id === tx.cowok_material);
         const rep = State.masterData.repairs.find((r) => r.id === tx.cowok_repair_type);
-        msg += `*Cincin Cowok:* ${metal?.name || ''} (Sz: ${tx.cowok_size})\n`;
-        msg += `- Layanan: ${rep?.name || ''}\n`;
+        msg += `*Cincin Cowok:* ${metal?.name || ''} (Sz: ${tx.cowok_size}${isOrderTx ? `, Qty: ${Math.max(1, parseInt(tx.cowok_qty) || 1)} pcs` : ''})\n`;
+        if (isOrderTx) {
+            msg += `- Est. Berat: ${tx.cowok_weight || 0} gr | Finishing: ${tx.cowok_finishing || 'Polished'}\n`;
+            if (tx.cowok_stone_spec) msg += `- Permata: ${tx.cowok_stone_spec}\n`;
+            if (txDiv === 'CASTING' && tx.cowok_cad_ref) msg += `- Kode CAD: ${tx.cowok_cad_ref}\n`;
+        } else {
+            msg += `- Layanan: ${rep?.name || (String(tx.cowok_is_reproduct).toUpperCase() === 'TRUE' ? 'Produksi Ulang (Re-Product)' : '-')}\n`;
+        }
         if (tx.cowok_engraving) msg += `- Ukir Nama: "${tx.cowok_engraving}"\n`;
     }
     if (String(tx.cewek_active).toUpperCase() === 'TRUE') {
         const metal = State.masterData.metals.find((m) => m.id === tx.cewek_material);
         const rep = State.masterData.repairs.find((r) => r.id === tx.cewek_repair_type);
-        msg += `*Cincin Cewek:* ${metal?.name || ''} (Sz: ${tx.cewek_size})\n`;
-        msg += `- Layanan: ${rep?.name || ''}\n`;
+        msg += `*Cincin Cewek:* ${metal?.name || ''} (Sz: ${tx.cewek_size}${isOrderTx ? `, Qty: ${Math.max(1, parseInt(tx.cewek_qty) || 1)} pcs` : ''})\n`;
+        if (isOrderTx) {
+            msg += `- Est. Berat: ${tx.cewek_weight || 0} gr | Finishing: ${tx.cewek_finishing || 'Polished'}\n`;
+            if (tx.cewek_stone_spec) msg += `- Permata: ${tx.cewek_stone_spec}\n`;
+            if (txDiv === 'CASTING' && tx.cewek_cad_ref) msg += `- Kode CAD: ${tx.cewek_cad_ref}\n`;
+        } else {
+            msg += `- Layanan: ${rep?.name || (String(tx.cewek_is_reproduct).toUpperCase() === 'TRUE' ? 'Produksi Ulang (Re-Product)' : '-')}\n`;
+        }
         if (tx.cewek_engraving) msg += `- Ukir Nama: "${tx.cewek_engraving}"\n`;
     }
 
@@ -3151,11 +4122,11 @@ async function triggerWhatsAppNotification(repairNum) {
 
     msg += `\n*RINCIAN BIAYA:*\n`;
     msg += `------------------------------------------------------------\n`;
-    msg += `Total Tagihan: *${formatRupiah(tx.total_price)}*\n`;
+    msg += `Total Tagihan: *${formatRupiah(totalPrice)}*\n`;
     msg += `Total DP Masuk: *${formatRupiah(dpTotal)}*\n`;
     msg += `Sisa Tagihan: *${formatRupiah(remaining)}* ${remaining <= 0 ? '(LUNAS)' : ''}\n\n`;
     msg += `Alamat Pengiriman:\n_${tx.customer_address}_\n_${tx.customer_city}_\n\n`;
-    msg += `Kakak bisa memantau status repair cincin Kakak secara berkala lewat sales kami. Terima kasih! ✨\n`;
+    msg += `Kakak bisa memantau status ${isOrderTx ? 'pembuatan cincin' : 'repair cincin'} Kakak secara berkala lewat sales kami. Terima kasih! ✨\n`;
     msg += `------------------------------------------------------------\n`;
     msg += `*SOVIA JEWELRY* - Sleman, Bantul, HQ Yogyakarta`;
 
@@ -3247,26 +4218,24 @@ async function runBackgroundSync() {
     setSyncLockDisplay('locked');
     showToast(`Memulai sinkronisasi ${queue.length} transaksi ke Sheets...`, 'info');
 
-    // Run item-by-item queue drains
-    const tx = State.db.transaction('sync_queue', 'readwrite');
-    const store = tx.objectStore('sync_queue');
-
     // We fetch cursor to process FIFO
     let processedCount = 0;
 
-    try {
-        for (const item of queue) {
-            // Push payload to GAS api
-            const success = await pushDataToGAS(item.action, item.payload);
-            if (success) {
-                // Delete from local queue store upon success
-                await deleteFromQueueByTimestamp(item.timestamp);
-                processedCount++;
-            } else {
-                // If it fails, stop execution and try again in next cycles
-                throw new Error('Gagal menyambung ke server Google');
-            }
+    const drainQueue = async (index) => {
+        if (index >= queue.length) return;
+        const item = queue[index];
+        const success = await pushDataToGAS(item.action, item.payload);
+        if (success) {
+            await deleteFromQueueByTimestamp(item.timestamp);
+            processedCount++;
+            await drainQueue(index + 1);
+        } else {
+            throw new Error('Gagal menyambung ke server Google');
         }
+    };
+
+    try {
+        await drainQueue(0);
         if (processedCount > 0) {
             showToast(`Berhasil sinkronisasi ${processedCount} data ke Google Sheets!`, 'success');
         }
@@ -3283,17 +4252,25 @@ async function runBackgroundSync() {
 
 // Dynamic POST request sender to Apps Script
 async function pushDataToGAS(action, payload) {
+    const txSyncActions = new Set([
+        'SAVE_REPAIR',
+        'UPDATE_REPAIR',
+        'UPDATE_REPAIR_STATUS',
+        'SAVE_ORDER',
+        'UPDATE_ORDER',
+        'UPDATE_ORDER_STATUS'
+    ]);
+
     if (!CONFIG.GAS_API_URL) {
         // Mock Mode - if URL is empty, simulate successful sync after delay to demonstrate offline success!
         return new Promise((resolve) => {
             setTimeout(async () => {
-                // If action is SAVE_REPAIR or UPDATE, mark transaction status as Synced in local store
-                if (action === 'SAVE_REPAIR' || action === 'UPDATE_REPAIR_STATUS') {
-                    const txs = await getLocalData('repair_transactions');
-                    const match = txs.find((t) => t.repair_number === payload.repair_number);
+                // If action is SAVE/UPDATE transaction, mark transaction status as Synced in local store
+                if (txSyncActions.has(action) && payload?.repair_number) {
+                    const match = await getTransactionByNumber(payload.repair_number);
                     if (match) {
                         match.status = 'Synced';
-                        await saveLocalData('repair_transactions', match);
+                        await saveTransactionRecord(match);
                     }
                 }
                 resolve(true);
@@ -3314,12 +4291,8 @@ async function pushDataToGAS(action, payload) {
 
         if (result && result.status === 'success') {
             // Update local transaction URLs / statuses if uploaded successfully
-            if (
-                (action === 'SAVE_REPAIR' || action === 'UPDATE_REPAIR' || action === 'UPDATE_REPAIR_STATUS') &&
-                result.data
-            ) {
-                const txs = await getLocalData('repair_transactions');
-                const match = txs.find((t) => t.repair_number === payload.repair_number);
+            if (txSyncActions.has(action) && result.data) {
+                const match = await getTransactionByNumber(payload.repair_number);
                 if (match) {
                     match.status = 'Synced';
                     if (result.data.cowok_image_url) match.cowok_image_url = result.data.cowok_image_url;
@@ -3359,6 +4332,9 @@ async function pushDataToGAS(action, payload) {
                     if (result.data.qc_checked_by) match.qc_checked_by = result.data.qc_checked_by;
                     if (result.data.qc_checked_at) match.qc_checked_at = result.data.qc_checked_at;
 
+                    if (result.data.division) match.division = result.data.division;
+                    if (result.data.order_prefix) match.order_prefix = result.data.order_prefix;
+
                     if (payload.assigned_workshop !== undefined) match.assigned_workshop = payload.assigned_workshop;
                     if (payload.production_status !== undefined) match.production_status = payload.production_status;
                     if (payload.logistic_status !== undefined) match.logistic_status = payload.logistic_status;
@@ -3367,7 +4343,7 @@ async function pushDataToGAS(action, payload) {
                     if (payload.dp2_amount !== undefined) match.dp2_amount = payload.dp2_amount;
                     if (payload.dp2_method !== undefined) match.dp2_method = payload.dp2_method;
 
-                    await saveLocalData('repair_transactions', match);
+                    await saveTransactionRecord(normalizeTransaction(match));
                 }
             }
             return true;
@@ -3633,7 +4609,7 @@ async function loadAdminTable(panelSuffix, storeName, keys) {
             if (k === 'date' && val !== '-') {
                 try {
                     val = new Date(val).toLocaleString('id-ID', { dateStyle: 'medium', timeStyle: 'short' });
-                } catch(e) {}
+                } catch {}
             }
             
             cellsHtml += `<td>${val}</td>`;
@@ -4211,15 +5187,15 @@ async function executeCRUDSubmit() {
     await refreshAllData();
 }
 
-// Delegating workshop to pengerjaan repair
+// Delegating workshop to pengerjaan repair / order produksi
 async function executeProductionAssignSubmit() {
     const repNum = document.getElementById('crud-p-repnum').value;
     const assignedWks = document.getElementById('crud-p-wks').value;
 
-    const txs = await getLocalData('repair_transactions');
-    const match = txs.find((t) => t.repair_number === repNum);
+    const match = await getTransactionByNumber(repNum);
 
     if (match) {
+        const isOrderTx = isNewOrderTransaction(match);
         match.assigned_workshop = assignedWks;
         match.production_status = 'Active'; // Automatically moves status to active pengerjaan
         match.status = 'Pending Sync';
@@ -4228,9 +5204,9 @@ async function executeProductionAssignSubmit() {
         if (isQAFailed) {
             match.qa_status = 'In Revision';
         }
-        await saveLocalData('repair_transactions', match);
+        await saveTransactionRecord(match);
 
-        await queueSyncTask('UPDATE_REPAIR_STATUS', {
+        await queueSyncTask(getTxSyncAction('UPDATE_STATUS', match), {
             repair_number: repNum,
             assigned_workshop: assignedWks,
             production_status: 'Active',
@@ -4239,18 +5215,18 @@ async function executeProductionAssignSubmit() {
         });
 
         // ----------------------------------------------------
-        // SPK PRODUKSI TERINTEGRASI (BUAT RECORD BARU JIKA REPRO / REVISI QA)
+        // SPK PRODUKSI TERINTEGRASI (BUAT RECORD BARU JIKA ORDER / REPRO / REVISI QA)
         // ----------------------------------------------------
         const processSPK = async (type) => {
+            const isActiveRing = String(match[`${type}_active`]).toUpperCase() === 'TRUE';
+            if (!isActiveRing) return;
             const isReproduct = String(match[`${type}_is_reproduct`]).toUpperCase() === 'TRUE';
-            const needsNewMetal = isReproduct || isQAFailed;
+            const needsNewMetal = isOrderTx || isReproduct || isQAFailed;
 
             if (needsNewMetal) {
                 const addGramInput = document.getElementById(`crud-p-${type}-add`);
                 if (addGramInput) {
                     const addGram = parseFloat(addGramInput.value) || 0;
-                    const oldWeight = parseFloat(match[`${type}_weight`]) || 0;
-                    const targetWeight = parseFloat(match[`${type}_target_weight`]) || 0;
                     const metalId = match[`${type}_material`] || '';
 
                     const revSuffix = isQAFailed ? `-REV${match.revision_count || 1}` : '';
@@ -4310,133 +5286,61 @@ async function executeProductionAssignSubmit() {
     }
 }
 
-// Helper: Cetak SPK Tukang Per Cincin (Tanpa Harga & Identitas Lengkap)
-function printSPKTukang(tx, type, wks, initialWeight, targetWeight) {
-    const isReproduct = String(tx[`${type}_is_reproduct`]).toUpperCase() === 'TRUE';
-    const renderImg = tx[`${type}_render_img`] || '';
-    const custName = tx.customer_name ? tx.customer_name.split(' ')[0] : 'NN';
-    const repNum = tx.repair_number;
-    
-    // Only show render if it's reproduct and image exists
-    const showRender = isReproduct && renderImg;
-
-    const htmlContent = `
-    <html>
-    <head>
-        <title>SPK Pengrajin - ${repNum} (${type.toUpperCase()})</title>
-        <style>
-            body { font-family: 'Arial', sans-serif; padding: 20px; color: #333; }
-            .header { text-align: center; border-bottom: 2px solid #000; padding-bottom: 10px; margin-bottom: 20px; }
-            .header h1 { margin: 0; font-size: 24px; text-transform: uppercase; }
-            .header p { margin: 5px 0 0 0; font-size: 14px; }
-            .content-table { width: 100%; border-collapse: collapse; margin-bottom: 20px; }
-            .content-table th, .content-table td { border: 1px solid #000; padding: 10px; text-align: left; }
-            .content-table th { background-color: #f5f5f5; width: 35%; }
-            .render-box { width: 100%; height: 400px; border: 2px dashed #999; display: flex; align-items: center; justify-content: center; margin-bottom: 20px; }
-            .render-box img { max-width: 100%; max-height: 100%; object-fit: contain; }
-            .footer { margin-top: 40px; display: flex; justify-content: space-between; text-align: center; }
-            .sign-box { width: 200px; }
-            .sign-box p { margin-bottom: 70px; font-weight: bold; }
-        </style>
-    </head>
-    <body onload="window.print(); setTimeout(() => window.close(), 1000);">
-        <div class="header">
-            <h1>SURAT PERINTAH KERJA (SPK) - WORKSHOP</h1>
-            <p><strong>No. Repair:</strong> ${repNum} | <strong>Tipe Cincin:</strong> ${type.toUpperCase()}</p>
-        </div>
-        
-        <table class="content-table">
-            <tr>
-                <th>Nama Pemesan</th>
-                <td>${custName} <em>(Identitas dienkripsi)</em></td>
-            </tr>
-            <tr>
-                <th>Workshop / Pengrajin</th>
-                <td><strong>${wks}</strong></td>
-            </tr>
-            <tr>
-                <th>Status Pekerjaan</th>
-                <td>${isReproduct ? 'PRODUKSI ULANG (REMAKE)' : 'REPAIR REGULER'}</td>
-            </tr>
-            <tr>
-                <th>Berat Logam Awal (Diserahkan)</th>
-                <td><strong>${initialWeight} Gram</strong></td>
-            </tr>
-            ${isReproduct ? `<tr>
-                <th>Target Berat Jadi (Estimasi)</th>
-                <td>${targetWeight || '-'} Gram</td>
-            </tr>` : ''}
-            <tr>
-                <th>Instruksi Tambahan (Ukir Nama)</th>
-                <td>${tx[`${type}_engraving`] || '-'}</td>
-            </tr>
-            <tr>
-                <th>Keterangan Ring Size dsb</th>
-                <td>${tx[`${type}_notes`] || '-'}</td>
-            </tr>
-        </table>
-
-        ${showRender ? `
-        <h3>Gambar Render / Referensi Model:</h3>
-        <div class="render-box">
-            <img src="${renderImg}" alt="Render Cincin ${type}">
-        </div>
-        ` : `
-        ${isReproduct ? `
-        <h3>Gambar Render / Referensi Model:</h3>
-        <div class="render-box">
-            <span style="color: #666;">(Tidak ada foto render yang diunggah)</span>
-        </div>
-        ` : ''}
-        `}
-
-        <div class="footer">
-            <div class="sign-box">
-                <p>Diserahkan Oleh,</p>
-                <hr>
-                <span>Bagian Produksi (Admin)</span>
-            </div>
-            <div class="sign-box">
-                <p>Diterima Oleh,</p>
-                <hr>
-                <span>${wks}</span>
-            </div>
-        </div>
-    </body>
-    </html>
-    `;
-
-    const printWin = window.open('', '_blank');
-    if (printWin) {
-        printWin.document.open();
-        printWin.document.write(htmlContent);
-        printWin.document.close();
-    }
-}
-
-// Logistik inputting kurir tracking numbers
+// Logistik inputting kurir tracking numbers + Automatic Packaging Inventory Deduction (BundlingRules)
 async function executeLogisticShipSubmit() {
     const repNum = document.getElementById('crud-l-repnum').value;
     const trackingNo = document.getElementById('crud-l-receipt').value.trim();
 
-    const txs = await getLocalData('repair_transactions');
-    const match = txs.find((t) => t.repair_number === repNum);
+    const match = await getTransactionByNumber(repNum);
 
     if (match && trackingNo) {
+        const wasAlreadyShipped = match.logistic_status === 'Shipped';
         match.logistic_receipt_no = trackingNo;
         match.logistic_status = 'Shipped';
-        match.status = 'Synced'; // Simulating completed delivery
-        await saveLocalData('repair_transactions', match);
+        match.status = 'Pending Sync';
+        await saveTransactionRecord(match);
 
-        await queueSyncTask('UPDATE_REPAIR_STATUS', {
+        await queueSyncTask(getTxSyncAction('UPDATE_STATUS', match), {
             repair_number: repNum,
             logistic_receipt_no: trackingNo,
             logistic_status: 'Shipped',
             status: 'Completed'
         });
 
-        showToast(`Resi kurir ${trackingNo} disimpan pada transaksi ${repNum}!`, 'success');
+        // Deduct packaging stock based on BundlingRules (Single vs Couple) on first shipment
+        if (!wasAlreadyShipped) {
+            const isCowokActive = String(match.cowok_active).toUpperCase() === 'TRUE';
+            const isCewekActive = String(match.cewek_active).toUpperCase() === 'TRUE';
+            const ringType = isCowokActive && isCewekActive ? 'Couple' : 'Single';
+            const packMultiplier = isNewOrderTransaction(match)
+                ? Math.max(parseInt(match.cowok_qty) || 1, parseInt(match.cewek_qty) || 1)
+                : 1;
+
+            const rules = (await getLocalData('master_bundlingrules')) || [];
+            const packagingList = (await getLocalData('master_packaginginventory')) || [];
+            const matchingRules = rules.filter(
+                (r) => String(r.ring_type || '').toLowerCase() === ringType.toLowerCase()
+            );
+
+            await Promise.all(
+                matchingRules.map(async (rule) => {
+                    const pkgItem = packagingList.find((p) => p.id === rule.packaging_id);
+                    const qtyDeduct = (parseInt(rule.qty) || 1) * packMultiplier;
+                    if (pkgItem && qtyDeduct > 0) {
+                        pkgItem.stock_qty = Math.max(0, (parseInt(pkgItem.stock_qty) || 0) - qtyDeduct);
+                        await saveLocalData('master_packaginginventory', pkgItem);
+                        await queueSyncTask('UPDATE_MASTER_RECORD', {
+                            store_name: 'master_packaginginventory',
+                            payload: pkgItem
+                        });
+                    }
+                })
+            );
+        }
+
+        showToast(`Resi kurir ${trackingNo} disimpan & stok kemasan dipotong sesuai paket!`, 'success');
         document.getElementById('crud-modal').classList.add('hidden');
+        runBackgroundSync();
         await refreshAllData();
     }
 }
@@ -4461,7 +5365,7 @@ async function refreshAllData() {
         await renderAdminPanels();
 
         // Update stats
-        const allTx = await getLocalData('repair_transactions');
+        const allTx = await getAllTransactions();
         document.getElementById('stat-total-repairs').textContent = allTx.length;
 
         const activeProd = allTx.filter((t) => t.production_status === 'Active').length;
@@ -4469,6 +5373,61 @@ async function refreshAllData() {
 
         const comp = allTx.filter((t) => t.production_status === 'Completed' || t.logistic_status === 'Shipped').length;
         document.getElementById('stat-completed-repairs').textContent = comp;
+
+        // Render Dynamic Repair & Order Distribution on Dashboard
+        const chartContainer = document.getElementById('dashboard-repair-types-list');
+        if (chartContainer) {
+            const counts = {};
+            let totalCount = 0;
+            const repairMaster = State.masterData.repairs || [];
+
+            allTx.forEach((tx) => {
+                const isOrderTx = isNewOrderTransaction(tx);
+                const txDiv = getTransactionDivision(tx);
+                ['cowok', 'cewek'].forEach((prefix) => {
+                    if (String(tx[`${prefix}_active`]).toUpperCase() === 'TRUE') {
+                        if (isOrderTx) {
+                            const label = txDiv === 'CASTING' ? 'Order Cincin Casting' : 'Order Cincin Handmade';
+                            const qty = Math.max(1, parseInt(tx[`${prefix}_qty`]) || 1);
+                            counts[label] = (counts[label] || 0) + qty;
+                            totalCount += qty;
+                        } else {
+                            let label = 'Repair Reguler';
+                            if (String(tx[`${prefix}_is_reproduct`]).toUpperCase() === 'TRUE') {
+                                label = 'Produksi Ulang (Re-Product)';
+                            } else {
+                                const rId = tx[`${prefix}_repair_type`];
+                                const rObj = repairMaster.find((r) => r.id === rId);
+                                label = rObj ? rObj.name : rId || 'Repair Reguler';
+                            }
+                            counts[label] = (counts[label] || 0) + 1;
+                            totalCount++;
+                        }
+                    }
+                });
+            });
+
+            if (totalCount === 0) {
+                chartContainer.innerHTML =
+                    '<div style="font-size:12.5px; color:var(--text-muted); padding:8px 0;">Belum ada data transaksi.</div>';
+            } else {
+                const sorted = Object.entries(counts).toSorted((a, b) => b[1] - a[1]);
+                chartContainer.innerHTML = sorted
+                    .map(([label, cnt]) => {
+                        const pct = Math.round((cnt / totalCount) * 100);
+                        return `
+                            <div class="progress-bar-row">
+                                <span class="bar-label">${label} (${cnt})</span>
+                                <div class="bar-track">
+                                    <div class="bar-fill" style="width: ${pct}%"></div>
+                                </div>
+                                <span class="bar-value">${pct}%</span>
+                            </div>
+                        `;
+                    })
+                    .join('');
+            }
+        }
     }
 
     // 3. Update Sync Queue logs visualizer
@@ -4485,11 +5444,6 @@ function formatSimpleDate(dateString) {
     const parts = dateString.split('-');
     if (parts.length !== 3) return dateString;
     return `${parts[2]}/${parts[1]}/${parts[0]}`;
-}
-
-function formatSimpleTime(timeString) {
-    if (!timeString) return '';
-    return timeString.substring(0, 5);
 }
 
 // Notification Toast Visualizer
@@ -4544,7 +5498,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             await pullDataFromServer();
             hideInitialLoading();
             showToast('Sistem Siap Digunakan! Data tersinkronisasi.', 'success');
-        } catch (e) {
+        } catch {
             hideInitialLoading();
             showToast('Koneksi lambat, beralih ke cache lokal.', 'warning');
         }
@@ -4560,9 +5514,31 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     }, 15000);
 
-    // --- BINDING: PORTAL HUB & LOGIN ---
-    document.getElementById('btn-enter-repair').addEventListener('click', () => {
-        showLoginScreen();
+    // --- BINDING: PORTAL HUB, DIVISION SWITCHER & LOGIN ---
+    document.getElementById('btn-enter-repair')?.addEventListener('click', () => {
+        enterDivision('repair').catch((err) => console.error('enterDivision failed:', err));
+    });
+    document.getElementById('btn-enter-handmade')?.addEventListener('click', () => {
+        enterDivision('handmade').catch((err) => console.error('enterDivision failed:', err));
+    });
+    document.getElementById('btn-enter-casting')?.addEventListener('click', () => {
+        enterDivision('casting').catch((err) => console.error('enterDivision failed:', err));
+    });
+
+    document.querySelectorAll('.division-switch-btn').forEach((btn) => {
+        btn.addEventListener('click', async () => {
+            const nextDiv = btn.dataset.division;
+            setActiveDivision(nextDiv, true);
+            if (State.currentPanel === 'sales-panel') {
+                switchPanel('sales-panel');
+            }
+            await refreshAllData();
+            showToast(`Divisi aktif beralih ke ${getDivisionMeta(nextDiv).label}.`, 'info');
+        });
+    });
+
+    document.getElementById('btn-back-to-portal')?.addEventListener('click', () => {
+        showPortalHub();
     });
 
     document.getElementById('btn-login-back').addEventListener('click', () => {
@@ -4643,6 +5619,10 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
 
     // --- BINDING: SALES FORM ACTIONS ---
+    document.getElementById('tx-division')?.addEventListener('change', (e) => {
+        applySalesFormDivisionUI(e.target.value);
+    });
+
     document.getElementById('ring-cowok-active').addEventListener('change', (e) => {
         toggleRingCardActive('cowok', e.target.checked);
         calculateFormPricing();
@@ -4656,11 +5636,19 @@ document.addEventListener('DOMContentLoaded', async () => {
     const calcSelectors = [
         'cowok-material',
         'cowok-weight',
+        'cowok-qty',
+        'cowok-stone-fee',
+        'cowok-custom-fee',
+        'cowok-casting-fee',
         'cowok-repair-type',
         'cowok-is-reproduct',
         'cowok-target-weight',
         'cewek-material',
         'cewek-weight',
+        'cewek-qty',
+        'cewek-stone-fee',
+        'cewek-custom-fee',
+        'cewek-casting-fee',
         'cewek-repair-type',
         'cewek-is-reproduct',
         'cewek-target-weight',
@@ -4677,6 +5665,21 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
 
     ['cowok', 'cewek'].forEach((type) => {
+        const matSel = document.getElementById(`${type}-material`);
+        const customFeeInp = document.getElementById(`${type}-custom-fee`);
+        if (customFeeInp) {
+            customFeeInp.addEventListener('input', () => {
+                customFeeInp.dataset.userEdited = 'true';
+            });
+        }
+        if (matSel) {
+            matSel.addEventListener('change', () => {
+                if (customFeeInp) customFeeInp.dataset.userEdited = 'false';
+                syncMetalCustomFeeDefault(type, true);
+                calculateFormPricing();
+            });
+        }
+
         const cb = document.getElementById(`${type}-is-reproduct`);
         if (cb) {
             cb.addEventListener('change', (e) => {
@@ -4760,24 +5763,25 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         if (!validateRepairForm()) return;
 
-        showToast('Memproses penyimpanan formulir repair...', 'info');
-
         const tx = await getTransactionFromForm();
+        const divMeta = getDivisionMeta(tx);
 
-        // Add to local database
-        await saveLocalData('repair_transactions', tx);
+        showToast(`Memproses penyimpanan formulir ${divMeta.shortLabel}...`, 'info');
 
-        // Put in sync queue
-        const syncAction = State.activeEditId ? 'UPDATE_REPAIR' : 'SAVE_REPAIR';
+        // Add to division-routed local database (repair_transactions or order_transactions)
+        await saveTransactionRecord(tx);
+
+        // Put in sync queue (SAVE/UPDATE_REPAIR vs SAVE/UPDATE_ORDER)
+        const syncAction = getTxSyncAction(State.activeEditId ? 'UPDATE' : 'SAVE', tx);
         await queueSyncTask(syncAction, tx);
 
-        showToast(`Repair Cincin ${tx.repair_number} berhasil disimpan di sistem lokal!`, 'success');
+        showToast(`${divMeta.shortLabel} ${tx.repair_number} berhasil disimpan di sistem lokal!`, 'success');
 
         // Reset and refresh
         resetForm();
         await refreshAllData();
 
-        // Switch to history tab to view newly saved/updated repair
+        // Switch to history tab to view newly saved/updated transaction
         switchSubTab('sales-panel', 'tab-sales-history');
 
         // Auto trigger background sync check
@@ -4786,13 +5790,31 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     // Recent History Table Filter events
     document.getElementById('history-search').addEventListener('input', () => renderRepairHistory());
+    document.getElementById('history-division-filter')?.addEventListener('change', () => renderRepairHistory());
     document.getElementById('history-status-filter').addEventListener('change', () => renderRepairHistory());
 
     // Accounting Board Filters
     const accSearch = document.getElementById('accounting-search');
     if (accSearch) accSearch.addEventListener('input', () => renderAccountingBoard());
+    const accDivFilter = document.getElementById('acc-division-filter');
+    if (accDivFilter) accDivFilter.addEventListener('change', () => renderAccountingBoard());
     const accFilter = document.getElementById('accounting-status-filter');
     if (accFilter) accFilter.addEventListener('change', () => renderAccountingBoard());
+
+    // Production Board Division Filter (synchronizes all production sub-tables)
+    const prodDivFilter = document.getElementById('prod-division-filter');
+    if (prodDivFilter) {
+        prodDivFilter.addEventListener('change', () => {
+            renderProductionBoard();
+            renderDesignerBoard();
+            renderQABoard();
+            renderQCBoard();
+        });
+    }
+
+    // Logistic Board Division Filter
+    const logDivFilter = document.getElementById('log-division-filter');
+    if (logDivFilter) logDivFilter.addEventListener('change', () => renderLogisticBoard());
 
     // Sales Sub-Tab Navigation Actions
     const btnGotoNew = document.getElementById('btn-goto-new-repair');
@@ -4962,16 +5984,10 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
 
     // --- BINDING: SALES DETAIL PROGRESS MODAL ---
-    const closeSalesDetail = () => {
-        document.getElementById('sales-detail-modal').classList.add('hidden');
-    };
     document.getElementById('btn-close-sales-detail-modal').addEventListener('click', closeSalesDetail);
     document.getElementById('btn-close-sales-detail-modal-footer').addEventListener('click', closeSalesDetail);
 
     // Lightbox close button
-    const closeLightbox = () => {
-        document.getElementById('image-lightbox-modal').classList.remove('active');
-    };
     document.getElementById('btn-close-lightbox').addEventListener('click', closeLightbox);
     document.getElementById('image-lightbox-modal').addEventListener('click', (e) => {
         if (e.target.id === 'image-lightbox-modal') {
@@ -4987,23 +6003,22 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         showToast('Menyetujui model render 3D...', 'info');
         try {
-            const txs = await getLocalData('repair_transactions');
-            const match = txs.find((t) => t.repair_number === repairNumber);
+            const match = await getTransactionByNumber(repairNumber);
             if (match) {
                 match.render_approval = 'Approved';
                 match.render_rejection_reason = '';
                 match.status = 'Pending Sync';
-                await saveLocalData('repair_transactions', match);
+                await saveTransactionRecord(match);
             }
 
-            await queueSyncTask('UPDATE_REPAIR_STATUS', {
+            await queueSyncTask(getTxSyncAction('UPDATE_STATUS', match || repairNumber), {
                 repair_number: repairNumber,
                 render_approval: 'Approved',
                 render_rejection_reason: ''
             });
             runBackgroundSync();
 
-            showToast(`Render Model 3D perbaikan ${repairNumber} disetujui!`, 'success');
+            showToast(`Render Model 3D transaksi ${repairNumber} disetujui!`, 'success');
             await showSalesDetailModal(repairNumber);
             await refreshAllData();
         } catch (err) {
@@ -5026,23 +6041,22 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         showToast('Menolak model render 3D...', 'info');
         try {
-            const txs = await getLocalData('repair_transactions');
-            const match = txs.find((t) => t.repair_number === repairNumber);
+            const match = await getTransactionByNumber(repairNumber);
             if (match) {
                 match.render_approval = 'Rejected';
                 match.render_rejection_reason = comment;
                 match.status = 'Pending Sync';
-                await saveLocalData('repair_transactions', match);
+                await saveTransactionRecord(match);
             }
 
-            await queueSyncTask('UPDATE_REPAIR_STATUS', {
+            await queueSyncTask(getTxSyncAction('UPDATE_STATUS', match || repairNumber), {
                 repair_number: repairNumber,
                 render_approval: 'Rejected',
                 render_rejection_reason: comment
             });
             runBackgroundSync();
 
-            showToast(`Render Model 3D perbaikan ${repairNumber} ditolak!`, 'warning');
+            showToast(`Render Model 3D transaksi ${repairNumber} ditolak!`, 'warning');
             await showSalesDetailModal(repairNumber);
             await refreshAllData();
         } catch (err) {
@@ -5059,18 +6073,20 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         showToast('Menyetujui realpict cincin...', 'info');
         try {
-            const txs = await getLocalData('repair_transactions');
-            const match = txs.find((t) => t.repair_number === repairNumber);
+            const match = await getTransactionByNumber(repairNumber);
             if (match) {
                 match.realpict_approval = 'Approved';
                 match.status = 'Pending Sync';
-                await saveLocalData('repair_transactions', match);
+                await saveTransactionRecord(match);
             }
 
-            await queueSyncTask('UPDATE_REPAIR_STATUS', { repair_number: repairNumber, realpict_approval: 'Approved' });
+            await queueSyncTask(getTxSyncAction('UPDATE_STATUS', match || repairNumber), {
+                repair_number: repairNumber,
+                realpict_approval: 'Approved'
+            });
             runBackgroundSync();
 
-            showToast(`Foto Realpict perbaikan ${repairNumber} disetujui!`, 'success');
+            showToast(`Foto Realpict transaksi ${repairNumber} disetujui!`, 'success');
             await showSalesDetailModal(repairNumber);
             await refreshAllData();
         } catch (err) {
@@ -5086,18 +6102,20 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         showToast('Menolak realpict cincin...', 'info');
         try {
-            const txs = await getLocalData('repair_transactions');
-            const match = txs.find((t) => t.repair_number === repairNumber);
+            const match = await getTransactionByNumber(repairNumber);
             if (match) {
                 match.realpict_approval = 'Rejected';
                 match.status = 'Pending Sync';
-                await saveLocalData('repair_transactions', match);
+                await saveTransactionRecord(match);
             }
 
-            await queueSyncTask('UPDATE_REPAIR_STATUS', { repair_number: repairNumber, realpict_approval: 'Rejected' });
+            await queueSyncTask(getTxSyncAction('UPDATE_STATUS', match || repairNumber), {
+                repair_number: repairNumber,
+                realpict_approval: 'Rejected'
+            });
             runBackgroundSync();
 
-            showToast(`Foto Realpict perbaikan ${repairNumber} ditolak!`, 'warning');
+            showToast(`Foto Realpict transaksi ${repairNumber} ditolak!`, 'warning');
             await showSalesDetailModal(repairNumber);
             await refreshAllData();
         } catch (err) {
@@ -5147,18 +6165,17 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         showToast('Mengunggah pembayaran pelunasan...', 'info');
         try {
-            const txs = await getLocalData('repair_transactions');
-            const match = txs.find((t) => t.repair_number === repairNumber);
+            const match = await getTransactionByNumber(repairNumber);
             if (match) {
                 match.dp2_method = method;
                 match.dp2_amount = amount;
                 match.dp2_receipt_url = base64Data;
                 match.pelunasan_approval = 'Pending';
                 match.status = 'Pending Sync';
-                await saveLocalData('repair_transactions', match);
+                await saveTransactionRecord(match);
             }
 
-            await queueSyncTask('UPDATE_REPAIR_STATUS', {
+            await queueSyncTask(getTxSyncAction('UPDATE_STATUS', match || repairNumber), {
                 repair_number: repairNumber,
                 dp2_method: method,
                 dp2_amount: amount,
@@ -5168,7 +6185,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             runBackgroundSync();
 
             showToast(
-                `Bukti pelunasan perbaikan ${repairNumber} berhasil diunggah! Menunggu persetujuan Keuangan.`,
+                `Bukti pelunasan transaksi ${repairNumber} berhasil diunggah! Menunggu persetujuan Keuangan.`,
                 'success'
             );
             await showSalesDetailModal(repairNumber);
@@ -5187,27 +6204,26 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         if (
             confirm(
-                `Konfirmasi bahwa perhiasan repair dengan nomor ${repairNumber} telah diserahterimakan secara sah kepada customer?`
+                `Konfirmasi bahwa perhiasan dengan nomor transaksi ${repairNumber} telah diserahterimakan secara sah kepada customer?`
             )
         ) {
             showToast('Memproses serah terima...', 'info');
             try {
-                const txs = await getLocalData('repair_transactions');
-                const match = txs.find((t) => t.repair_number === repairNumber);
+                const match = await getTransactionByNumber(repairNumber);
                 if (match) {
                     match.final_pickup_status = 'Picked Up';
                     match.status = 'Pending Sync';
-                    await saveLocalData('repair_transactions', match);
+                    await saveTransactionRecord(match);
                 }
 
-                await queueSyncTask('UPDATE_REPAIR_STATUS', {
+                await queueSyncTask(getTxSyncAction('UPDATE_STATUS', match || repairNumber), {
                     repair_number: repairNumber,
                     final_pickup_status: 'Picked Up',
                     status: 'Completed'
                 });
                 runBackgroundSync();
 
-                showToast(`Serah terima perbaikan ${repairNumber} berhasil dikonfirmasi!`, 'success');
+                showToast(`Serah terima transaksi ${repairNumber} berhasil dikonfirmasi!`, 'success');
                 await showSalesDetailModal(repairNumber);
                 await refreshAllData();
             } catch (err) {
@@ -5225,6 +6241,15 @@ document.addEventListener('DOMContentLoaded', async () => {
         showReceiptPrintModal(repairNumber, 'RECEIPT');
     });
 
+    // Branch Receipt Verification (Approve / Reject)
+    document.getElementById('btn-sd-branch-approve')?.addEventListener('click', () => {
+        handleBranchVerification('Approved');
+    });
+
+    document.getElementById('btn-sd-branch-reject')?.addEventListener('click', () => {
+        handleBranchVerification('Rejected');
+    });
+
     // Initialize lightbox events globally
     initLightboxEvents();
 
@@ -5240,59 +6265,121 @@ document.addEventListener('DOMContentLoaded', async () => {
     resetForm();
 });
 
+function closeSalesDetail() {
+    document.getElementById('sales-detail-modal').classList.add('hidden');
+}
+
+function closeLightbox() {
+    document.getElementById('image-lightbox-modal').classList.remove('active');
+}
+
+async function handleBranchVerification(statusValue) {
+    const modal = document.getElementById('sales-detail-modal');
+    const repairNumber = modal?.dataset.repairNumber;
+    if (!repairNumber) return;
+
+    const commentInput = document.getElementById('sd-branch-comment');
+    const comment = commentInput ? commentInput.value.trim() : '';
+
+    if (statusValue === 'Rejected' && !comment) {
+        showToast('Harap isi catatan kerusakan / selisih berat terlebih dahulu!', 'warning');
+        return;
+    }
+
+    try {
+        const match = await getTransactionByNumber(repairNumber);
+        if (match) {
+            match.branch_receipt_status = statusValue;
+            match.branch_receipt_comment = comment;
+            match.status = 'Pending Sync';
+            await saveTransactionRecord(match);
+        }
+
+        await queueSyncTask(getTxSyncAction('UPDATE_STATUS', match || repairNumber), {
+            repair_number: repairNumber,
+            branch_receipt_status: statusValue,
+            branch_receipt_comment: comment
+        });
+        runBackgroundSync();
+
+        showToast(
+            statusValue === 'Approved'
+                ? `Penerimaan barang cabang untuk ${repairNumber} dikonfirmasi OK!`
+                : `Laporan kendala penerimaan cabang untuk ${repairNumber} telah dicatat.`,
+            statusValue === 'Approved' ? 'success' : 'warning'
+        );
+        await showSalesDetailModal(repairNumber);
+        await refreshAllData();
+    } catch (err) {
+        console.error(err);
+        showToast('Gagal menyimpan verifikasi penerimaan cabang.', 'error');
+    }
+}
+
 // --- AUXILIARY HELPERS FOR ADVANCED FINANCIALS & LIGHTBOX ---
 
 function calculateTransactionHPP(tx) {
-    let cowokHpp = 0;
-    if (String(tx.cowok_active).toUpperCase() === 'TRUE') {
-        const metal = State.masterData.metals.find((m) => m.id === tx.cowok_material);
-        if (metal) {
-            cowokHpp =
-                (parseFloat(tx.cowok_weight) || 0) * (parseFloat(metal.price_per_gram) || 0) +
-                (parseFloat(metal.custom_fee) || 0) * 0.5;
-        }
-    }
+    const workshops = State.masterData.workshops || [];
+    const assignedWks = workshops.find(
+        (w) => w.name === tx.assigned_workshop || w.id === tx.assigned_workshop
+    );
+    const defaultWksCowok = assignedWks ? parseFloat(assignedWks.modal_repair_cowok) || 50000 : 50000;
+    const defaultWksCewek = assignedWks ? parseFloat(assignedWks.modal_repair_cewek) || 50000 : 50000;
+    const isOrderTx = isNewOrderTransaction(tx);
+    const txDiv = getTransactionDivision(tx);
 
-    let cewekHpp = 0;
-    if (String(tx.cewek_active).toUpperCase() === 'TRUE') {
-        const metal = State.masterData.metals.find((m) => m.id === tx.cewek_material);
-        if (metal) {
-            cewekHpp =
-                (parseFloat(tx.cewek_weight) || 0) * (parseFloat(metal.price_per_gram) || 0) +
-                (parseFloat(metal.custom_fee) || 0) * 0.5;
+    const calcSideHpp = (type, defaultLabor) => {
+        if (String(tx[`${type}_active`]).toUpperCase() !== 'TRUE') return 0;
+        const metal = (State.masterData.metals || []).find((m) => m.id === tx[`${type}_material`]);
+        if (isOrderTx) {
+            const weightUsed = parseFloat(tx[`${type}_weight_final`]) || parseFloat(tx[`${type}_weight`]) || 0;
+            const qty = Math.max(1, parseInt(tx[`${type}_qty`]) || 1);
+            const modalPerGram = metal
+                ? parseFloat(metal.modal_per_gram) || (parseFloat(metal.price_per_gram) || 0) * 0.85
+                : 0;
+            const metalModal = weightUsed * qty * modalPerGram;
+            const laborModal = defaultLabor * qty;
+            const stoneModal = (parseFloat(tx[`${type}_stone_fee`]) || 0) * 0.65 * qty;
+            const castingModal = txDiv === 'CASTING' ? (parseFloat(tx[`${type}_casting_fee`]) || 0) * 0.6 * qty : 0;
+            return metalModal + laborModal + stoneModal + castingModal;
         }
-    }
+        const isRepro = String(tx[`${type}_is_reproduct`]).toUpperCase() === 'TRUE';
+        if (isRepro && metal) {
+            const weightUsed =
+                parseFloat(tx[`${type}_weight_final`]) ||
+                parseFloat(tx[`${type}_target_weight`]) ||
+                parseFloat(tx[`${type}_weight`]) ||
+                0;
+            const modalPerGram =
+                parseFloat(metal.modal_per_gram) || (parseFloat(metal.price_per_gram) || 0) * 0.85;
+            return weightUsed * modalPerGram + defaultLabor;
+        }
+        const rep = (State.masterData.repairs || []).find((r) => r.id === tx[`${type}_repair_type`]);
+        return rep ? parseFloat(rep.modal_price) || (parseFloat(rep.repair_fee) || 0) * 0.4 : defaultLabor;
+    };
 
-    let cowokRepHpp = 0;
-    if (String(tx.cowok_active).toUpperCase() === 'TRUE') {
-        const rep = State.masterData.repairs.find((r) => r.id === tx.cowok_repair_type);
-        if (rep) {
-            cowokRepHpp = (parseFloat(rep.repair_fee) || 0) * 0.4;
-        }
-    }
-
-    let cewekRepHpp = 0;
-    if (String(tx.cewek_active).toUpperCase() === 'TRUE') {
-        const rep = State.masterData.repairs.find((r) => r.id === tx.cewek_repair_type);
-        if (rep) {
-            cewekRepHpp = (parseFloat(rep.repair_fee) || 0) * 0.4;
-        }
-    }
+    const cowokHpp = calcSideHpp('cowok', defaultWksCowok);
+    const cewekHpp = calcSideHpp('cewek', defaultWksCewek);
 
     let additionalHpp = 0;
     try {
         const addItems = JSON.parse(tx.additional_items_json || '[]');
         addItems.forEach((item) => {
-            const catItem = State.masterData.catalog.find((c) => c.name === item.name);
-            const category = catItem ? catItem.category : 'Barang';
-            const multiplier = category === 'Jasa' ? 0.45 : 0.6;
-            additionalHpp += (parseFloat(item.price) || 0) * (parseInt(item.qty) || 0) * multiplier;
+            const catItem = (State.masterData.catalog || []).find((c) => c.name === item.name);
+            const qty = parseInt(item.qty) || 0;
+            if (catItem && parseFloat(catItem.modal_price) > 0) {
+                additionalHpp += (parseFloat(catItem.modal_price) || 0) * qty;
+            } else {
+                const category = catItem ? catItem.category : 'Barang';
+                const multiplier = category === 'Jasa' ? 0.45 : 0.6;
+                additionalHpp += (parseFloat(item.price) || 0) * qty * multiplier;
+            }
         });
     } catch (e) {
         console.error('Error parsing additional items for HPP: ', e);
     }
 
-    return cowokHpp + cewekHpp + cowokRepHpp + cewekRepHpp + additionalHpp;
+    return cowokHpp + cewekHpp + additionalHpp;
 }
 
 function getFileBase64(file) {
@@ -5301,15 +6388,14 @@ function getFileBase64(file) {
             return resolve('');
         }
         const reader = new FileReader();
-        reader.onload = () => resolve(reader.result);
-        reader.onerror = (error) => reject(error);
+        reader.addEventListener('load', () => resolve(reader.result));
+        reader.addEventListener('error', (error) => reject(error));
         reader.readAsDataURL(file);
     });
 }
 
 async function showSalesDetailModal(repairNumber) {
-    const txs = await getLocalData('repair_transactions');
-    const tx = txs.find((t) => t.repair_number === repairNumber);
+    const tx = await getTransactionByNumber(repairNumber);
     if (!tx) {
         showToast('Transaksi tidak ditemukan!', 'error');
         return;
@@ -5317,6 +6403,25 @@ async function showSalesDetailModal(repairNumber) {
 
     const modal = document.getElementById('sales-detail-modal');
     modal.dataset.repairNumber = repairNumber;
+
+    const txDiv = getTransactionDivision(tx);
+    const divMeta = getDivisionMeta(txDiv);
+    const isOrderTx = isNewOrderTransaction(tx);
+
+    const divBadgeEl = document.getElementById('sd-division-badge');
+    if (divBadgeEl) {
+        divBadgeEl.className = `division-badge ${divMeta.badgeClass}`;
+        divBadgeEl.innerHTML = `<i class="fa-solid ${divMeta.icon}"></i> ${divMeta.shortLabel.toUpperCase()}`;
+    }
+    const modalTitleEl = document.getElementById('sd-modal-title');
+    if (modalTitleEl) {
+        modalTitleEl.innerHTML = `<i class="fa-solid fa-bars-progress"></i> Progress & Detail Pelacakan ${divMeta.shortLabel}`;
+    }
+    const stepperLabel3 = document.getElementById('stepper-label-3');
+    if (stepperLabel3) {
+        stepperLabel3.textContent =
+            txDiv === 'CASTING' ? 'Desain CAD / Wax' : txDiv === 'HANDMADE' ? 'Desain & Model' : 'Desain 3D';
+    }
 
     // Bind basic info
     document.getElementById('sd-repair-num').textContent = tx.repair_number;
@@ -5326,37 +6431,52 @@ async function showSalesDetailModal(repairNumber) {
     document.getElementById('sd-date').textContent = formatSimpleDate(tx.date);
     document.getElementById('sd-deadline').textContent = formatSimpleDate(tx.deadline);
 
-    // Bind ring cowok details
-    const cowokBlock = document.getElementById('sd-cowok-block');
-    if (String(tx.cowok_active).toUpperCase() === 'TRUE') {
-        cowokBlock.classList.remove('hidden');
-        const metal = State.masterData.metals.find((m) => m.id === tx.cowok_material);
-        const rep = State.masterData.repairs.find((r) => r.id === tx.cowok_repair_type);
-        document.getElementById('sd-cowok-mat').textContent = metal ? metal.name : tx.cowok_material;
-        document.getElementById('sd-cowok-weight').textContent = tx.cowok_weight;
-        document.getElementById('sd-cowok-size').textContent = tx.cowok_size;
-        document.getElementById('sd-cowok-type').textContent = rep ? rep.name : tx.cowok_repair_type;
-        document.getElementById('sd-cowok-engrave').textContent = tx.cowok_engraving || 'Tidak ada';
-        document.getElementById('sd-cowok-notes').textContent = tx.cowok_notes || 'Tidak ada catatan';
-    } else {
-        cowokBlock.classList.add('hidden');
-    }
+    const bindRingDetailSide = (side) => {
+        const block = document.getElementById(`sd-${side}-block`);
+        if (!block) return;
+        if (String(tx[`${side}_active`]).toUpperCase() === 'TRUE') {
+            block.classList.remove('hidden');
+            const metal = State.masterData.metals.find((m) => m.id === tx[`${side}_material`]);
+            const rep = State.masterData.repairs.find((r) => r.id === tx[`${side}_repair_type`]);
+            const isRepro = String(tx[`${side}_is_reproduct`]).toUpperCase() === 'TRUE';
 
-    // Bind ring cewek details
-    const cewekBlock = document.getElementById('sd-cewek-block');
-    if (String(tx.cewek_active).toUpperCase() === 'TRUE') {
-        cewekBlock.classList.remove('hidden');
-        const metal = State.masterData.metals.find((m) => m.id === tx.cewek_material);
-        const rep = State.masterData.repairs.find((r) => r.id === tx.cewek_repair_type);
-        document.getElementById('sd-cewek-mat').textContent = metal ? metal.name : tx.cewek_material;
-        document.getElementById('sd-cewek-weight').textContent = tx.cewek_weight;
-        document.getElementById('sd-cewek-size').textContent = tx.cewek_size;
-        document.getElementById('sd-cewek-type').textContent = rep ? rep.name : tx.cewek_repair_type;
-        document.getElementById('sd-cewek-engrave').textContent = tx.cewek_engraving || 'Tidak ada';
-        document.getElementById('sd-cewek-notes').textContent = tx.cewek_notes || 'Tidak ada catatan';
-    } else {
-        cewekBlock.classList.add('hidden');
-    }
+            document.getElementById(`sd-${side}-mat`).textContent = metal ? metal.name : tx[`${side}_material`];
+            document.getElementById(`sd-${side}-weight`).textContent = tx[`${side}_weight`] || 0;
+            document.getElementById(`sd-${side}-size`).textContent = tx[`${side}_size`] || '-';
+            document.getElementById(`sd-${side}-type`).textContent = isOrderTx
+                ? divMeta.shortLabel
+                : isRepro
+                  ? 'Produksi Ulang (Re-Product)'
+                  : rep
+                    ? rep.name
+                    : tx[`${side}_repair_type`] || '-';
+            document.getElementById(`sd-${side}-engrave`).textContent = tx[`${side}_engraving`] || 'Tidak ada';
+            document.getElementById(`sd-${side}-notes`).textContent = tx[`${side}_notes`] || 'Tidak ada catatan';
+
+            const extraEl = document.getElementById(`sd-${side}-order-extra`);
+            if (extraEl) {
+                if (isOrderTx) {
+                    const qty = Math.max(1, parseInt(tx[`${side}_qty`]) || 1);
+                    const fin = tx[`${side}_finishing`] || 'Glossy (Kilap)';
+                    const stone = tx[`${side}_stone_spec`] || 'Tanpa Permata';
+                    const cadHtml =
+                        txDiv === 'CASTING' && tx[`${side}_cad_ref`]
+                            ? ` | CAD: <strong>${tx[`${side}_cad_ref`]}</strong>`
+                            : '';
+                    extraEl.innerHTML = `Qty: <strong>${qty} pcs</strong> | Finishing: ${fin} | Permata: ${stone}${cadHtml}<br />`;
+                    extraEl.classList.remove('hidden');
+                } else {
+                    extraEl.innerHTML = '';
+                    extraEl.classList.add('hidden');
+                }
+            }
+        } else {
+            block.classList.add('hidden');
+        }
+    };
+
+    bindRingDetailSide('cowok');
+    bindRingDetailSide('cewek');
 
     // Bind financials
     const dpTotal = (parseFloat(tx.dp1_amount) || 0) + (parseFloat(tx.dp2_amount) || 0);
@@ -5532,6 +6652,49 @@ async function showSalesDetailModal(repairNumber) {
         refundPreviewArea.classList.add('hidden');
     }
 
+    // Branch Receipt Verification Area (V2)
+    const branchVerifArea = document.getElementById('sd-branch-verification-area');
+    const branchCommentInput = document.getElementById('sd-branch-comment');
+    const branchStatusDisplay = document.getElementById('sd-branch-receipt-status-display');
+    const branchStatusBadge = document.getElementById('sd-branch-status-badge');
+    const branchCommentDisplay = document.getElementById('sd-branch-comment-display');
+
+    if (branchVerifArea) {
+        const branchStatus = tx.branch_receipt_status || 'Pending';
+        const showBranchBox =
+            tx.logistic_status === 'Shipped' ||
+            tx.qc_status === 'Passed' ||
+            (branchStatus && branchStatus !== 'Pending');
+
+        if (showBranchBox) {
+            branchVerifArea.classList.remove('hidden');
+            if (branchCommentInput) {
+                branchCommentInput.value = tx.branch_receipt_comment || '';
+            }
+            if (branchStatusDisplay && branchStatusBadge) {
+                branchStatusDisplay.classList.remove('hidden');
+                if (branchStatus === 'Approved') {
+                    branchStatusBadge.textContent = 'Diterima Cabang (OK)';
+                    branchStatusBadge.className = 'badge success';
+                } else if (branchStatus === 'Rejected') {
+                    branchStatusBadge.textContent = 'Terima Bermasalah';
+                    branchStatusBadge.className = 'badge danger';
+                } else {
+                    branchStatusBadge.textContent = 'Menunggu Verifikasi Cabang';
+                    branchStatusBadge.className = 'badge warning';
+                }
+            }
+            if (branchCommentDisplay) {
+                const spanEl = branchCommentDisplay.querySelector('span');
+                if (spanEl) {
+                    spanEl.textContent = tx.branch_receipt_comment || 'Tidak ada catatan';
+                }
+            }
+        } else {
+            branchVerifArea.classList.add('hidden');
+        }
+    }
+
     // Serah Terima & Action Buttons
     const pickupStatusEl = document.getElementById('sd-pickup-status');
     const isPickedUp = tx.final_pickup_status === 'Picked Up';
@@ -5550,7 +6713,9 @@ async function showSalesDetailModal(repairNumber) {
     const isRealpictApproved = tx.realpict_url ? tx.realpict_approval === 'Approved' : true;
     const isFinancialOk =
         outstanding <= 0 &&
-        (outstanding === 0 || tx.pelunasan_approval === 'Approved' || tx.dp1_amount >= tx.total_price);
+        (outstanding === 0 ||
+            tx.pelunasan_approval === 'Approved' ||
+            (parseFloat(tx.dp1_amount) || 0) >= totalPrice);
 
     if (isDpApproved && isRenderApproved && isRealpictApproved && isFinancialOk && !isPickedUp) {
         btnPickup.removeAttribute('disabled');
@@ -5601,7 +6766,9 @@ function updateStepperProgress(tx) {
     const outstanding = totalPrice - dpTotal;
     const isPaid =
         outstanding <= 0 &&
-        (outstanding === 0 || tx.pelunasan_approval === 'Approved' || tx.dp1_amount >= tx.total_price);
+        (outstanding === 0 ||
+            tx.pelunasan_approval === 'Approved' ||
+            (parseFloat(tx.dp1_amount) || 0) >= totalPrice);
     const isPickedUp = tx.final_pickup_status === 'Picked Up';
 
     let currentStepIndex = 0; // 0-indexed
@@ -5876,20 +7043,21 @@ async function populateAttachmentDropdown() {
     const list = document.getElementById('chat-attachment-dropdown-list');
     if (!list) return;
 
-    const txs = await getLocalData('repair_transactions');
+    const txs = await getAllTransactions();
     list.innerHTML = '';
 
     if (txs.length === 0) {
-        list.innerHTML = '<div class="dropdown-item-empty">Tidak ada proyek perbaikan aktif.</div>';
+        list.innerHTML = '<div class="dropdown-item-empty">Tidak ada proyek aktif.</div>';
         return;
     }
 
     txs.forEach((tx) => {
+        const divMeta = getDivisionMeta(tx);
         const item = document.createElement('div');
         item.className = 'dropdown-item';
         item.innerHTML = `
             <strong>${tx.repair_number}</strong>
-            <span>Cust: ${tx.customer_name}</span>
+            <span>[${divMeta.shortLabel}] Cust: ${tx.customer_name}</span>
         `;
         item.addEventListener('click', () => {
             ChatState.attachedProject = tx.repair_number;
@@ -5907,7 +7075,7 @@ async function renderChatProjectsList() {
     if (!listContainer) return;
 
     const searchVal = document.getElementById('chat-project-search').value.toLowerCase();
-    const txs = await getLocalData('repair_transactions');
+    const txs = await getAllTransactions();
 
     // Sort by newest created_at
     txs.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
@@ -5916,8 +7084,11 @@ async function renderChatProjectsList() {
     let matches = 0;
 
     txs.forEach((tx) => {
+        const divMeta = getDivisionMeta(tx);
         const matchText =
-            tx.repair_number.toLowerCase().includes(searchVal) || tx.customer_name.toLowerCase().includes(searchVal);
+            tx.repair_number.toLowerCase().includes(searchVal) ||
+            tx.customer_name.toLowerCase().includes(searchVal) ||
+            divMeta.shortLabel.toLowerCase().includes(searchVal);
         if (matchText) {
             matches++;
             const item = document.createElement('div');
@@ -5925,7 +7096,7 @@ async function renderChatProjectsList() {
             item.dataset.channel = tx.repair_number;
             item.dataset.customer = tx.customer_name;
 
-            const iconClass = 'fa-solid fa-gem';
+            const iconClass = `fa-solid ${divMeta.icon}`;
 
             item.innerHTML = `
                 <div class="channel-icon">
@@ -5933,7 +7104,7 @@ async function renderChatProjectsList() {
                 </div>
                 <div class="channel-info">
                     <h4>${tx.repair_number}</h4>
-                    <p>${tx.customer_name} - sz Co: ${tx.cowok_size || '-'} / sz Ce: ${tx.cewek_size || '-'}</p>
+                    <p>[${divMeta.shortLabel}] ${tx.customer_name} - Co: ${tx.cowok_size || '-'} / Ce: ${tx.cewek_size || '-'}</p>
                 </div>
             `;
             listContainer.appendChild(item);
@@ -5982,7 +7153,7 @@ async function renderChatMessages() {
             let timeStr = '';
             try {
                 timeStr = new Date(msg.timestamp).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
-            } catch (e) {
+            } catch {
                 timeStr = msg.timestamp;
             }
 
@@ -6370,16 +7541,18 @@ document.getElementById('btn-save-melting')?.addEventListener('click', async () 
 
     // 2. Potong stok bahan mentah (master_rawmaterials)
     const rawMaterials = (await getLocalData('master_rawmaterials')) || [];
-    for (let item of inputRawJson) {
-        const rm = rawMaterials.find((r) => r.id === item.raw_id);
-        if (rm) {
-            rm.stock_gram = Math.max(0, (parseFloat(rm.stock_gram) || 0) - item.gram);
-            await saveLocalData('master_rawmaterials', rm);
-            await queueSyncTask('UPDATE_RAW_MATERIAL', rm);
-        }
-    }
+    await Promise.all(
+        inputRawJson.map(async (item) => {
+            const rm = rawMaterials.find((r) => r.id === item.raw_id);
+            if (rm) {
+                rm.stock_gram = Math.max(0, (parseFloat(rm.stock_gram) || 0) - item.gram);
+                await saveLocalData('master_rawmaterials', rm);
+                await queueSyncTask('UPDATE_RAW_MATERIAL', rm);
+            }
+        })
+    );
 
-    // 3. Tambah stok Solid/Lempeng di master_processedmetals & rekalkulasi HPP
+    // 3. Tambah stok Solid/Lempeng di master_processedmetals & rekalkulasi HPP (auto-upsert jika belum ada)
     const processed = (await getLocalData('master_processedmetals')) || [];
     let pm = processed.find((p) => p.metal_id === mId && p.type === 'Solid/Lempeng');
     if (pm) {
@@ -6390,18 +7563,22 @@ document.getElementById('btn-save-melting')?.addEventListener('click', async () 
 
         pm.stock_gram = newStock;
         pm.average_cost_per_gram = Math.round(newAvgCost);
-        await saveLocalData('master_processedmetals', pm);
-        await queueSyncTask('UPDATE_PROCESSED_METAL', pm);
+        pm.last_updated = new Date().toISOString();
+    } else {
+        pm = {
+            id: 'PRC-' + new Date().getTime(),
+            metal_id: mId,
+            type: 'Solid/Lempeng',
+            stock_gram: yieldWeight,
+            average_cost_per_gram: Math.round(costPerGram),
+            last_updated: new Date().toISOString()
+        };
     }
+    await saveLocalData('master_processedmetals', pm);
+    await queueSyncTask('UPDATE_PROCESSED_METAL', pm);
 
     // 4. Push to Sync Queue
-    const syncItem = {
-        action: 'SAVE_MELTING_JOB',
-        payload: payload,
-        timestamp: new Date().getTime()
-    };
-
-    await saveLocalData('sync_queue', syncItem);
+    await queueSyncTask('SAVE_MELTING_JOB', payload);
     document.getElementById('melting-job-modal').classList.add('hidden');
 
     showToast(`SPK Peleburan berhasil! ${yieldWeight} gr Lempeng ditambahkan ke Gudang Logam Olahan.`, 'success');
@@ -6439,12 +7616,12 @@ async function showProductionJobModal() {
     document.getElementById('btn-save-prod').disabled = true;
 
     if (repSelect) {
-        repSelect.innerHTML = '<option value="">-- Pengerjaan Umum (Tanpa Nomor Repair) --</option>';
+        repSelect.innerHTML = '<option value="">-- Pengerjaan Umum (Tanpa Nomor Transaksi) --</option>';
         if (repInfo) {
             repInfo.classList.add('hidden');
             repInfo.innerHTML = '';
         }
-        const txs = (await getLocalData('repair_transactions')) || [];
+        const txs = await getAllTransactions();
         const activeRepairs = txs.filter((t) => 
             t.production_status === 'Active' || 
             (t.qa_status && t.qa_status.includes('Failed')) || 
@@ -6455,8 +7632,9 @@ async function showProductionJobModal() {
         activeRepairs.forEach((tx) => {
             const opt = document.createElement('option');
             opt.value = tx.repair_number;
+            const divShort = getDivisionMeta(tx).shortLabel;
             const revTag = (tx.qa_status && tx.qa_status.includes('Failed')) || tx.qa_status === 'In Revision' ? ' [REVISI QA]' : '';
-            opt.textContent = `${tx.repair_number} - ${tx.customer_name} (${tx.assigned_workshop || 'Workshop Belum Ditetapkan'})${revTag}`;
+            opt.textContent = `[${divShort}] ${tx.repair_number} - ${tx.customer_name} (${tx.assigned_workshop || 'Workshop Belum Ditetapkan'})${revTag}`;
             repSelect.appendChild(opt);
         });
     }
@@ -6500,22 +7678,25 @@ document.getElementById('prod-select-repair')?.addEventListener('change', async 
         return;
     }
 
-    const txs = (await getLocalData('repair_transactions')) || [];
-    const tx = txs.find((t) => t.repair_number === repNum);
+    const tx = await getTransactionByNumber(repNum);
     if (!tx || !repInfo) return;
 
+    const isOrderTx = isNewOrderTransaction(tx);
     const isQAFailed = (tx.qa_status && tx.qa_status.includes('Failed')) || tx.qa_status === 'In Revision';
     repInfo.classList.remove('hidden');
     repInfo.innerHTML = `
         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
             <strong style="color:var(--text-primary); font-size:12.5px;"><i class="fa-solid fa-gem"></i> ${tx.repair_number} - ${tx.customer_name}</strong>
-            <span class="badge ${isQAFailed ? 'danger' : 'warning'}">${isQAFailed ? 'SPK REVISI PASCA QA' : (tx.production_status || 'Aktif')}</span>
+            <div style="display:flex; gap:6px; align-items:center;">
+                ${renderDivisionBadgeHtml(tx)}
+                <span class="badge ${isQAFailed ? 'danger' : 'warning'}">${isQAFailed ? 'SPK REVISI PASCA QA' : (tx.production_status || 'Aktif')}</span>
+            </div>
         </div>
         <div style="display:grid; grid-template-columns:1fr 1fr; gap:6px; font-size:11px; color:var(--text-secondary);">
             <div>Deadline: <strong>${formatSimpleDate(tx.deadline)}</strong></div>
             <div>Workshop Ditugaskan: <strong>${tx.assigned_workshop || '-'}</strong></div>
-            <div>Cincin Pria: <strong>${tx.cowok_material || '-'} (${tx.cowok_weight || 0}g &rarr; Target: ${tx.cowok_target_weight || '-'}g)</strong></div>
-            <div>Cincin Wanita: <strong>${tx.cewek_material || '-'} (${tx.cewek_weight || 0}g &rarr; Target: ${tx.cewek_target_weight || '-'}g)</strong></div>
+            <div>Cincin Pria: <strong>${tx.cowok_material || '-'} (${tx.cowok_weight || 0}g${isOrderTx ? ` x ${tx.cowok_qty || 1} pcs` : ` &rarr; Target: ${tx.cowok_target_weight || '-'}g`})</strong></div>
+            <div>Cincin Wanita: <strong>${tx.cewek_material || '-'} (${tx.cewek_weight || 0}g${isOrderTx ? ` x ${tx.cewek_qty || 1} pcs` : ` &rarr; Target: ${tx.cewek_target_weight || '-'}g`})</strong></div>
         </div>
         ${isQAFailed ? `<div style="margin-top:6px; color:var(--red); font-size:11px;"><i class="fa-solid fa-triangle-exclamation"></i> <strong>Catatan QA:</strong> ${tx.qa_notes || 'Cacat produksi fisik'}</div>` : ''}
     `;
@@ -6671,14 +7852,30 @@ document.getElementById('btn-save-prod')?.addEventListener('click', async () => 
         await queueSyncTask('UPDATE_PROCESSED_METAL', pmSolid);
     }
 
-    // If instant and there is scrap, add scrap to master_processedmetals (Scrap/Leburan)
+    // If instant and there is scrap, add scrap to master_processedmetals (Scrap/Leburan, auto-upsert)
     if (isInstant && scrap > 0) {
         let pmScrap = processedMetals.find((p) => p.metal_id === mId && p.type === 'Scrap/Leburan');
+        const masterMetal = (State.masterData.metals || []).find((m) => m.id === mId);
+        const defaultCost = pmSolid
+            ? parseFloat(pmSolid.average_cost_per_gram) || 0
+            : masterMetal
+              ? parseFloat(masterMetal.modal_per_gram) || 0
+              : 0;
         if (pmScrap) {
             pmScrap.stock_gram = (parseFloat(pmScrap.stock_gram) || 0) + scrap;
-            await saveLocalData('master_processedmetals', pmScrap);
-            await queueSyncTask('UPDATE_PROCESSED_METAL', pmScrap);
+            pmScrap.last_updated = new Date().toISOString();
+        } else {
+            pmScrap = {
+                id: 'PRC-S-' + new Date().getTime(),
+                metal_id: mId,
+                type: 'Scrap/Leburan',
+                stock_gram: scrap,
+                average_cost_per_gram: defaultCost,
+                last_updated: new Date().toISOString()
+            };
         }
+        await saveLocalData('master_processedmetals', pmScrap);
+        await queueSyncTask('UPDATE_PROCESSED_METAL', pmScrap);
     }
 
     const loss = isInstant ? (initial - (final + scrap + dust)) : 0;
@@ -6710,13 +7907,7 @@ document.getElementById('btn-save-prod')?.addEventListener('click', async () => 
         recorded_by: State.currentUser ? State.currentUser.username : 'system'
     };
 
-    const syncItem = {
-        action: 'SAVE_PRODUCTION_JOB',
-        payload: payload,
-        timestamp: new Date().getTime()
-    };
-
-    await saveLocalData('sync_queue', syncItem);
+    await queueSyncTask('SAVE_PRODUCTION_JOB', payload);
     await saveLocalData('master_productionjobs', payload);
     if (!State.masterData.productionjobs) State.masterData.productionjobs = [];
     State.masterData.productionjobs.push(payload);
@@ -6748,13 +7939,13 @@ document.getElementById('btn-save-prod')?.addEventListener('click', async () => 
 // 14. PRODUCTION COMPLETE CONTROLLER
 // ==========================================================================
 async function showProductionCompleteModal(repairNum) {
-    const txs = await getLocalData('repair_transactions');
-    const tx = txs.find((t) => t.repair_number === repairNum);
+    const tx = await getTransactionByNumber(repairNum);
     if (!tx) return;
 
+    const isOrderTx = isNewOrderTransaction(tx);
     document.getElementById('prod-complete-id').value = repairNum;
 
-    // We need to fetch the SPKs created for this repair (strictly active WIP iteration!)
+    // We need to fetch the SPKs created for this repair/order (strictly active WIP iteration!)
     let totalInitial = 0;
     let hasRepro = false;
 
@@ -6767,8 +7958,11 @@ async function showProductionCompleteModal(repairNum) {
     }
 
     if (!hasRepro) {
-        // If no SPK exists, it means it's just a normal repair, just complete it directly
-        if (confirm(`Repair biasa (tanpa peleburan ulang). Tandai selesai produksi untuk ${repairNum}?`)) {
+        // If no SPK exists, complete directly
+        const promptMsg = isOrderTx
+            ? `Order ${repairNum} belum memiliki SPK material WIP gudang. Tandai selesai produksi langsung?`
+            : `Repair biasa (tanpa peleburan ulang). Tandai selesai produksi untuk ${repairNum}?`;
+        if (confirm(promptMsg)) {
             executeProductionCompleteSubmit(repairNum, 0, 0, 0, 0, false);
         }
         return;
@@ -6791,17 +7985,15 @@ async function showProductionCompleteModal(repairNum) {
     document.getElementById('prod-scrap-direct-group')?.classList.remove('hidden');
     document.getElementById('prod-scrap-collective-note')?.classList.add('hidden');
 
-    if (String(tx.cowok_is_reproduct).toUpperCase() === 'TRUE') {
-        cowokGroup.classList.remove('hidden');
-    } else {
-        cowokGroup.classList.add('hidden');
-    }
+    const showCowokWeight =
+        String(tx.cowok_active).toUpperCase() === 'TRUE' &&
+        (isOrderTx || String(tx.cowok_is_reproduct).toUpperCase() === 'TRUE');
+    const showCewekWeight =
+        String(tx.cewek_active).toUpperCase() === 'TRUE' &&
+        (isOrderTx || String(tx.cewek_is_reproduct).toUpperCase() === 'TRUE');
 
-    if (String(tx.cewek_is_reproduct).toUpperCase() === 'TRUE') {
-        cewekGroup.classList.remove('hidden');
-    } else {
-        cewekGroup.classList.add('hidden');
-    }
+    cowokGroup.classList.toggle('hidden', !showCowokWeight);
+    cewekGroup.classList.toggle('hidden', !showCewekWeight);
 
     document.getElementById('prod-complete-loss-breakdown').classList.add('hidden');
     document.getElementById('btn-save-prod-complete').disabled = true;
@@ -6941,8 +8133,7 @@ document.getElementById('btn-save-prod-complete')?.addEventListener('click', asy
 });
 
 async function executeProductionCompleteSubmit(repNum, cowokW, cewekW, scrap, dust, penaltyApplied) {
-    const txs = await getLocalData('repair_transactions');
-    const match = txs.find((t) => t.repair_number === repNum);
+    const match = await getTransactionByNumber(repNum);
     if (!match) return;
 
     match.production_status = 'Completed';
@@ -6951,10 +8142,10 @@ async function executeProductionCompleteSubmit(repNum, cowokW, cewekW, scrap, du
     if (cowokW > 0) match.cowok_weight_final = cowokW;
     if (cewekW > 0) match.cewek_weight_final = cewekW;
 
-    await saveLocalData('repair_transactions', match);
+    await saveTransactionRecord(match);
 
-    // Update Repair Status
-    await queueSyncTask('UPDATE_REPAIR_STATUS', {
+    // Update Transaction Status
+    await queueSyncTask(getTxSyncAction('UPDATE_STATUS', match), {
         repair_number: repNum,
         production_status: 'Completed',
         qa_status: 'Pending',
@@ -6962,21 +8153,40 @@ async function executeProductionCompleteSubmit(repNum, cowokW, cewekW, scrap, du
         cewek_weight_final: cewekW > 0 ? cewekW : ''
     });
 
-    // Update specific ProductionJobs related to this repair
+    // Update specific ProductionJobs related to this transaction
+    let activeProdJobs = [];
     if (State.masterData.productionjobs) {
         const jobs = State.masterData.productionjobs.filter((j) => j.repair_number === repNum && j.status === 'WIP');
+        activeProdJobs = jobs;
         let totalInitial = jobs.reduce((sum, j) => sum + (parseFloat(j.initial_gram) || 0), 0);
 
-        // If direct scrap > 0, credit back to master_processedmetals (Scrap/Leburan)
+        // If direct scrap > 0, credit back to master_processedmetals (Scrap/Leburan, auto-upsert)
         if (scrap > 0 && jobs.length > 0) {
             const processed = (await getLocalData('master_processedmetals')) || [];
             const mId = jobs[0].metal_id;
             let pmScrap = processed.find((p) => p.metal_id === mId && p.type === 'Scrap/Leburan');
+            const pmSolid = processed.find((p) => p.metal_id === mId && p.type === 'Solid/Lempeng');
+            const masterMetal = (State.masterData.metals || []).find((m) => m.id === mId);
+            const defaultCost = pmSolid
+                ? parseFloat(pmSolid.average_cost_per_gram) || 0
+                : masterMetal
+                  ? parseFloat(masterMetal.modal_per_gram) || 0
+                  : 0;
             if (pmScrap) {
                 pmScrap.stock_gram = (parseFloat(pmScrap.stock_gram) || 0) + scrap;
-                await saveLocalData('master_processedmetals', pmScrap);
-                await queueSyncTask('UPDATE_PROCESSED_METAL', pmScrap);
+                pmScrap.last_updated = new Date().toISOString();
+            } else {
+                pmScrap = {
+                    id: 'PRC-S-' + new Date().getTime(),
+                    metal_id: mId,
+                    type: 'Scrap/Leburan',
+                    stock_gram: scrap,
+                    average_cost_per_gram: defaultCost,
+                    last_updated: new Date().toISOString()
+                };
             }
+            await saveLocalData('master_processedmetals', pmScrap);
+            await queueSyncTask('UPDATE_PROCESSED_METAL', pmScrap);
         }
 
         for (let j of jobs) {
@@ -6999,11 +8209,14 @@ async function executeProductionCompleteSubmit(repNum, cowokW, cewekW, scrap, du
             j.loss_percentage = jLossPct;
             j.status = penaltyApplied ? 'PENALTY' : 'CLEARED';
             j.penalty_applied = penaltyApplied;
-
-            await saveLocalData('master_productionjobs', j);
-            await queueSyncTask('UPDATE_PRODUCTION_JOB', j);
         }
     }
+    await Promise.all(
+        activeProdJobs.map(async (j) => {
+            await saveLocalData('master_productionjobs', j);
+            await queueSyncTask('UPDATE_PRODUCTION_JOB', j);
+        })
+    );
 
     if (penaltyApplied) {
         showToast(`SPK Produksi ${repNum} selesai dengan Penalti Susut! Diteruskan ke QA.`, 'warning');
@@ -7026,9 +8239,15 @@ async function printCollectiveSuratJalan(type) {
     const todayStr = new Date().toLocaleDateString('id-ID');
     
     if (type === 'logistic') {
-        const txs = await getLocalData('repair_transactions');
+        const txs = await getAllTransactions();
         title = 'SURAT JALAN KOLEKTIF - PENGIRIMAN LOGISTIK';
-        filteredTxs = txs.filter(t => String(t.logistic_ready).toUpperCase() === 'TRUE' && String(t.logistic_shipped).toUpperCase() !== 'TRUE');
+        filteredTxs = txs.filter(
+            (t) =>
+                t.qc_status === 'Passed' ||
+                t.realpict_approval === 'Approved' ||
+                t.logistic_status === 'Gudang HQ' ||
+                t.logistic_status === 'Shipped'
+        );
         if (filteredTxs.length === 0) {
             showToast('Tidak ada data aktif untuk dicetak', 'warning');
             return;
@@ -7036,30 +8255,33 @@ async function printCollectiveSuratJalan(type) {
         tableHeadersHtml = `
             <tr>
                 <th style="width: 5%">No</th>
-                <th style="width: 18%">No. Repair</th>
-                <th style="width: 22%">Nama Pelanggan</th>
-                <th style="width: 20%">Kurir / Ekspedisi</th>
+                <th style="width: 20%">No. Transaksi</th>
+                <th style="width: 20%">Nama Pelanggan</th>
+                <th style="width: 20%">Resi / Status Paket</th>
                 <th style="width: 25%">Alamat Tujuan</th>
                 <th style="width: 10%; text-align: center;">Ceklis</th>
             </tr>
         `;
         filteredTxs.forEach((tx, idx) => {
             const custName = tx.customer_name ? tx.customer_name.split(' ')[0] : 'NN';
+            const divTag = getDivisionMeta(tx).shortLabel;
             tableRows += `
                 <tr>
                     <td style="text-align: center;">${idx + 1}</td>
-                    <td><strong>${tx.repair_number}</strong></td>
+                    <td><strong>${tx.repair_number}</strong><br><small>[${divTag}]</small></td>
                     <td>${custName} (Dienkripsi)</td>
-                    <td>${tx.logistic_courier || '-'}</td>
-                    <td>${tx.logistic_address || '-'}</td>
+                    <td>${tx.logistic_receipt_no || tx.logistic_status || 'Gudang HQ'}</td>
+                    <td>${tx.customer_address || '-'}${tx.customer_city ? ', ' + tx.customer_city : ''}</td>
                     <td style="text-align: center;">[ &nbsp; ]</td>
                 </tr>
             `;
         });
     } else if (type === 'workshop') {
-        const txs = await getLocalData('repair_transactions');
+        const txs = await getAllTransactions();
         title = 'SURAT JALAN KOLEKTIF - DELEGASI WORKSHOP';
-        filteredTxs = txs.filter(t => (t.cowok_wks && String(t.production_status) !== 'Completed') || (t.cewek_wks && String(t.production_status) !== 'Completed'));
+        filteredTxs = txs.filter(
+            (t) => t.assigned_workshop && String(t.production_status) !== 'Completed'
+        );
         if (filteredTxs.length === 0) {
             showToast('Tidak ada data aktif untuk dicetak', 'warning');
             return;
@@ -7067,22 +8289,38 @@ async function printCollectiveSuratJalan(type) {
         tableHeadersHtml = `
             <tr>
                 <th style="width: 5%">No</th>
-                <th style="width: 18%">No. Repair</th>
-                <th style="width: 22%">Nama Pelanggan</th>
+                <th style="width: 20%">No. Transaksi</th>
+                <th style="width: 20%">Nama Pelanggan</th>
                 <th style="width: 20%">Tujuan Workshop</th>
                 <th style="width: 25%">Rincian Cincin</th>
                 <th style="width: 10%; text-align: center;">Ceklis</th>
             </tr>
         `;
+        const metals = State.masterData.metals || [];
         filteredTxs.forEach((tx, idx) => {
             const custName = tx.customer_name ? tx.customer_name.split(' ')[0] : 'NN';
+            const divTag = getDivisionMeta(tx).shortLabel;
+            const isOrderTx = isNewOrderTransaction(tx);
+            const cowokMetal = metals.find((m) => m.id === tx.cowok_material);
+            const cewekMetal = metals.find((m) => m.id === tx.cewek_material);
+            const specs = [];
+            if (String(tx.cowok_active).toUpperCase() === 'TRUE') {
+                specs.push(
+                    `Co: ${cowokMetal ? cowokMetal.name : tx.cowok_material} (${tx.cowok_weight || 0}g${isOrderTx ? ` x ${tx.cowok_qty || 1}pcs` : ''})`
+                );
+            }
+            if (String(tx.cewek_active).toUpperCase() === 'TRUE') {
+                specs.push(
+                    `Ce: ${cewekMetal ? cewekMetal.name : tx.cewek_material} (${tx.cewek_weight || 0}g${isOrderTx ? ` x ${tx.cewek_qty || 1}pcs` : ''})`
+                );
+            }
             tableRows += `
                 <tr>
                     <td style="text-align: center;">${idx + 1}</td>
-                    <td><strong>${tx.repair_number}</strong></td>
+                    <td><strong>${tx.repair_number}</strong><br><small>[${divTag}]</small></td>
                     <td>${custName} (Dienkripsi)</td>
-                    <td>${(tx.cowok_wks || '') + ' ' + (tx.cewek_wks || '')}</td>
-                    <td>${tx.cowok_material || tx.cewek_material || 'Tunggu Produksi'}</td>
+                    <td>${tx.assigned_workshop || '-'}</td>
+                    <td>${specs.join(' | ') || 'Tunggu Produksi'}</td>
                     <td style="text-align: center;">[ &nbsp; ]</td>
                 </tr>
             `;
@@ -7205,7 +8443,7 @@ async function printMeltingJobSingle(jobId) {
     let inputRaw = [];
     try {
         inputRaw = typeof job.input_raw_json === 'string' ? JSON.parse(job.input_raw_json) : (job.input_raw_json || []);
-    } catch (e) {
+    } catch {
         inputRaw = [];
     }
 
@@ -7459,6 +8697,9 @@ async function executeProcurementSubmit() {
     await refreshAllData();
     runBackgroundSync();
 }
+window.printIndividualLogistic = printIndividualLogistic;
+window.showProcurementModal = showProcurementModal;
+window.executeProcurementSubmit = executeProcurementSubmit;
 
 // ==========================================================================
 // 15. COLLECTIVE RESIDUE CONTROLLER
@@ -7567,15 +8808,32 @@ document.getElementById('btn-save-collective')?.addEventListener('click', async 
     if (!State.masterData.collective_residues) State.masterData.collective_residues = [];
     State.masterData.collective_residues.push(payload);
 
-    // 2. Tambah stok Scrap/Leburan di master_processedmetals HANYA untuk scrap padat bersih
+    // 2. Tambah stok Scrap/Leburan di master_processedmetals HANYA untuk scrap padat bersih (auto-upsert)
     if (scrap > 0) {
         const processed = (await getLocalData('master_processedmetals')) || [];
         let pm = processed.find((p) => p.metal_id === metalId && p.type === 'Scrap/Leburan');
+        const pmSolid = processed.find((p) => p.metal_id === metalId && p.type === 'Solid/Lempeng');
+        const masterMetal = (State.masterData.metals || []).find((m) => m.id === metalId);
+        const defaultCost = pmSolid
+            ? parseFloat(pmSolid.average_cost_per_gram) || 0
+            : masterMetal
+              ? parseFloat(masterMetal.modal_per_gram) || 0
+              : 0;
         if (pm) {
             pm.stock_gram = (parseFloat(pm.stock_gram) || 0) + scrap;
-            await saveLocalData('master_processedmetals', pm);
-            await queueSyncTask('UPDATE_PROCESSED_METAL', pm);
+            pm.last_updated = new Date().toISOString();
+        } else {
+            pm = {
+                id: 'PRC-S-' + new Date().getTime(),
+                metal_id: metalId,
+                type: 'Scrap/Leburan',
+                stock_gram: scrap,
+                average_cost_per_gram: defaultCost,
+                last_updated: new Date().toISOString()
+            };
         }
+        await saveLocalData('master_processedmetals', pm);
+        await queueSyncTask('UPDATE_PROCESSED_METAL', pm);
     }
 
     // 3. Queue sync task
@@ -7641,7 +8899,7 @@ async function showRefiningJobModal(resId = '') {
             try {
                 const existing = JSON.parse(target.refined_yield_json);
                 existing.forEach((item) => addRefiningYieldRow(item.raw_id, item.gram));
-            } catch (e) {
+            } catch {
                 addRefiningYieldRow();
             }
         } else {
@@ -7779,14 +9037,16 @@ document.getElementById('btn-save-refining')?.addEventListener('click', async ()
 
     // 1. Tambah stok pada masing-masing logam murni di master_rawmaterials
     const rawMaterials = (await getLocalData('master_rawmaterials')) || [];
-    for (let item of yieldList) {
-        const rm = rawMaterials.find((r) => r.id === item.raw_id);
-        if (rm) {
-            rm.stock_gram = (parseFloat(rm.stock_gram) || 0) + item.gram;
-            await saveLocalData('master_rawmaterials', rm);
-            await queueSyncTask('UPDATE_RAW_MATERIAL', rm);
-        }
-    }
+    await Promise.all(
+        yieldList.map(async (item) => {
+            const rm = rawMaterials.find((r) => r.id === item.raw_id);
+            if (rm) {
+                rm.stock_gram = (parseFloat(rm.stock_gram) || 0) + item.gram;
+                await saveLocalData('master_rawmaterials', rm);
+                await queueSyncTask('UPDATE_RAW_MATERIAL', rm);
+            }
+        })
+    );
 
     // 2. Update record di master_collective_residues
     const slagWaste = Math.max(0, grossDust - totalRecovered);
@@ -7843,7 +9103,7 @@ async function renderRefiningJobsTable() {
             try {
                 const yieldArr = JSON.parse(r.refined_yield_json);
                 recoveredHtml = yieldArr.map((y) => `<span class="badge" style="font-size: 11px; margin-right: 4px; background: rgba(197, 168, 92, 0.15); color: var(--gold);">${y.metal_name}: ${y.gram.toFixed(2)}g</span>`).join('');
-            } catch (e) {
+            } catch {
                 recoveredHtml = `${(parseFloat(r.total_recovered_gram) || 0).toFixed(2)} gr`;
             }
         }
@@ -7988,7 +9248,7 @@ async function renderCraftsmanReconciliationTable() {
         return;
     }
 
-    keys.sort().forEach((k) => {
+    keys.toSorted().forEach((k) => {
         const rowData = ledger[k];
         const metalLabel = metalNameMap[rowData.metal_id] || rowData.metal_id;
         // Total credit Model A: Cincin Jadi + Scrap Bersih + Logam Murni Hasil Pemurnian
